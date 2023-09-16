@@ -6,15 +6,15 @@ rustup update
 rustup toolchain install nightly
 rustup component add miri --toolchain nightly
 
-pushd automata
+cd automata
 export QUICKCHECK_TESTS=10000
 . ../ci-local.sh
-popd
+cd ..
 
-pushd macros
+cd macros
 export QUICKCHECK_TESTS=1000000
 . ../ci-local.sh
-popd
+cd ..
 
 export QUICKCHECK_TESTS=1000000
 . ./ci-local.sh
