@@ -9,11 +9,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Nondeterministic finite automata with epsilon transitions.
-#[repr(transparent)]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
+    /// Initial set of states.
+    pub(crate) initial: BTreeSet<usize>,
 }
 
 /// Transitions from one state to arbitrarily many others, possibly without even consuming input.
@@ -48,9 +49,9 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
 impl<I: Clone + Ord> Graph<I> {
     /// Check if there are any states (empty would be illegal, but hey, why crash your program).
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        self.states.is_empty()
+        self.states.is_empty() || self.initial.is_empty()
     }
 
     /// Get the state at a given index.
@@ -85,7 +86,7 @@ impl<I: Clone + Ord> Graph<I> {
         if self.is_empty() {
             return false;
         }
-        let mut state = core::iter::once(0).collect();
+        let mut state = self.initial.clone();
         for input in iter {
             state = self
                 .take_all_epsilon_transitions(state)
@@ -105,7 +106,9 @@ impl<I: Clone + Ord> Graph<I> {
 
 impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
     #[inline]
+    #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "Initial states: {:?}", self.initial)?;
         for (i, state) in self.states.iter().enumerate() {
             write!(f, "State {i} {state}")?;
         }
@@ -162,15 +165,20 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let mut states = quickcheck::Arbitrary::arbitrary(g);
         cut_nonsense(&mut states);
-        Self { states }
+        let mut initial = BTreeSet::arbitrary(g);
+        initial.retain(|i| i < &states.len());
+        Self { states, initial }
     }
 
     #[inline]
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new(self.states.shrink().map(|mut states| {
-            cut_nonsense(&mut states);
-            Self { states }
-        }))
+        Box::new((self.states.clone(), self.initial.clone()).shrink().map(
+            |(mut states, mut initial)| {
+                cut_nonsense(&mut states);
+                initial.retain(|i| i < &states.len());
+                Self { states, initial }
+            },
+        ))
     }
 }
 

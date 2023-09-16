@@ -9,11 +9,12 @@
 use std::collections::BTreeMap;
 
 /// Deterministic finite automata.
-#[repr(transparent)]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
+    /// Initial set of states.
+    pub(crate) initial: usize,
 }
 
 /// State transitions from one state to no more than one other.
@@ -40,7 +41,7 @@ impl<I: Clone + Ord> Graph<I> {
         if self.states.is_empty() {
             return false;
         }
-        let mut state = 0;
+        let mut state = self.initial;
         for input in iter {
             match unwrap!(self.get(state)).transition(&input) {
                 Some(&next_state) => state = next_state,
@@ -72,6 +73,7 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
 impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "Initial state: {}", self.initial)?;
         for (i, state) in self.states.iter().enumerate() {
             write!(f, "State {i} {state}")?;
         }

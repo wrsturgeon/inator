@@ -20,23 +20,26 @@ impl<I: Clone + Ord> From<Nfa<I>> for Dfa<I> {
     fn from(value: Nfa<I>) -> Self {
         // Check if we have any states at all
         if value.is_empty() {
-            return Dfa { states: vec![] };
+            return Dfa {
+                states: vec![],
+                initial: usize::MAX,
+            };
         }
 
         // Map which _subsets_ of states transition to which _subsets_ of states
         let mut subset_states = BTreeMap::new();
-        let initial_state = traverse(&value, core::iter::once(0).collect(), &mut subset_states);
+        let initial_state = traverse(&value, value.initial.clone(), &mut subset_states);
 
         // Fix an ordering on those subsets so each can be a DFA state
         let mut ordered: Vec<_> = subset_states.keys().collect();
+        ordered.sort_unstable();
 
-        // TODO: sort `ordered`, use `binary_search` below, and add an `initial` member to DFAs & NFAs
-
-        // Move the initial state to the first index
+        // Check that binary_search works
+        #[cfg(test)]
         {
-            let initial_state_index =
-                unwrap!(ordered.iter().position(|&tree| tree == &initial_state));
-            ordered.swap(0, initial_state_index);
+            for (i, subset) in ordered.iter().enumerate() {
+                assert_eq!(ordered.binary_search(subset), Ok(i));
+            }
         }
 
         // Construct the vector of subset-mapped states
@@ -47,7 +50,7 @@ impl<I: Clone + Ord> From<Nfa<I>> for Dfa<I> {
                 crate::dfa::State {
                     transitions: tree
                         .iter()
-                        .map(|(k, v)| (k.clone(), unwrap!(ordered.iter().position(|&t| t == v))))
+                        .map(|(k, v)| (k.clone(), unwrap!(ordered.binary_search(&v))))
                         .collect::<BTreeMap<I, usize>>(),
                     accepting,
                 }
@@ -55,7 +58,10 @@ impl<I: Clone + Ord> From<Nfa<I>> for Dfa<I> {
             .collect();
 
         // Wrap it in a DFA
-        Dfa { states }
+        Dfa {
+            states,
+            initial: unwrap!(ordered.binary_search(&&initial_state)),
+        }
     }
 }
 

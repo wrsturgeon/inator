@@ -69,6 +69,7 @@ mod prop_reduced {
                     non_epsilon: core::iter::once((0, BTreeSet::new())).collect(),
                     accepting: true,
                 }],
+                initial: core::iter::once(0).collect(),
             },
             vec![vec![]],
         );
@@ -90,6 +91,7 @@ mod prop_reduced {
                         accepting: true,
                     },
                 ],
+                initial: core::iter::once(0).collect(),
             },
             vec![vec![]],
         );
@@ -104,6 +106,7 @@ mod prop_reduced {
                     non_epsilon: core::iter::once((255, BTreeSet::new())).collect(),
                     accepting: true,
                 }],
+                initial: core::iter::once(0).collect(),
             },
             vec![vec![255]],
         );
@@ -126,8 +129,31 @@ mod prop_reduced {
                         accepting: true,
                     },
                 ],
+                initial: core::iter::once(0).collect(),
             },
             vec![vec![255]],
+        );
+    }
+
+    #[test]
+    fn nfa_dfa_equal_5() {
+        nfa_dfa_equal(
+            &Nfa {
+                states: vec![
+                    nfa::State {
+                        epsilon: BTreeSet::new(),
+                        non_epsilon: BTreeMap::new(),
+                        accepting: false,
+                    },
+                    nfa::State {
+                        epsilon: BTreeSet::new(),
+                        non_epsilon: BTreeMap::new(),
+                        accepting: true,
+                    },
+                ],
+                initial: core::iter::once(1).collect(),
+            },
+            vec![vec![]],
         );
     }
 }
