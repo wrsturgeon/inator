@@ -3,6 +3,14 @@
 version = 3
 
 [[package]]
+name = "inator"
+version = "0.1.0"
+dependencies = [
+ "inator-automata",
+ "inator-macros",
+]
+
+[[package]]
 name = "inator-automata"
 version = "0.1.0"
 
@@ -35,9 +43,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.35"
+version = "2.0.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59bf04c28bee9043ed9ea1e41afc0552288d3aba9c6efdd78903b802926f4879"
+checksum = "88ec6cdb6a4c16306eccf52ccd8d492e4ab64705a15a5016acb205251001bf72"
 dependencies = [
  "proc-macro2",
  "quote",

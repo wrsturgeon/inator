@@ -1,7 +1,11 @@
 [package]
 name = "inator-automata"
+authors = ["Will Sturgeon <willstrgn@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
+description = "Nondeterministic finite automata with epsilon transitions and algorithms to compile them into optimal deterministic finite automata."
+license = "MPL-2.0"
+repository = "github.com/wrsturgeon/inator"
 
 [dependencies]
 # none
