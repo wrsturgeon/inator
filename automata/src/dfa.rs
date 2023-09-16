@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 
 /// Deterministic finite automata.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
@@ -18,7 +18,7 @@ pub struct Graph<I: Clone + Ord> {
 }
 
 /// State transitions from one state to no more than one other.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that require consuming and matching input.
     pub(crate) transitions: BTreeMap<I, usize>,
@@ -43,12 +43,36 @@ impl<I: Clone + Ord> Graph<I> {
         }
         let mut state = self.initial;
         for input in iter {
-            match unwrap!(self.get(state)).transition(&input) {
+            match get!(self.states, state).transition(&input) {
                 Some(&next_state) => state = next_state,
                 None => return false,
             }
         }
-        unwrap!(self.get(state)).is_accepting()
+        get!(self.states, state).is_accepting()
+    }
+
+    /// DFA with zero states.
+    #[must_use]
+    #[inline(always)]
+    pub const fn invalid() -> Self {
+        Self {
+            states: vec![],
+            initial: usize::MAX,
+        }
+    }
+
+    /// Check if there are any states (empty would be illegal, but hey, why crash your program).
+    #[must_use]
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+
+    /// Number of states.
+    #[must_use]
+    #[inline(always)]
+    pub fn size(&self) -> usize {
+        self.states.len()
     }
 }
 

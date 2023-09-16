@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Nondeterministic finite automata with epsilon transitions.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
@@ -18,7 +18,7 @@ pub struct Graph<I: Clone + Ord> {
 }
 
 /// Transitions from one state to arbitrarily many others, possibly without even consuming input.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that doesn't require consuming input.
     pub(crate) epsilon: BTreeSet<usize>,
@@ -69,7 +69,7 @@ impl<I: Clone + Ord> Graph<I> {
         // Take all epsilon transitions immediately
         let mut superposition = BTreeSet::<usize>::new();
         while let Some(state) = queue.pop_first() {
-            for next in unwrap!(self.get(state)).epsilon_transitions() {
+            for next in get!(self.states, state).epsilon_transitions() {
                 if !superposition.contains(next) {
                     let _ = queue.insert(*next);
                 }
@@ -92,7 +92,7 @@ impl<I: Clone + Ord> Graph<I> {
                 .take_all_epsilon_transitions(state)
                 .into_iter()
                 .flat_map(|index| {
-                    unwrap!(self.get(index))
+                    get!(self.states, index)
                         .transition(&input)
                         .map_or(BTreeSet::new(), Clone::clone)
                 })
@@ -100,7 +100,14 @@ impl<I: Clone + Ord> Graph<I> {
         }
         self.take_all_epsilon_transitions(state)
             .into_iter()
-            .any(|index| unwrap!(self.get(index)).is_accepting())
+            .any(|index| get!(self.states, index).is_accepting())
+    }
+
+    /// Number of states.
+    #[must_use]
+    #[inline(always)]
+    pub fn size(&self) -> usize {
+        self.states.len()
     }
 }
 

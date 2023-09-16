@@ -20,10 +20,7 @@ impl<I: Clone + Ord> From<Nfa<I>> for Dfa<I> {
     fn from(value: Nfa<I>) -> Self {
         // Check if we have any states at all
         if value.is_empty() {
-            return Dfa {
-                states: vec![],
-                initial: usize::MAX,
-            };
+            return Dfa::invalid();
         }
 
         // Map which _subsets_ of states transition to which _subsets_ of states
@@ -46,9 +43,9 @@ impl<I: Clone + Ord> From<Nfa<I>> for Dfa<I> {
         let states = ordered
             .iter()
             .map(|subset| {
-                let &(ref tree, accepting) = unwrap!(subset_states.get(subset));
+                let &(ref set, accepting) = get!(subset_states, subset);
                 crate::dfa::State {
-                    transitions: tree
+                    transitions: set
                         .iter()
                         .map(|(k, v)| (k.clone(), unwrap!(ordered.binary_search(&v))))
                         .collect::<BTreeMap<I, usize>>(),
@@ -83,7 +80,7 @@ fn traverse<I: Clone + Ord>(
     };
 
     // Get all _states_ from indices
-    let states = superposition.iter().map(|&i| unwrap!(nfa.get(i)));
+    let states = superposition.iter().map(|&i| get!(nfa.states, i));
 
     // For now, so we can't get stuck in a cycle, cache an empty map:
     let _ = entry.insert((
@@ -109,7 +106,7 @@ fn traverse<I: Clone + Ord>(
     // think about how to make this iterative instead
 
     // Insert the new values!
-    unwrap!(subset_states.get_mut(&superposition)).0 = next_superposition;
+    get_mut!(subset_states, &superposition).0 = next_superposition;
 
     superposition
 }

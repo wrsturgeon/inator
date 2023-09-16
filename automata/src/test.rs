@@ -27,6 +27,18 @@ mod prop {
             )
         }
 
+        fn dfa_nfa_equal(dfa: Dfa<u8>, input: Vec<Vec<u8>>) -> quickcheck::TestResult {
+            if input.is_empty() {
+                return quickcheck::TestResult::discard();
+            }
+            let nfa = Nfa::from(dfa.clone());
+            quickcheck::TestResult::from_bool(
+                input
+                    .into_iter()
+                    .all(|v| dfa.accept(v.iter().copied()) == nfa.accept(v)),
+            )
+        }
+
         fn nfa_dfa_one_and_a_half_roundtrip(nfa: Nfa<u8>) -> bool {
             let dfa = Dfa::from(nfa);
             Dfa::from(Nfa::from(dfa.clone())) == dfa
@@ -35,6 +47,27 @@ mod prop {
         fn dfa_nfa_double_roundtrip(dfa: Dfa<u8>) -> bool {
             let once = Dfa::from(Nfa::from(dfa));
             Dfa::from(Nfa::from(once.clone())) == once
+        }
+
+        fn brzozowski(nfa: Nfa<u8>, input: Vec<Vec<u8>>) -> quickcheck::TestResult {
+            if input.is_empty() {
+                return quickcheck::TestResult::discard();
+            }
+            let dfa = nfa.clone().minimize();
+            quickcheck::TestResult::from_bool(
+                input
+                    .into_iter()
+                    .all(|v| nfa.accept(v.iter().copied()) == dfa.accept(v)),
+            )
+        }
+
+        fn brzozowski_reduces_size(nfa: Nfa<u8>) -> quickcheck::TestResult {
+            let nfa_size = nfa.size();
+            match nfa.minimize().size().cmp(&nfa_size) {
+                core::cmp::Ordering::Greater => quickcheck::TestResult::failed(),
+                core::cmp::Ordering::Equal => quickcheck::TestResult::discard(),
+                core::cmp::Ordering::Less => quickcheck::TestResult::passed(),
+            }
         }
     }
 }
@@ -46,7 +79,36 @@ mod prop_reduced {
         println!("NFA:");
         println!("{nfa}");
         let dfa = Dfa::from(nfa.clone());
-        println!(); // <-- FIXME: remove when the powerset construction algorithm stops printing
+        println!("DFA:");
+        println!("{dfa}");
+        for string in input {
+            let nfa_accepted = nfa.accept(string.iter().copied());
+            let dfa_accepted = dfa.accept(string.iter().copied());
+            assert_eq!(
+                nfa_accepted,
+                dfa_accepted,
+                "On input {string:?}, the NFA {} but the DFA {}",
+                if nfa_accepted {
+                    "accepted"
+                } else {
+                    "did not accept"
+                },
+                if dfa_accepted {
+                    "accepted"
+                } else {
+                    "did not accept"
+                },
+            );
+        }
+    }
+
+    fn brzozowski(nfa: &Nfa<u8>, input: Vec<Vec<u8>>) {
+        if input.is_empty() {
+            return;
+        }
+        println!("NFA:");
+        println!("{nfa}");
+        let dfa = nfa.clone().minimize();
         println!("DFA:");
         println!("{dfa}");
         for string in input {
@@ -162,6 +224,47 @@ mod prop_reduced {
                     },
                 ],
                 initial: core::iter::once(1).collect(),
+            },
+            vec![vec![]],
+        );
+    }
+
+    #[test]
+    fn brzozowski_1() {
+        brzozowski(
+            &Nfa {
+                states: vec![],
+                initial: BTreeSet::new(),
+            },
+            vec![vec![]],
+        );
+    }
+
+    #[test]
+    fn brzozowski_2() {
+        brzozowski(
+            &Nfa {
+                states: vec![nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: false,
+                }],
+                initial: core::iter::once(0).collect(),
+            },
+            vec![vec![]],
+        );
+    }
+
+    #[test]
+    fn brzozowski_3() {
+        brzozowski(
+            &Nfa {
+                states: vec![nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: core::iter::once((0, core::iter::once(0).collect())).collect(),
+                    accepting: false,
+                }],
+                initial: BTreeSet::new(),
             },
             vec![vec![]],
         );
