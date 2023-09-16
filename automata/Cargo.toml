@@ -1,0 +1,13 @@
+[package]
+name = "inator-automata"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# none
+
+# Optional dependencies:
+quickcheck = { version = "1.0.3", optional = true }
+
+[features]
+quickcheck = ["dep:quickcheck"]
