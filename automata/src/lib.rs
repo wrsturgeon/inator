@@ -102,6 +102,7 @@ macro_rules! unwrap {
     };
 }
 
+mod brzozowski;
 mod dfa;
 mod nfa;
 mod powerset_construction;

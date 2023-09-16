@@ -26,6 +26,16 @@ mod prop {
                     .all(|v| nfa.accept(v.iter().copied()) == dfa.accept(v)),
             )
         }
+
+        fn nfa_dfa_one_and_a_half_roundtrip(nfa: Nfa<u8>) -> bool {
+            let dfa = Dfa::from(nfa);
+            Dfa::from(Nfa::from(dfa.clone())) == dfa
+        }
+
+        fn dfa_nfa_double_roundtrip(dfa: Dfa<u8>) -> bool {
+            let once = Dfa::from(Nfa::from(dfa));
+            Dfa::from(Nfa::from(once.clone())) == once
+        }
     }
 }
 

@@ -109,3 +109,63 @@ impl<I: Clone + Ord> State<I> {
         self.accepting
     }
 }
+
+#[cfg(feature = "quickcheck")]
+impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
+    #[inline]
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let mut states = quickcheck::Arbitrary::arbitrary(g);
+        cut_nonsense(&mut states);
+        let size = states.len();
+        Self {
+            states,
+            initial: usize::arbitrary(g).checked_rem(size).unwrap_or(0),
+        }
+    }
+
+    #[inline]
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            (self.states.clone(), self.initial)
+                .shrink()
+                .map(|(mut states, initial)| {
+                    cut_nonsense(&mut states);
+                    let size = states.len();
+                    Self {
+                        states,
+                        initial: initial.checked_rem(size).unwrap_or(0),
+                    }
+                }),
+        )
+    }
+}
+
+#[cfg(feature = "quickcheck")]
+impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
+    #[inline]
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            transitions: quickcheck::Arbitrary::arbitrary(g),
+            accepting: quickcheck::Arbitrary::arbitrary(g),
+        }
+    }
+
+    #[inline]
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new((self.transitions.clone(), self.accepting).shrink().map(
+            |(transitions, accepting)| Self {
+                transitions,
+                accepting,
+            },
+        ))
+    }
+}
+
+/// Remove impossible transitions from automatically generated automata.
+#[cfg(feature = "quickcheck")]
+fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
+    let size = v.len();
+    for state in v {
+        state.transitions.retain(|_, index| *index < size);
+    }
+}
