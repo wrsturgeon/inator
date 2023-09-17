@@ -91,10 +91,8 @@
 extern crate proc_macro;
 
 mod builtins;
-mod expr;
 
-use expr::Expression;
-use inator_automata::Nfa;
+use inator_automata::{Expression, Nfa};
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{__private::ToTokens, spanned::Spanned, Token};
 
@@ -173,31 +171,7 @@ fn process_fn_source(source: TokenStream) -> syn::Result<TokenStream> {
 #[inline]
 fn compile(mut f: syn::ItemFn, in_t: syn::Type, out_t: syn::Type) -> syn::Result<TokenStream> {
     let id = f.sig.ident.to_string();
-    let (init_fn, mut module_contents) = process_fn_body(&f.block)?
-        .minimize()
-        .as_source(&f, in_t, out_t);
-    f.block.stmts.insert(
-        0, /* ouch */
-        syn::Stmt::Item(syn::Item::Use(syn::ItemUse {
-            attrs: vec![],
-            vis: syn::Visibility::Inherited,
-            use_token: Token!(use)(Span::call_site()),
-            leading_colon: None,
-            tree: syn::UseTree::Path(syn::UsePath {
-                ident: Ident::new("inator", Span::call_site()),
-                colon2_token: Token!(::)(Span::call_site()),
-                tree: Box::new(syn::UseTree::Path(syn::UsePath {
-                    ident: Ident::new("mirage", Span::call_site()),
-                    colon2_token: Token!(::)(Span::call_site()),
-                    tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
-                        star_token: Token!(*)(Span::call_site()),
-                    })),
-                })),
-            }),
-            semi_token: Token!(;)(Span::call_site()),
-        })),
-    );
-    module_contents.push(syn::Item::Use(syn::ItemUse {
+    let mut module_contents = vec![syn::Item::Use(syn::ItemUse {
         attrs: vec![],
         vis: syn::Visibility::Inherited,
         use_token: Token!(use)(Span::call_site()),
@@ -228,9 +202,34 @@ fn compile(mut f: syn::ItemFn, in_t: syn::Type, out_t: syn::Type) -> syn::Result
             .collect(),
         }),
         semi_token: Token!(;)(Span::call_site()),
-    }));
+    })];
+    let (init_fn, state_fns) = process_fn_body(&f.block)?
+        .minimize()
+        .as_source(&f, in_t, out_t);
+    f.block.stmts.insert(
+        0, /* ouch */
+        syn::Stmt::Item(syn::Item::Use(syn::ItemUse {
+            attrs: vec![],
+            vis: syn::Visibility::Inherited,
+            use_token: Token!(use)(Span::call_site()),
+            leading_colon: None,
+            tree: syn::UseTree::Path(syn::UsePath {
+                ident: Ident::new("inator", Span::call_site()),
+                colon2_token: Token!(::)(Span::call_site()),
+                tree: Box::new(syn::UseTree::Path(syn::UsePath {
+                    ident: Ident::new("mirage", Span::call_site()),
+                    colon2_token: Token!(::)(Span::call_site()),
+                    tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
+                        star_token: Token!(*)(Span::call_site()),
+                    })),
+                })),
+            }),
+            semi_token: Token!(;)(Span::call_site()),
+        })),
+    );
     // Copy the original so that IDEs don't think the body has been deleted:
     module_contents.push(syn::Item::Fn(f));
+    module_contents.extend(state_fns);
     let mut ts = init_fn.into_token_stream();
     #[allow(clippy::arithmetic_side_effects)]
     syn::ItemMod {
@@ -311,27 +310,26 @@ fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<(syn::Type, syn::Type
             };
             let mut p: syn::punctuated::Punctuated<_, _> =
                 core::iter::once(syn::GenericArgument::Type(in_t.clone())).collect();
-            let syn::ReturnType::Type(_, ref out_t) = args.output else {
-                return Err(syn::Error::new(
-                    args.span(),
-                    "Expected an output type specified with either \
-                    `Parse(I) -> O` or `Parse<I, Output = O>`",
-                ));
+            let out_t = match args.output {
+                syn::ReturnType::Type(_, ref out_t) => syn::Type::clone(out_t),
+                syn::ReturnType::Default => syn::Type::Tuple(syn::TypeTuple {
+                    paren_token: syn::token::Paren::default(),
+                    elems: syn::punctuated::Punctuated::new(),
+                }),
             };
             p.push(syn::GenericArgument::AssocType(syn::AssocType {
                 ident: Ident::new("Output", Span::call_site()),
                 generics: None,
                 eq_token: Token!(=)(Span::call_site()),
-                ty: syn::Type::clone(out_t),
+                ty: syn::Type::clone(&out_t),
             }));
-            let out_t_copied = syn::Type::clone(out_t);
             *arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
                 colon2_token: None,
                 lt_token: Token!(<)(Span::call_site()),
                 args: p,
                 gt_token: Token!(>)(Span::call_site()),
             });
-            (in_t, out_t_copied)
+            (in_t, out_t)
         }
         syn::PathArguments::AngleBracketed(_) => {
             todo!()
@@ -406,19 +404,28 @@ fn process_expression(expr: &syn::Expr) -> syn::Result<Nfa<Expression>> {
             ));
         }
         // TODO: Why the fuck doesn't `syn::Pat` implement `syn::Parse`?
-        process_non_macro(&syn::parse2(mac.tokens.clone())?)
+        process_non_macro(&syn::parse2(mac.tokens.clone())?, false)
     } else {
-        process_non_macro(expr)
+        process_non_macro(expr, true)
     }
 }
 
 #[inline]
 #[allow(unused_variables)] // <-- FIXME
-fn process_non_macro(expr: &syn::Expr) -> syn::Result<Nfa<Expression>> {
+fn process_non_macro(expr: &syn::Expr, outside_p: bool) -> syn::Result<Nfa<Expression>> {
     Ok(match *expr {
         syn::Expr::Binary(ref bin) => match bin.op {
             syn::BinOp::BitOr(_) => {
                 process_expression(&bin.left)? | process_expression(&bin.right)?
+            }
+            syn::BinOp::BitAnd(_) if outside_p => {
+                process_expression(&bin.left)? & process_expression(&bin.right)?
+            }
+            syn::BinOp::Shl(_) if outside_p => {
+                process_expression(&bin.left)? << process_expression(&bin.right)?
+            }
+            syn::BinOp::Shr(_) if outside_p => {
+                process_expression(&bin.left)? >> process_expression(&bin.right)?
             }
             op => {
                 return Err(syn::Error::new(

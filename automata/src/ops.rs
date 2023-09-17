@@ -29,7 +29,6 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
 impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
     type Output = Nfa<I>;
     #[inline]
-    #[allow(clippy::todo)] // FIXME
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
     fn bitor(mut self, mut rhs: Self) -> Self::Output {
         if rhs.is_empty() {
@@ -46,5 +45,35 @@ impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
                 .map(|x| x.checked_add(index).expect("Huge number of states")),
         );
         self
+    }
+}
+
+impl<I: Clone + Ord> core::ops::BitAnd for Nfa<I> {
+    type Output = Nfa<I>;
+    #[inline]
+    #[allow(clippy::todo)] // FIXME
+    #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
+    fn bitand(self, _rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> core::ops::Shl for Nfa<I> {
+    type Output = Nfa<I>;
+    #[inline]
+    #[allow(clippy::todo)] // FIXME
+    #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
+    fn shl(self, _rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
+    type Output = Nfa<I>;
+    #[inline]
+    #[allow(clippy::todo)] // FIXME
+    #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
+    fn shr(self, _rhs: Self) -> Self::Output {
+        todo!()
     }
 }

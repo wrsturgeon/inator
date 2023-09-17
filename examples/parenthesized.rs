@@ -1,12 +1,15 @@
 use inator::prelude::*;
 
 #[inator]
+fn just_star() -> impl Parse(char) {
+    p!('*')
+}
+
+#[inator]
 fn parenthesized<O>(inside: impl Parse(char) -> O) -> impl Parse(char) -> O {
-    // p!('(') >> inside << p!(')')
-    p!('A' | 'B') // binary (bitor)
-                  // p!(_) // infer
+    p!('(') >> inside << p!(')')
 }
 
 fn main() {
-    parenthesized().parse("(*)");
+    parenthesized().parse("(*)").unwrap();
 }

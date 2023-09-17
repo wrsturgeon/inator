@@ -8,30 +8,45 @@
 
 #![allow(clippy::needless_pass_by_value, unused_variables)]
 
-/// Empty parser to represent unprocessed macros in source code for IDEs.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Parser;
+use core::marker::PhantomData;
 
-impl<I> crate::traits::Parse<I> for Parser {
-    type Output = core::convert::Infallible;
+/// Empty parser to represent unprocessed macros in source code for IDEs.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Parser<O>(PhantomData<O>);
+
+impl<O> Parser<O> {
+    #[must_use]
+    #[inline(always)]
+    #[allow(missing_docs)]
+    pub const fn new() -> Self {
+        Self(PhantomData)
+    }
 }
 
-impl core::ops::BitOr for Parser {
-    type Output = Parser;
+impl<I, O> crate::traits::Parse<I> for Parser<O> {
+    type Output = O;
+}
+
+impl<O> core::ops::BitOr for Parser<O> {
+    type Output = Parser<O>;
+    #[allow(clippy::missing_inline_in_public_items, clippy::panic)]
     fn bitor(self, rhs: Self) -> Self::Output {
         panic!("The `p!(...)` macro from `inator` only work in functions marked `#[inator]`");
     }
 }
 
-impl core::ops::Shl for Parser {
-    type Output = Parser;
+impl<O> core::ops::Shl for Parser<O> {
+    type Output = Parser<O>;
+    #[allow(clippy::missing_inline_in_public_items, clippy::panic)]
     fn shl(self, rhs: Self) -> Self::Output {
         panic!("The `p!(...)` macro from `inator` only work in functions marked `#[inator]`");
     }
 }
 
-impl core::ops::Shr for Parser {
-    type Output = Parser;
+impl<O> core::ops::Shr for Parser<O> {
+    type Output = Parser<O>;
+    #[allow(clippy::missing_inline_in_public_items, clippy::panic)]
     fn shr(self, rhs: Self) -> Self::Output {
         panic!("The `p!(...)` macro from `inator` only work in functions marked `#[inator]`");
     }
@@ -46,7 +61,7 @@ macro_rules! p {
         // compile_error!(
         //     "The `p!(...)` macro from `inator` only work in functions marked `#[inator]`"
         // )
-        Parser
+        Parser::new()
     };
 }
 
