@@ -103,8 +103,9 @@ impl<I: Clone + Ord> Graph<I> {
 
     /// Decide whether an input belongs to the regular langage this NFA accepts.
     #[inline]
+    #[cfg(test)]
     #[allow(clippy::missing_panics_doc)]
-    pub fn accept<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
+    pub(crate) fn accept<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
         if self.is_empty() {
             return false;
         }
@@ -122,7 +123,7 @@ impl<I: Clone + Ord> Graph<I> {
         }
         self.take_all_epsilon_transitions(state)
             .into_iter()
-            .any(|index| get!(self.states, index).is_accepting())
+            .any(|index| get!(self.states, index).accepting)
     }
 
     /// Number of states.
@@ -152,7 +153,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
         writeln!(
             f,
             "({}accepting):",
-            if self.is_accepting() { "" } else { "NOT " }
+            if self.accepting { "" } else { "NOT " }
         )?;
         writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         for (input, transitions) in &self.non_epsilon {
@@ -179,12 +180,6 @@ impl<I: Clone + Ord> State<I> {
     #[inline]
     pub fn transition(&self, input: &I) -> Option<&BTreeSet<usize>> {
         self.non_epsilon.get(input)
-    }
-
-    /// Whether an input that ends in this state ought to be accepted.
-    #[inline(always)]
-    pub const fn is_accepting(&self) -> bool {
-        self.accepting
     }
 }
 

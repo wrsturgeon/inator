@@ -50,7 +50,7 @@ impl<I: Clone + Ord> Graph<I> {
                 None => return false,
             }
         }
-        get!(self.states, state).is_accepting()
+        get!(self.states, state).accepting
     }
 
     /// DFA with zero states.
@@ -81,6 +81,8 @@ impl<I: Clone + Ord> Graph<I> {
 impl Graph<crate::expr::Expression> {
     /// Print as a set of Rust source-code functions.
     #[inline]
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn as_source(
         &self,
         f: &syn::ItemFn,
@@ -111,7 +113,7 @@ impl Graph<crate::expr::Expression> {
                                             ident: Ident::new("Item", Span::call_site()),
                                             generics: None,
                                             eq_token: Token!(=)(Span::call_site()),
-                                            ty: in_t.clone(),
+                                            ty: in_t,
                                         },
                                     ))
                                     .collect(),
@@ -265,7 +267,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
         writeln!(
             f,
             "({}accepting):",
-            if self.is_accepting() { "" } else { "NOT " }
+            if self.accepting { "" } else { "NOT " }
         )?;
         for (input, transitions) in &self.transitions {
             writeln!(f, "    {input} --> {transitions}")?;
@@ -280,17 +282,12 @@ impl<I: Clone + Ord> State<I> {
     pub fn transition(&self, input: &I) -> Option<&usize> {
         self.transitions.get(input)
     }
-
-    /// Whether an input that ends in this state ought to be accepted.
-    #[inline(always)]
-    pub const fn is_accepting(&self) -> bool {
-        self.accepting
-    }
 }
 
 impl State<crate::expr::Expression> {
     /// Print as a Rust source-code function.
     #[inline]
+    #[allow(clippy::too_many_lines)]
     pub fn as_source(&self, index: usize, generics: syn::Generics, out_t: syn::Type) -> syn::Item {
         syn::Item::Fn(syn::ItemFn {
             attrs: vec![syn::Attribute {

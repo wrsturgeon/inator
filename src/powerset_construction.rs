@@ -14,18 +14,18 @@ use crate::{Dfa, Nfa};
 /// Type for transitions from _subsets_ of states to _subsets_ of states.
 type SubsetStates<I> = BTreeMap<BTreeSet<usize>, (BTreeMap<I, BTreeSet<usize>>, bool)>;
 
-#[allow(clippy::fallible_impl_from)]
-impl<I: Clone + Ord> From<Nfa<I>> for Dfa<I> {
+impl<I: Clone + Ord> Nfa<I> {
+    /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
-    fn from(value: Nfa<I>) -> Self {
+    pub(crate) fn subsets(self) -> Dfa<I> {
         // Check if we have any states at all
-        if value.is_empty() {
+        if self.is_empty() {
             return Dfa::invalid();
         }
 
         // Map which _subsets_ of states transition to which _subsets_ of states
         let mut subset_states = BTreeMap::new();
-        let initial_state = traverse(&value, value.initial.clone(), &mut subset_states);
+        let initial_state = traverse(&self, self.initial.clone(), &mut subset_states);
 
         // Fix an ordering on those subsets so each can be a DFA state
         let mut ordered: Vec<_> = subset_states.keys().collect();
@@ -83,10 +83,7 @@ fn traverse<I: Clone + Ord>(
     let states = superposition.iter().map(|&i| get!(nfa.states, i));
 
     // For now, so we can't get stuck in a cycle, cache an empty map:
-    let _ = entry.insert((
-        BTreeMap::new(),
-        states.clone().any(crate::nfa::State::is_accepting),
-    ));
+    let _ = entry.insert((BTreeMap::new(), states.clone().any(|state| state.accepting)));
 
     // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
     let mut next_superposition = BTreeMap::<I, BTreeSet<usize>>::new();

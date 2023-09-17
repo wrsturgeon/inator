@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! Declarative parsers via nondeterminstic finite automata.
+//! Nondeterministic finite automata with epsilon transitions and algorithms to compile them into optimal deterministic finite automata.
 
 #![deny(warnings)]
 #![allow(unknown_lints)]
@@ -59,6 +59,7 @@
 )]
 #![allow(
     clippy::blanket_clippy_restriction_lints,
+    clippy::cargo_common_metadata,
     clippy::expect_used,
     clippy::implicit_return,
     clippy::inline_always,
@@ -84,16 +85,69 @@
     clippy::use_self,
     clippy::wildcard_imports
 )]
-#![allow(unused_crate_dependencies)] // <-- FIXME: remove
 
-/// Common utilities imported for each `#[inator]` function.
-pub mod prelude {
-    use super::*;
-
-    pub use {inator_macros::*, traits::*};
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(any(debug_assertions, test))]
+macro_rules! unwrap {
+    ($expr:expr) => {
+        $expr.unwrap()
+    };
 }
 
-pub mod mirage;
-mod traits;
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! unwrap {
+    ($expr:expr) => {
+        unsafe { $expr.unwrap_unchecked() }
+    };
+}
 
-// TODO: SEPARATE `base` modules for `u8` & `char` with identical names! Best of both worlds <3
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(any(debug_assertions, test))]
+macro_rules! get {
+    ($expr:expr, $index:expr) => {
+        $expr.get($index).unwrap()
+    };
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! get {
+    ($expr:expr, $index:expr) => {
+        unsafe { $expr.get_unchecked($index) }
+    };
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(any(debug_assertions, test))]
+macro_rules! get_mut {
+    ($expr:expr, $index:expr) => {
+        $expr.get_mut($index).unwrap()
+    };
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! get_mut {
+    ($expr:expr, $index:expr) => {
+        unsafe { $expr.get_unchecked_mut($index) }
+    };
+}
+
+mod brzozowski;
+mod dfa;
+mod expr;
+mod nfa;
+mod ops;
+mod powerset_construction;
+
+#[cfg(test)]
+mod test;
+
+pub use {dfa::Graph as Dfa, expr::Expression, nfa::Graph as Nfa};
+
+/// Match exactly this argument as a character in an input stream.
+#[inline(always)]
+pub fn c<I: Clone + Ord>(input: I) -> Nfa<I> {
+    Nfa::unit(input)
+}

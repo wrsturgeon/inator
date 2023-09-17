@@ -1,15 +1,29 @@
-use inator::prelude::*;
-
-#[inator]
-fn just_star() -> impl Parse(char) {
-    p!('*')
-}
-
-#[inator]
-fn parenthesized<O>(inside: impl Parse(char) -> O) -> impl Parse(char) -> O {
-    p!('(') >> inside << p!(')')
-}
+use inator::*;
 
 fn main() {
-    parenthesized().parse("(*)").unwrap();
+    let abc = c('A') | c('B') | c('C');
+    println!("abc:");
+    println!("{abc}");
+
+    let left_paren = c('(');
+    println!("left_paren:");
+    println!("{left_paren}");
+
+    let right_paren = c(')');
+    println!("right_paren:");
+    println!("{right_paren}");
+
+    let left_paren_abc = c('(') >> abc;
+    println!("left_paren_abc:");
+    println!("{left_paren_abc}");
+
+    let abc_in_parentheses = left_paren_abc << c(')');
+    println!("abc_in_parentheses:");
+    println!("{abc_in_parentheses}");
+
+    let compiled = abc_in_parentheses.compile();
+    println!("compiled:");
+    println!("{compiled}");
+
+    assert!(compiled.accept("(A)".chars()));
 }

@@ -19,7 +19,7 @@ mod prop {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let dfa = Dfa::from(nfa.clone());
+            let dfa = nfa.clone().subsets();
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -40,20 +40,20 @@ mod prop {
         }
 
         fn nfa_dfa_one_and_a_half_roundtrip(nfa: Nfa<u8>) -> bool {
-            let dfa = Dfa::from(nfa);
-            Dfa::from(Nfa::from(dfa.clone())) == dfa
+            let dfa = nfa.subsets();
+            Nfa::from(dfa.clone()).subsets() == dfa
         }
 
         fn dfa_nfa_double_roundtrip(dfa: Dfa<u8>) -> bool {
-            let once = Dfa::from(Nfa::from(dfa));
-            Dfa::from(Nfa::from(once.clone())) == once
+            let once = Nfa::from(dfa).subsets();
+            Nfa::from(once.clone()).subsets() == once
         }
 
         fn brzozowski(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let dfa = nfa.clone().minimize();
+            let dfa = nfa.clone().compile();
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -63,7 +63,7 @@ mod prop {
 
         fn brzozowski_reduces_size(nfa: Nfa<u8>) -> quickcheck::TestResult {
             let nfa_size = nfa.size();
-            match nfa.minimize().size().cmp(&nfa_size) {
+            match nfa.compile().size().cmp(&nfa_size) {
                 core::cmp::Ordering::Greater => quickcheck::TestResult::failed(),
                 core::cmp::Ordering::Equal => quickcheck::TestResult::discard(),
                 core::cmp::Ordering::Less => quickcheck::TestResult::passed(),
@@ -89,6 +89,17 @@ mod prop {
                     == (lhs.accept(input.iter().copied()) || rhs.accept(input))
             }))
         }
+
+        fn bitand(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<(Vec<u8>, Vec<u8>)>) -> quickcheck::TestResult {
+            if inputs.is_empty() {
+                return quickcheck::TestResult::discard();
+            }
+            let fused = lhs.clone() & rhs.clone();
+            quickcheck::TestResult::from_bool(inputs.into_iter().all(|(input_l, input_r)| {
+                fused.accept(input_l.iter().chain(&input_r).copied())
+                    == (lhs.accept(input_l.iter().copied()) && rhs.accept(input_r))
+            }))
+        }
     }
 }
 
@@ -98,7 +109,7 @@ mod prop_reduced {
     fn nfa_dfa_equal(nfa: &Nfa<u8>, input: &Vec<u8>) {
         println!("NFA:");
         println!("{nfa}");
-        let dfa = Dfa::from(nfa.clone());
+        let dfa = nfa.clone().subsets();
         println!("DFA:");
         println!("{dfa}");
         let nfa_accepted = nfa.accept(input.iter().copied());
@@ -123,7 +134,7 @@ mod prop_reduced {
     fn brzozowski(nfa: &Nfa<u8>, input: &Vec<u8>) {
         println!("NFA:");
         println!("{nfa}");
-        let dfa = nfa.clone().minimize();
+        let dfa = nfa.clone().compile();
         println!("DFA:");
         println!("{dfa}");
         let nfa_accepted = nfa.accept(input.iter().copied());
@@ -160,6 +171,40 @@ mod prop_reduced {
             fused_accepted,
             lhs_accepted || rhs_accepted,
             "On input {input:?}, the LHS {} and the RHS {} but the fused NFA {}",
+            if lhs_accepted {
+                "accepted"
+            } else {
+                "did not accept"
+            },
+            if rhs_accepted {
+                "accepted"
+            } else {
+                "did not accept"
+            },
+            if fused_accepted {
+                "accepted"
+            } else {
+                "did not accept"
+            },
+        );
+    }
+
+    fn bitand(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input_l: &Vec<u8>, input_r: &Vec<u8>) {
+        println!("LHS:");
+        println!("{lhs}");
+        println!("RHS:");
+        println!("{rhs}");
+        let fused = lhs.clone() & rhs.clone();
+        println!("Fused:");
+        println!("{fused}");
+        let lhs_accepted = lhs.accept(input_l.iter().copied());
+        let rhs_accepted = rhs.accept(input_r.iter().copied());
+        let fused_accepted = fused.accept(input_l.iter().chain(input_r).copied());
+        assert_eq!(
+            fused_accepted,
+            lhs_accepted && rhs_accepted,
+            "On inputs {input_l:?} and {input_r:?}, \
+            the LHS {} and the RHS {} but the fused NFA {}",
             if lhs_accepted {
                 "accepted"
             } else {
@@ -374,6 +419,26 @@ mod prop_reduced {
                 initial: core::iter::once(0).collect(),
             },
             &vec![72],
+        );
+    }
+
+    #[test]
+    fn bitand_1() {
+        bitand(
+            &Nfa {
+                states: vec![nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: true,
+                }],
+                initial: core::iter::once(0).collect(),
+            },
+            &Nfa {
+                states: vec![],
+                initial: BTreeSet::new(),
+            },
+            &vec![],
+            &vec![],
         );
     }
 }

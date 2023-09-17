@@ -6,13 +6,14 @@ edition = "2021"
 description = "Fast declarative zero-copy parsers via nondeterministic finite automata."
 license = "MPL-2.0"
 repository = "github.com/wrsturgeon/inator"
-readme = "README.md"
-keywords = ["parsing", "parser", "no_std"]
-categories = ["parsing", "no-std", "no-std::no-alloc", "encoding", "compilers"]
 build = "build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-inator-macros = { path = "macros" }
-inator-automata = { path = "automata" }
+proc-macro2 = "1.0.67"
+syn = { version = "2.0.34", features = ["full"] }
+
+# Optional dependencies:
+quickcheck = { version = "1.0.3", optional = true }
+
+[features]
+quickcheck = ["dep:quickcheck"]

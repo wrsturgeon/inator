@@ -9,6 +9,7 @@
 use proc_macro2::Span;
 
 /// Any possible expression to be matched against.
+#[non_exhaustive]
 #[allow(dead_code)] // <-- FIXME
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Expression {
@@ -31,6 +32,7 @@ pub enum Expression {
 impl Expression {
     /// Convert to a `syn::Pat`.
     #[inline]
+    #[must_use]
     pub fn as_pattern(&self) -> syn::Pat {
         match *self {
             Self::Bool(b) => syn::Pat::Lit(syn::ExprLit {
@@ -48,17 +50,21 @@ impl Expression {
             Self::Int(ref i) => syn::Pat::Lit(syn::ExprLit {
                 attrs: vec![],
                 lit: syn::Lit::Int(syn::LitInt::new(
-                    core::str::from_utf8(&i).unwrap(),
+                    #[allow(unsafe_code)]
+                    // SAFETY: Untouched from `syn`
+                    unsafe {
+                        core::str::from_utf8_unchecked(i)
+                    },
                     Span::call_site(),
                 )),
             }),
             Self::ByteString(ref bs) => syn::Pat::Lit(syn::ExprLit {
                 attrs: vec![],
-                lit: syn::Lit::ByteStr(syn::LitByteStr::new(&bs, Span::call_site())),
+                lit: syn::Lit::ByteStr(syn::LitByteStr::new(bs, Span::call_site())),
             }),
             Self::String(ref s) => syn::Pat::Lit(syn::ExprLit {
                 attrs: vec![],
-                lit: syn::Lit::Str(syn::LitStr::new(&s, Span::call_site())),
+                lit: syn::Lit::Str(syn::LitStr::new(s, Span::call_site())),
             }),
         }
     }
