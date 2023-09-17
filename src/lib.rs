@@ -84,14 +84,16 @@
     clippy::use_self,
     clippy::wildcard_imports
 )]
+#![allow(unused_crate_dependencies)] // <-- FIXME: remove
 
-pub use {macros::*, traits::*};
+/// Common utilities imported for each `#[inator]` function.
+pub mod prelude {
+    use super::*;
 
+    pub use {inator_macros::*, mirage::*, traits::*};
+}
+
+mod mirage;
 mod traits;
 
 // TODO: SEPARATE `base` modules for `u8` & `char` with identical names! Best of both worlds <3
-
-#[inator]
-fn parenthesized<O>(inside: impl Parse(char) -> O) -> impl Parse(char) -> O {
-    exact('(') >> inside << exact(')')
-}

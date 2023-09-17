@@ -59,6 +59,7 @@
 )]
 #![allow(
     clippy::blanket_clippy_restriction_lints,
+    clippy::cargo_common_metadata,
     clippy::expect_used,
     clippy::implicit_return,
     clippy::inline_always,
@@ -84,14 +85,18 @@
     clippy::use_self,
     clippy::wildcard_imports
 )]
-
-use proc_macro2::{Ident, Span, TokenStream};
-use syn::{__private::ToTokens, spanned::Spanned, Token};
+#![allow(unused_crate_dependencies)] // <-- FIXME: remove
 
 #[allow(unused_extern_crates)]
 extern crate proc_macro;
 
 mod builtins;
+mod expr;
+
+use expr::Expression;
+use inator_automata::Nfa;
+use proc_macro2::{Ident, Span, TokenStream};
+use syn::{__private::ToTokens, spanned::Spanned, Token};
 
 /// Define a parser.
 #[proc_macro_attribute]
@@ -99,33 +104,37 @@ pub fn inator(
     attr: proc_macro::TokenStream,
     source: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    fallible(attr.into(), source.into())
+    fallible(&attr.into(), source.into())
         .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
 
+/// Any processing that could fail.
 #[inline(always)] // one call site
-fn fallible(attr: TokenStream, source: TokenStream) -> syn::Result<TokenStream> {
+fn fallible(attr: &TokenStream, source: TokenStream) -> syn::Result<TokenStream> {
     check_no_macro_args(attr)?;
     process_fn_source(source)
 }
 
+/// Make sure the macro wasn't called with parenthesized arguments.
 #[inline(always)] // one call site
-fn check_no_macro_args(attr: TokenStream) -> syn::Result<()> {
-    if !attr.is_empty() {
+fn check_no_macro_args(attr: &TokenStream) -> syn::Result<()> {
+    if attr.is_empty() {
+        Ok(())
+    } else {
         Err(syn::Error::new(
             attr.span(),
             "Expected no arguments to this macro",
         ))
-    } else {
-        Ok(())
     }
 }
 
+/// Read the source of the function the user wrote.
 #[inline(always)] // one call site
 #[allow(unreachable_code)] // <-- FIXME
 fn process_fn_source(source: TokenStream) -> syn::Result<TokenStream> {
     // Make sure we have a function, not something else
+    #[allow(clippy::wildcard_enum_match_arm)]
     let mut f = match syn::parse2(source)? {
         syn::Item::Fn(f) => f,
         other => {
@@ -147,7 +156,7 @@ fn process_fn_source(source: TokenStream) -> syn::Result<TokenStream> {
     // Rewrite `Parse(I) -> O` to `Parse<I, Output = O>` for all I, O
     standardize_trait(rtn_t)?;
     for arg in &mut f.sig.inputs {
-        let syn::FnArg::Typed(t) = arg else {
+        let syn::FnArg::Typed(ref mut t) = *arg else {
             return Err(syn::Error::new(
                 arg.span(),
                 "Parsers can't take `self` arguments",
@@ -157,29 +166,66 @@ fn process_fn_source(source: TokenStream) -> syn::Result<TokenStream> {
     }
 
     // Start the output `TokenStream` with a private module for DFA states
-    Ok(compile(f).into_token_stream())
+    Ok(compile(f)?.into_token_stream())
 }
 
+/// Write a new set of functions based on the source function.
 #[inline]
-fn compile(f: syn::ItemFn) -> TokenStream {
-    let v = vec![syn::Item::Fn(f)]; // Copy the original so that IDEs don't think the body has been deleted
-    let ts = todo!().into_token_stream();
+fn compile(f: syn::ItemFn) -> syn::Result<TokenStream> {
+    let id = f.sig.ident.to_string();
+    let _nfa = process_fn_body(&f.block)?;
+    let module_contents = vec![
+        syn::Item::Use(syn::ItemUse {
+            attrs: vec![],
+            vis: syn::Visibility::Inherited,
+            use_token: Token!(use)(Span::call_site()),
+            leading_colon: None,
+            tree: syn::UseTree::Group(syn::UseGroup {
+                brace_token: syn::token::Brace::default(),
+                items: [
+                    syn::UseTree::Path(syn::UsePath {
+                        ident: Ident::new("super", Span::call_site()),
+                        colon2_token: Token!(::)(Span::call_site()),
+                        tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
+                            star_token: Token!(*)(Span::call_site()),
+                        })),
+                    }),
+                    syn::UseTree::Path(syn::UsePath {
+                        ident: Ident::new("inator", Span::call_site()),
+                        colon2_token: Token!(::)(Span::call_site()),
+                        tree: Box::new(syn::UseTree::Path(syn::UsePath {
+                            ident: Ident::new("prelude", Span::call_site()),
+                            colon2_token: Token!(::)(Span::call_site()),
+                            tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
+                                star_token: Token!(*)(Span::call_site()),
+                            })),
+                        })),
+                    }),
+                ]
+                .into_iter()
+                .collect(),
+            }),
+            semi_token: Token!(;)(Span::call_site()),
+        }),
+        // Copy the original so that IDEs don't think the body has been deleted:
+        syn::Item::Fn(f),
+    ];
+    let mut ts = TokenStream::new(); // TODO
+    #[allow(clippy::arithmetic_side_effects)]
     syn::ItemMod {
         attrs: vec![],
         vis: syn::Visibility::Inherited,
         unsafety: None,
         mod_token: Token!(mod)(Span::call_site()),
-        ident: Ident::new(
-            &("_states_".to_owned() + &f.sig.ident.to_string()),
-            Span::call_site(),
-        ),
-        content: Some((syn::token::Brace::default(), v)),
+        ident: Ident::new(&("_inator_automaton_".to_owned() + &id), Span::call_site()),
+        content: Some((syn::token::Brace::default(), module_contents)),
         semi: None,
     }
     .to_tokens(&mut ts);
-    ts
+    Ok(ts)
 }
 
+/// Standardize `Parse(I) -> O` to `Parse<I, Output = O>` for all I, O
 #[inline]
 fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<()> {
     // Make sure the return type is `impl ...`
@@ -252,7 +298,7 @@ fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<()> {
                     p
                 },
                 gt_token: Token!(>)(Span::call_site()),
-            })
+            });
         }
         syn::PathArguments::AngleBracketed(_) => {}
         syn::PathArguments::None => {
@@ -265,4 +311,111 @@ fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<()> {
     }
 
     Ok(())
+}
+
+#[inline]
+fn process_fn_body(body: &syn::Block) -> syn::Result<Nfa<Expression>> {
+    if body.stmts.len() > 1 {
+        return Err(syn::Error::new(
+            body.span(),
+            "Parser functions should be \
+            one statement long \
+            (an expression without a semicolon)",
+        ));
+    }
+    let Some(statement) = body.stmts.first() else {
+        return Err(syn::Error::new(
+            body.span(),
+            "Provide an expression that constructs a parser \
+            (e.g. `{ p!('A' | 'B') >> c }`)",
+        ));
+    };
+    let expr = match *statement {
+        syn::Stmt::Local(ref local) => {
+            return Err(syn::Error::new(
+                local.span(),
+                "Let-expressions not yet supported in `#[inator]` functions",
+            ))
+        }
+        syn::Stmt::Item(ref item) => {
+            return Err(syn::Error::new(
+                item.span(),
+                "Item expressions not yet supported in `#[inator]` functions",
+            ))
+        }
+        syn::Stmt::Expr(ref expr, None) => expr,
+        syn::Stmt::Expr(_, Some(semi)) => {
+            return Err(syn::Error::new(
+                semi.span(),
+                "Remove the semicolon to return this result",
+            ))
+        }
+        syn::Stmt::Macro(ref mac) => {
+            return Err(syn::Error::new(
+                mac.span(),
+                "Statement-position macros not yet supported in `#[inator]` functions",
+            ))
+        }
+    };
+    process_expression(expr)
+}
+
+#[inline]
+fn process_expression(expr: &syn::Expr) -> syn::Result<Nfa<Expression>> {
+    if let syn::Expr::Macro(syn::ExprMacro { attrs: _, ref mac }) = *expr {
+        if mac.path.leading_colon.is_some()
+            || mac.path.segments.len() != 1
+            || mac.path.segments.first().unwrap().ident != "p"
+        {
+            return Err(syn::Error::new(
+                mac.path.span(),
+                "`p!(...)` is the only macro allowed in `#[inator]` functions",
+            ));
+        }
+        // TODO: Why the fuck doesn't `syn::Pat` implement `syn::Parse`?
+        process_non_macro(&syn::parse2(mac.tokens.clone())?)
+    } else {
+        process_non_macro(expr)
+    }
+}
+
+#[inline]
+#[allow(unused_variables)] // <-- FIXME
+fn process_non_macro(expr: &syn::Expr) -> syn::Result<Nfa<Expression>> {
+    Ok(match *expr {
+        syn::Expr::Binary(ref bin) => match bin.op {
+            syn::BinOp::BitOr(_) => {
+                process_expression(&bin.left)? | process_expression(&bin.right)?
+            }
+            op => {
+                return Err(syn::Error::new(
+                    op.span(),
+                    "Only the `|` operator \
+                                (meaning \"any one of these\" in a Rust pattern) \
+                                is supported as an infix operator in `p!(...)`",
+                ))
+            }
+        },
+        syn::Expr::Infer(_) => panic!("infer"),
+        syn::Expr::Lit(ref lit) => Nfa::unit(match lit.lit {
+            syn::Lit::Str(ref s) => Expression::String(s.value()),
+            _ => todo!(),
+        }),
+        syn::Expr::Paren(ref paren) => {
+            return Err(syn::Error::new(paren.span(), "Unnecessary parentheses"))
+        }
+        syn::Expr::Path(ref path) => panic!("path"),
+        syn::Expr::Range(ref range) => panic!("range"),
+        syn::Expr::Reference(ref rf) => panic!("reference"),
+        syn::Expr::Struct(ref st) => panic!("struct"),
+        syn::Expr::Tuple(ref tuple) => panic!("tuple"),
+        syn::Expr::Unary(ref unary) => panic!("unary"),
+        syn::Expr::Verbatim(ref verbatim) => panic!("verbatim"),
+        _ => {
+            return Err(syn::Error::new(
+                expr.span(),
+                "This type of expression is not permitted in `#[inator]` functions",
+            ))
+        }
+    })
 }

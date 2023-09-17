@@ -69,6 +69,15 @@ mod prop {
                 core::cmp::Ordering::Less => quickcheck::TestResult::passed(),
             }
         }
+
+        fn unit(singleton: u8, reject: Vec<u8>) -> quickcheck::TestResult {
+            let accept = vec![singleton];
+            if reject == accept {
+                return quickcheck::TestResult::discard();
+            }
+            let nfa = Nfa::unit(singleton);
+            quickcheck::TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
+        }
     }
 }
 

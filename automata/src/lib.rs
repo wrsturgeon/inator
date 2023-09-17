@@ -137,6 +137,7 @@ macro_rules! get_mut {
 mod brzozowski;
 mod dfa;
 mod nfa;
+mod ops;
 mod powerset_construction;
 
 #[cfg(test)]

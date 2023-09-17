@@ -4,12 +4,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+//! Builtin functions.
+
+/// Builtin function.
 #[allow(dead_code)] // FIXME
 pub(crate) struct Builtin {
+    /// Name of the builtin.
     pub(crate) name: &'static str,
+    /// Description of the builtin's function.
     pub(crate) description: &'static str,
 }
 
+/// Builtin operators.
 #[allow(dead_code)] // FIXME
 pub(crate) const BUILTINS: &[Builtin] = &[
     Builtin {

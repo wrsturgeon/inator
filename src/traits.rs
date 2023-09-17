@@ -4,6 +4,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+//! Traits related to parsing.
+
+/// Anything that can parse input.
 pub trait Parse<Input> {
+    /// Output of a successful parser run.
     type Output;
 }

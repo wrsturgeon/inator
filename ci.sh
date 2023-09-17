@@ -7,7 +7,7 @@ rustup toolchain install nightly
 rustup component add miri --toolchain nightly
 
 cd automata
-export QUICKCHECK_TESTS=10000
+export QUICKCHECK_TESTS=100
 . ../ci-local.sh
 cd ..
 

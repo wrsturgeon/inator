@@ -6,6 +6,7 @@ edition = "2021"
 description = "Nondeterministic finite automata with epsilon transitions and algorithms to compile them into optimal deterministic finite automata."
 license = "MPL-2.0"
 repository = "github.com/wrsturgeon/inator"
+build = "build.rs"
 
 [dependencies]
 # none

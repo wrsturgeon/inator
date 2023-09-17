@@ -47,6 +47,28 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
 }
 
 impl<I: Clone + Ord> Graph<I> {
+    /// NFA accepting this exact character and only this exact character, only once.
+    #[must_use]
+    #[inline]
+    pub fn unit(singleton: I) -> Self {
+        Self {
+            states: vec![
+                State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: core::iter::once((singleton, core::iter::once(1).collect()))
+                        .collect(),
+                    accepting: false,
+                },
+                State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: true,
+                },
+            ],
+            initial: core::iter::once(0).collect(),
+        }
+    }
+
     /// Check if there are any states (empty would be illegal, but hey, why crash your program).
     #[must_use]
     #[inline]
