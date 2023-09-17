@@ -154,7 +154,7 @@ fn process_fn_source(source: TokenStream) -> syn::Result<TokenStream> {
     };
 
     // Rewrite `Parse(I) -> O` to `Parse<I, Output = O>` for all I, O
-    standardize_trait(rtn_t)?;
+    let (in_t, out_t) = standardize_trait(rtn_t)?;
     for arg in &mut f.sig.inputs {
         let syn::FnArg::Typed(ref mut t) = *arg else {
             return Err(syn::Error::new(
@@ -162,55 +162,76 @@ fn process_fn_source(source: TokenStream) -> syn::Result<TokenStream> {
                 "Parsers can't take `self` arguments",
             ));
         };
-        standardize_trait(&mut t.ty).unwrap_or(()); // Ignore non-`Parse` types while fixing `Parse` types
+        drop(standardize_trait(&mut t.ty)); // Ignore non-`Parse` types while fixing `Parse` types
     }
 
     // Start the output `TokenStream` with a private module for DFA states
-    Ok(compile(f)?.into_token_stream())
+    Ok(compile(f, in_t, out_t)?.into_token_stream())
 }
 
 /// Write a new set of functions based on the source function.
 #[inline]
-fn compile(f: syn::ItemFn) -> syn::Result<TokenStream> {
+fn compile(mut f: syn::ItemFn, in_t: syn::Type, out_t: syn::Type) -> syn::Result<TokenStream> {
     let id = f.sig.ident.to_string();
-    let _nfa = process_fn_body(&f.block)?;
-    let module_contents = vec![
-        syn::Item::Use(syn::ItemUse {
+    let (init_fn, mut module_contents) = process_fn_body(&f.block)?
+        .minimize()
+        .as_source(&f, in_t, out_t);
+    f.block.stmts.insert(
+        0, /* ouch */
+        syn::Stmt::Item(syn::Item::Use(syn::ItemUse {
             attrs: vec![],
             vis: syn::Visibility::Inherited,
             use_token: Token!(use)(Span::call_site()),
             leading_colon: None,
-            tree: syn::UseTree::Group(syn::UseGroup {
-                brace_token: syn::token::Brace::default(),
-                items: [
-                    syn::UseTree::Path(syn::UsePath {
-                        ident: Ident::new("super", Span::call_site()),
-                        colon2_token: Token!(::)(Span::call_site()),
-                        tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
-                            star_token: Token!(*)(Span::call_site()),
-                        })),
-                    }),
-                    syn::UseTree::Path(syn::UsePath {
-                        ident: Ident::new("inator", Span::call_site()),
-                        colon2_token: Token!(::)(Span::call_site()),
-                        tree: Box::new(syn::UseTree::Path(syn::UsePath {
-                            ident: Ident::new("prelude", Span::call_site()),
-                            colon2_token: Token!(::)(Span::call_site()),
-                            tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
-                                star_token: Token!(*)(Span::call_site()),
-                            })),
-                        })),
-                    }),
-                ]
-                .into_iter()
-                .collect(),
+            tree: syn::UseTree::Path(syn::UsePath {
+                ident: Ident::new("inator", Span::call_site()),
+                colon2_token: Token!(::)(Span::call_site()),
+                tree: Box::new(syn::UseTree::Path(syn::UsePath {
+                    ident: Ident::new("mirage", Span::call_site()),
+                    colon2_token: Token!(::)(Span::call_site()),
+                    tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
+                        star_token: Token!(*)(Span::call_site()),
+                    })),
+                })),
             }),
             semi_token: Token!(;)(Span::call_site()),
+        })),
+    );
+    module_contents.push(syn::Item::Use(syn::ItemUse {
+        attrs: vec![],
+        vis: syn::Visibility::Inherited,
+        use_token: Token!(use)(Span::call_site()),
+        leading_colon: None,
+        tree: syn::UseTree::Group(syn::UseGroup {
+            brace_token: syn::token::Brace::default(),
+            items: [
+                syn::UseTree::Path(syn::UsePath {
+                    ident: Ident::new("super", Span::call_site()),
+                    colon2_token: Token!(::)(Span::call_site()),
+                    tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
+                        star_token: Token!(*)(Span::call_site()),
+                    })),
+                }),
+                // syn::UseTree::Path(syn::UsePath {
+                //     ident: Ident::new("inator", Span::call_site()),
+                //     colon2_token: Token!(::)(Span::call_site()),
+                //     tree: Box::new(syn::UseTree::Path(syn::UsePath {
+                //         ident: Ident::new("prelude", Span::call_site()),
+                //         colon2_token: Token!(::)(Span::call_site()),
+                //         tree: Box::new(syn::UseTree::Glob(syn::UseGlob {
+                //             star_token: Token!(*)(Span::call_site()),
+                //         })),
+                //     })),
+                // }),
+            ]
+            .into_iter()
+            .collect(),
         }),
-        // Copy the original so that IDEs don't think the body has been deleted:
-        syn::Item::Fn(f),
-    ];
-    let mut ts = TokenStream::new(); // TODO
+        semi_token: Token!(;)(Span::call_site()),
+    }));
+    // Copy the original so that IDEs don't think the body has been deleted:
+    module_contents.push(syn::Item::Fn(f));
+    let mut ts = init_fn.into_token_stream();
     #[allow(clippy::arithmetic_side_effects)]
     syn::ItemMod {
         attrs: vec![],
@@ -227,7 +248,7 @@ fn compile(f: syn::ItemFn) -> syn::Result<TokenStream> {
 
 /// Standardize `Parse(I) -> O` to `Parse<I, Output = O>` for all I, O
 #[inline]
-fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<()> {
+fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<(syn::Type, syn::Type)> {
     // Make sure the return type is `impl ...`
     let syn::Type::ImplTrait(ref mut impl_t) = *rtn_t else {
         return Err(syn::Error::new(
@@ -276,31 +297,45 @@ fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<()> {
     }
 
     // Rewrite to angle brackets if they were parenthesized
-    match *arguments {
+    Ok(match *arguments {
         syn::PathArguments::Parenthesized(ref mut args) => {
+            let Some(first_arg) = args.inputs.pop() else {
+                return Err(syn::Error::new(args.span(), "Expected an input type"));
+            };
+            let in_t = first_arg.into_value();
+            if let Some(next_input_arg) = args.inputs.pop() {
+                return Err(syn::Error::new(
+                    next_input_arg.span(),
+                    "Expected a single input type",
+                ));
+            };
+            let mut p: syn::punctuated::Punctuated<_, _> =
+                core::iter::once(syn::GenericArgument::Type(in_t.clone())).collect();
+            let syn::ReturnType::Type(_, ref out_t) = args.output else {
+                return Err(syn::Error::new(
+                    args.span(),
+                    "Expected an output type specified with either \
+                    `Parse(I) -> O` or `Parse<I, Output = O>`",
+                ));
+            };
+            p.push(syn::GenericArgument::AssocType(syn::AssocType {
+                ident: Ident::new("Output", Span::call_site()),
+                generics: None,
+                eq_token: Token!(=)(Span::call_site()),
+                ty: syn::Type::clone(out_t),
+            }));
+            let out_t_copied = syn::Type::clone(out_t);
             *arguments = syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
                 colon2_token: None,
                 lt_token: Token!(<)(Span::call_site()),
-                args: {
-                    let mut p: syn::punctuated::Punctuated<_, _> = args
-                        .inputs
-                        .iter()
-                        .map(|t| syn::GenericArgument::Type(t.clone()))
-                        .collect();
-                    if let syn::ReturnType::Type(_, ref t) = args.output {
-                        p.push(syn::GenericArgument::AssocType(syn::AssocType {
-                            ident: Ident::new("Output", Span::call_site()),
-                            generics: None,
-                            eq_token: Token!(=)(Span::call_site()),
-                            ty: syn::Type::clone(t),
-                        }));
-                    }
-                    p
-                },
+                args: p,
                 gt_token: Token!(>)(Span::call_site()),
             });
+            (in_t, out_t_copied)
         }
-        syn::PathArguments::AngleBracketed(_) => {}
+        syn::PathArguments::AngleBracketed(_) => {
+            todo!()
+        }
         syn::PathArguments::None => {
             return Err(syn::Error::new(
                 arguments.span(),
@@ -308,9 +343,7 @@ fn standardize_trait(rtn_t: &mut syn::Type) -> syn::Result<()> {
                     `Parse(char) -> char` or `Parse<char, Output = char>`",
             ))
         }
-    }
-
-    Ok(())
+    })
 }
 
 #[inline]
@@ -362,7 +395,7 @@ fn process_fn_body(body: &syn::Block) -> syn::Result<Nfa<Expression>> {
 
 #[inline]
 fn process_expression(expr: &syn::Expr) -> syn::Result<Nfa<Expression>> {
-    if let syn::Expr::Macro(syn::ExprMacro { attrs: _, ref mac }) = *expr {
+    if let syn::Expr::Macro(syn::ExprMacro { ref mac, .. }) = *expr {
         if mac.path.leading_colon.is_some()
             || mac.path.segments.len() != 1
             || mac.path.segments.first().unwrap().ident != "p"
@@ -399,7 +432,23 @@ fn process_non_macro(expr: &syn::Expr) -> syn::Result<Nfa<Expression>> {
         syn::Expr::Infer(_) => panic!("infer"),
         syn::Expr::Lit(ref lit) => Nfa::unit(match lit.lit {
             syn::Lit::Str(ref s) => Expression::String(s.value()),
-            _ => todo!(),
+            syn::Lit::Char(ref c) => Expression::Char(c.value()),
+            syn::Lit::ByteStr(ref bs) => Expression::ByteString(bs.value()),
+            syn::Lit::Int(ref i) => Expression::Int(i.base10_digits().bytes().collect()),
+            syn::Lit::Float(_) => {
+                return Err(syn::Error::new(
+                    lit.lit.span(),
+                    "Floating-point literals not supported (they aren't `Ord`)",
+                ))
+            }
+            syn::Lit::Bool(ref b) => Expression::Bool(b.value),
+            syn::Lit::Verbatim(_) | _ => {
+                return Err(syn::Error::new(
+                    lit.lit.span(),
+                    "Couldn't parse this literal as a \
+                    string, character, byte string, integer, or boolean",
+                ))
+            }
         }),
         syn::Expr::Paren(ref paren) => {
             return Err(syn::Error::new(paren.span(), "Unnecessary parentheses"))

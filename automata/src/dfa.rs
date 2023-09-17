@@ -6,7 +6,9 @@
 
 //! Deterministic finite automata.
 
+use proc_macro2::Span;
 use std::collections::BTreeMap;
+use syn::{Ident, Token, __private::ToTokens};
 
 /// Deterministic finite automata.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -74,6 +76,156 @@ impl<I: Clone + Ord> Graph<I> {
     pub fn size(&self) -> usize {
         self.states.len()
     }
+
+    /// Print as a set of Rust source-code functions.
+    #[inline]
+    pub fn as_source(
+        &self,
+        f: &syn::ItemFn,
+        in_t: syn::Type,
+        out_t: syn::Type,
+    ) -> (syn::ItemFn, Vec<syn::Item>) {
+        let mut sig = f.sig.clone();
+        sig.generics
+            .params
+            .push(syn::GenericParam::Type(syn::TypeParam {
+                attrs: vec![],
+                ident: Ident::new("I", Span::call_site()),
+                colon_token: Some(Token!(:)(Span::call_site())),
+                bounds: core::iter::once(syn::TypeParamBound::Trait(syn::TraitBound {
+                    paren_token: Some(syn::token::Paren::default()),
+                    modifier: syn::TraitBoundModifier::None,
+                    lifetimes: None,
+                    path: syn::Path {
+                        leading_colon: None,
+                        segments: core::iter::once(syn::PathSegment {
+                            ident: Ident::new("Iterator", Span::call_site()),
+                            arguments: syn::PathArguments::AngleBracketed(
+                                syn::AngleBracketedGenericArguments {
+                                    colon2_token: None,
+                                    lt_token: Token!(<)(Span::call_site()),
+                                    args: core::iter::once(syn::GenericArgument::AssocType(
+                                        syn::AssocType {
+                                            ident: Ident::new("Item", Span::call_site()),
+                                            generics: None,
+                                            eq_token: Token!(=)(Span::call_site()),
+                                            ty: in_t,
+                                        },
+                                    ))
+                                    .collect(),
+                                    gt_token: Token!(>)(Span::call_site()),
+                                },
+                            ),
+                        })
+                        .collect(),
+                    },
+                }))
+                .collect(),
+                eq_token: None,
+                default: None,
+            }));
+        sig.inputs = core::iter::once(syn::FnArg::Typed(syn::PatType {
+            attrs: vec![],
+            pat: Box::new(syn::Pat::Ident(syn::PatIdent {
+                attrs: vec![],
+                by_ref: None,
+                mutability: None,
+                ident: Ident::new("i", Span::call_site()),
+                subpat: None,
+            })),
+            colon_token: Token!(:)(Span::call_site()),
+            ty: Box::new(syn::Type::Path(syn::TypePath {
+                qself: None,
+                path: syn::Path {
+                    leading_colon: None,
+                    segments: core::iter::once(syn::PathSegment {
+                        ident: Ident::new("I", Span::call_site()),
+                        arguments: syn::PathArguments::None,
+                    })
+                    .collect(),
+                },
+            })),
+        }))
+        .collect();
+        sig.output = syn::ReturnType::Type(Token!(->)(Span::call_site()), Box::new(out_t));
+        (
+            syn::ItemFn {
+                attrs: vec![syn::Attribute {
+                    pound_token: Token!(#)(Span::call_site()),
+                    style: syn::AttrStyle::Outer,
+                    bracket_token: syn::token::Bracket::default(),
+                    meta: syn::Meta::List(syn::MetaList {
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("inline", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                        delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
+                        tokens: Ident::new("always", Span::call_site()).into_token_stream(),
+                    }),
+                }],
+                block: Box::new(syn::Block {
+                    brace_token: syn::token::Brace::default(),
+                    stmts: vec![syn::Stmt::Expr(
+                        syn::Expr::Call(syn::ExprCall {
+                            attrs: vec![],
+                            func: Box::new(syn::Expr::Path(syn::ExprPath {
+                                attrs: vec![],
+                                qself: None,
+                                path: syn::Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        syn::PathSegment {
+                                            ident: Ident::new(
+                                                &format!("_inator_automaton_{}", f.sig.ident),
+                                                Span::call_site(),
+                                            ),
+                                            arguments: syn::PathArguments::None,
+                                        },
+                                        syn::PathSegment {
+                                            ident: Ident::new(
+                                                &format!("s{}", self.initial),
+                                                Span::call_site(),
+                                            ),
+                                            arguments: syn::PathArguments::None,
+                                        },
+                                    ]
+                                    .into_iter()
+                                    .collect(),
+                                },
+                            })),
+                            paren_token: syn::token::Paren::default(),
+                            args: core::iter::once(syn::Expr::Path(syn::ExprPath {
+                                attrs: vec![],
+                                qself: None,
+                                path: syn::Path {
+                                    leading_colon: None,
+                                    segments: core::iter::once(syn::PathSegment {
+                                        ident: Ident::new("i", Span::call_site()),
+                                        arguments: syn::PathArguments::None,
+                                    })
+                                    .collect(),
+                                },
+                            }))
+                            .collect(),
+                        }),
+                        None,
+                    )],
+                }),
+                sig,
+                vis: syn::Visibility::Inherited,
+            },
+            vec![], // TODO
+                    // self.states
+                    //     .iter()
+                    //     .enumerate()
+                    //     .map(|(i, state)| state.as_source(i, &in_t, &out_t)),
+                    //     .collect()
+        )
+    }
 }
 
 impl<I: Clone + Ord> IntoIterator for Graph<I> {
@@ -131,6 +283,16 @@ impl<I: Clone + Ord> State<I> {
     #[inline(always)]
     pub const fn is_accepting(&self) -> bool {
         self.accepting
+    }
+
+    /// Print as a Rust source-code function.
+    #[inline]
+    pub fn as_source(&self, _index: usize, _in_t: &str, _out_t: &str) -> syn::ItemFn {
+        // let mut s = format!("#[inline]fn s{index}<I:Iterator<Item={in_t}>>(i:I)->{out_t}{{");
+        // s.push_str("todo!()"); // TODO
+        // s.push('}');
+        // s
+        todo!()
     }
 }
 

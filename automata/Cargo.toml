@@ -9,7 +9,8 @@ repository = "github.com/wrsturgeon/inator"
 build = "build.rs"
 
 [dependencies]
-# none
+proc-macro2 = "1.0.67"
+syn = { version = "2.0.34", features = ["full"] }
 
 # Optional dependencies:
 quickcheck = { version = "1.0.3", optional = true }

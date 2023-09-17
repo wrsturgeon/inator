@@ -15,12 +15,12 @@ pub(crate) enum Expression {
     Byte(u8),
     /// Character.
     Char(char),
-    /// Integer.
-    Int(isize),
+    /// Integer (individual digits).
+    Int(Vec<u8>),
     // /// Floating-point number.
     // Float(f64),
     /// Byte-string.
-    ByteString(&'static [u8]),
+    ByteString(Vec<u8>),
     /// String.
     String(String),
     /// Uninterpretable.

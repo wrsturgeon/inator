@@ -90,10 +90,10 @@
 pub mod prelude {
     use super::*;
 
-    pub use {inator_macros::*, mirage::*, traits::*};
+    pub use {inator_macros::*, traits::*};
 }
 
-mod mirage;
+pub mod mirage;
 mod traits;
 
 // TODO: SEPARATE `base` modules for `u8` & `char` with identical names! Best of both worlds <3
