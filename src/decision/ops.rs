@@ -6,7 +6,7 @@
 
 //! Operations on NFAs.
 
-use crate::{nfa, Nfa};
+use crate::{decision::nfa, Nfa};
 
 impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
     #[inline]

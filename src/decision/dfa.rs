@@ -29,13 +29,6 @@ pub struct State<I: Clone + Ord> {
 }
 
 impl<I: Clone + Ord> Graph<I> {
-    /// Get the state at a given index.
-    #[must_use]
-    #[inline(always)]
-    pub fn get(&self, i: usize) -> Option<&State<I>> {
-        self.states.get(i)
-    }
-
     /// Decide whether an input belongs to the regular langage this NFA accepts.
     #[inline(always)]
     #[allow(clippy::missing_panics_doc)]
@@ -65,7 +58,7 @@ impl<I: Clone + Ord> Graph<I> {
             states: self
                 .states
                 .iter()
-                .map(|state| crate::nfa::State {
+                .map(|state| crate::decision::nfa::State {
                     epsilon: std::collections::BTreeSet::new(),
                     non_epsilon: state
                         .transitions

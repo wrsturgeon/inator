@@ -105,13 +105,6 @@ impl<I: Clone + Ord> Graph<I> {
         }
     }
 
-    /// Get the state at a given index.
-    #[must_use]
-    #[inline(always)]
-    pub fn get(&self, i: usize) -> Option<&State<I>> {
-        self.states.get(i)
-    }
-
     /// Take every transition that doesn't require input.
     #[inline]
     #[must_use]
@@ -173,6 +166,34 @@ impl<I: Clone + Ord> Graph<I> {
     #[must_use]
     pub fn would_ever_accept(&self) -> bool {
         self.states.iter().any(|state| state.accepting) && !self.initial.is_empty()
+    }
+
+    /// Match at least one time, then as many times as we want.
+    /// Note that if ANY number of times leads to an accepting state, we take it!
+    #[inline]
+    #[must_use]
+    pub fn repeat(mut self) -> Self {
+        for state in &mut self.states {
+            if state.accepting {
+                state.epsilon.extend(self.initial.iter());
+            }
+        }
+        self
+    }
+
+    /// Match at most one time (i.e. ignore if not present).
+    #[inline]
+    #[must_use]
+    pub fn optional(mut self) -> Self {
+        self.states.push(State {
+            epsilon: core::mem::replace(
+                &mut self.initial,
+                core::iter::once(self.states.len()).collect(),
+            ),
+            non_epsilon: BTreeMap::new(),
+            accepting: true,
+        });
+        self
     }
 }
 

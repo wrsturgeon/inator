@@ -33,9 +33,7 @@ impl<I: Clone + Ord> Iterator for Fuzzer<I> {
             let mut v = vec![];
             loop {
                 let state = get!(self.dfa.states, index);
-                if state.accepting
-                    && (state.transitions.is_empty() || ((self.rng.next_u32() & 1) == 0))
-                {
+                if state.accepting && ((self.rng.next_u32() & 1) == 0) {
                     v.reverse();
                     return Some(v);
                 }

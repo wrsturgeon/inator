@@ -134,26 +134,19 @@ macro_rules! get_mut {
     };
 }
 
-mod brzozowski;
-mod dfa;
+mod decision;
 mod expr;
-mod fuzz;
-mod nfa;
-mod ops;
-mod powerset_construction;
 
 #[cfg(test)]
 mod test;
 
 pub use {
-    dfa::Graph as Dfa,
+    decision::{Dfa as Compiled, Nfa as Parser, *},
     expr::Expression,
-    fuzz::{Fuzzer, NeverAccepts},
-    nfa::Graph as Nfa,
 };
 
-/// Match exactly this token.
+/// Decide whether the next input token equals this token.
 #[inline(always)]
-pub fn c<I: Clone + Ord>(input: I) -> Nfa<I> {
+pub fn d<I: Clone + Ord>(input: I) -> Nfa<I> {
     Nfa::unit(input)
 }

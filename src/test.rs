@@ -6,7 +6,7 @@
 
 #![allow(clippy::print_stdout, clippy::unwrap_used)]
 
-use crate::*;
+use crate::decision::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod unit {
@@ -169,6 +169,50 @@ mod prop {
                     quickcheck::TestResult::from_bool(fuzz.take(100).all(|input| nfa.accept(input)))
                 })
         }
+
+        fn repeat_fuzz_chain(nfa: Nfa<u8>) -> quickcheck::TestResult {
+            let Ok(mut fuzzer) = nfa.fuzz() else {
+                return quickcheck::TestResult::discard();
+            };
+            let repeated = nfa.repeat();
+            #[allow(clippy::default_numeric_fallback)]
+            for _ in 0..100 {
+                let fst = fuzzer.next().unwrap();
+                let snd = fuzzer.next().unwrap();
+                if !repeated.accept(fst.into_iter().chain(snd)) {
+                    return quickcheck::TestResult::failed();
+                }
+            }
+            quickcheck::TestResult::passed()
+        }
+
+        fn repeat_optional_swap(nfa: Nfa<u8>) -> bool {
+            nfa.clone().repeat().optional().compile() == nfa.optional().repeat().compile()
+        }
+
+        fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) -> quickcheck::TestResult {
+            let Ok(af) = a.fuzz() else { return quickcheck::TestResult::discard(); };
+            let Ok(bf) = b.fuzz() else { return quickcheck::TestResult::discard(); };
+            let Ok(cf) = c.fuzz() else { return quickcheck::TestResult::discard(); };
+            #[allow(clippy::arithmetic_side_effects)]
+            let abc = a >> b.optional() >> c;
+            #[allow(clippy::default_numeric_fallback)]
+            for ((ai, bi), ci) in af.zip(bf).zip(cf).take(10) {
+                // if !abc.accept(ai.iter().chain(bi.iter()).chain(ci.iter())) { return quickcheck::TestResult::failed(); }
+                // if !abc.accept(ai.iter().chain(bi.iter())) { return quickcheck::TestResult::failed(); }
+                assert!(
+                    abc.accept(ai.iter().chain(bi.iter()).chain(ci.iter())),
+                    "Sandwiched optional did not accept the concatenation of \
+                    three valid inputs: {ai:?}, {bi:?}, & {ci:?}",
+                );
+                assert!(
+                    abc.accept(ai.iter().chain(ci.iter())),
+                    "Sandwiched optional did not accept the concatenation of \
+                    two valid inputs: {ai:?} & {ci:?}",
+                );
+            }
+            quickcheck::TestResult::passed()
+        }
     }
 }
 
@@ -216,20 +260,6 @@ mod reduced {
             if dfa_accepted { "accepted" } else { "did not" },
         );
     }
-
-    // fn brzozowski_reduces_size(dfa: &Dfa<u8>) {
-    //     let orig_size = dfa.size();
-    //     println!("Original DFA (size {orig_size}):");
-    //     println!("{dfa}");
-    //     let dfa = Nfa::from(dfa.clone()).compile();
-    //     let dfa_size = dfa.size();
-    //     println!("Reduced DFA (size {dfa_size}):");
-    //     println!("{dfa}");
-    //     assert!(
-    //         dfa_size < orig_size,
-    //         "Reducing a {orig_size}-state DFA increased its size to {dfa_size}",
-    //     );
-    // }
 
     fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
         println!("LHS:");
@@ -292,6 +322,40 @@ mod reduced {
             },
         );
     }
+
+    fn repeat_optional_swap(nfa: Nfa<u8>) {
+        assert_eq!(
+            nfa.clone().repeat().optional().compile(),
+            nfa.optional().repeat().compile()
+        );
+    }
+
+    // fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) {
+    //     println!("a:");
+    //     println!("{a}");
+    //     println!("b:");
+    //     println!("{b}");
+    //     println!("c:");
+    //     println!("{c}");
+    //     let af = a.fuzz().unwrap();
+    //     let bf = b.fuzz().unwrap();
+    //     let cf = c.fuzz().unwrap();
+    //     #[allow(clippy::arithmetic_side_effects)]
+    //     let abc = a >> b.optional() >> c;
+    //     #[allow(clippy::default_numeric_fallback)]
+    //     for ((ai, bi), ci) in af.zip(bf).zip(cf).take(100000) {
+    //         assert!(
+    //             abc.accept(ai.iter().chain(bi.iter()).chain(ci.iter())),
+    //             "Sandwiched optional did not accept the concatenation of \
+    //             three valid inputs: {ai:?}, {bi:?}, & {ci:?}",
+    //         );
+    //         assert!(
+    //             abc.accept(ai.iter().chain(ci.iter())),
+    //             "Sandwiched optional did not accept the concatenation of \
+    //             two valid inputs: {ai:?} & {ci:?}",
+    //         );
+    //     }
+    // }
 
     #[test]
     fn nfa_dfa_equal_1() {
@@ -430,28 +494,6 @@ mod reduced {
             &[],
         );
     }
-
-    // #[test]
-    // fn brzozowski_reduces_size_1() {
-    //     brzozowski_reduces_size(&Nfa {
-    //         states: vec![
-    //             nfa::State {
-    //                 epsilon: BTreeSet::new(),
-    //                 non_epsilon: BTreeMap::new(),
-    //                 accepting: true,
-    //             },
-    //             nfa::State {
-    //                 epsilon: BTreeSet::new(),
-    //                 non_epsilon: [(0, 1), (1, 0)]
-    //                     .map(|(a, b)| (a, core::iter::once(b).collect()))
-    //                     .into_iter()
-    //                     .collect(),
-    //                 accepting: false,
-    //             },
-    //         ],
-    //         initial: [0, 1].into_iter().collect(),
-    //     });
-    // }
 
     #[test]
     fn bitor_1() {
@@ -592,4 +634,86 @@ mod reduced {
             &[],
         );
     }
+
+    #[test]
+    fn repeat_optional_swap_1() {
+        repeat_optional_swap(Nfa {
+            states: vec![],
+            initial: BTreeSet::new(),
+        });
+    }
+
+    // #[test]
+    // fn sandwich_1() {
+    //     sandwich(
+    //         Nfa {
+    //             states: vec![nfa::State {
+    //                 epsilon: BTreeSet::new(),
+    //                 non_epsilon: BTreeMap::new(),
+    //                 accepting: true,
+    //             }],
+    //             initial: core::iter::once(0).collect(),
+    //         },
+    //         Nfa {
+    //             states: vec![nfa::State {
+    //                 epsilon: BTreeSet::new(),
+    //                 non_epsilon: BTreeMap::new(),
+    //                 accepting: true,
+    //             }],
+    //             initial: core::iter::once(0).collect(),
+    //         },
+    //         Nfa {
+    //             states: vec![
+    //                 nfa::State {
+    //                     epsilon: BTreeSet::new(),
+    //                     non_epsilon: BTreeMap::new(),
+    //                     accepting: true,
+    //                 },
+    //                 nfa::State {
+    //                     epsilon: BTreeSet::new(),
+    //                     non_epsilon: core::iter::once((0, core::iter::once(0).collect())).collect(),
+    //                     accepting: false,
+    //                 },
+    //             ],
+    //             initial: core::iter::once(1).collect(),
+    //         },
+    //     );
+    // }
+
+    // #[test]
+    // fn sandwich_2() {
+    //     sandwich(
+    //         Nfa {
+    //             states: vec![nfa::State {
+    //                 epsilon: BTreeSet::new(),
+    //                 non_epsilon: BTreeMap::new(),
+    //                 accepting: true,
+    //             }],
+    //             initial: core::iter::once(0).collect(),
+    //         },
+    //         Nfa {
+    //             states: vec![nfa::State {
+    //                 epsilon: BTreeSet::new(),
+    //                 non_epsilon: BTreeMap::new(),
+    //                 accepting: true,
+    //             }],
+    //             initial: core::iter::once(0).collect(),
+    //         },
+    //         Nfa {
+    //             states: vec![
+    //                 nfa::State {
+    //                     epsilon: BTreeSet::new(),
+    //                     non_epsilon: core::iter::once((0, core::iter::once(1).collect())).collect(),
+    //                     accepting: false,
+    //                 },
+    //                 nfa::State {
+    //                     epsilon: BTreeSet::new(),
+    //                     non_epsilon: BTreeMap::new(),
+    //                     accepting: true,
+    //                 },
+    //             ],
+    //             initial: core::iter::once(0).collect(),
+    //         },
+    //     );
+    // }
 }

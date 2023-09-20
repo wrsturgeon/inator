@@ -43,7 +43,7 @@ impl<I: Clone + Ord> Nfa<I> {
             .iter()
             .map(|subset| {
                 let &(ref set, accepting) = get!(subset_states, subset);
-                crate::dfa::State {
+                crate::decision::dfa::State {
                     transitions: set
                         .iter()
                         .map(|(k, v)| (k.clone(), unwrap!(ordered.binary_search(&v))))
