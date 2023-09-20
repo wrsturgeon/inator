@@ -17,7 +17,8 @@ fn main() {
     println!("left_paren_abc:");
     println!("{left_paren_abc}");
 
-    let abc_in_parentheses = left_paren_abc << c(')');
+    // let abc_in_parentheses = left_paren_abc << c(')');
+    let abc_in_parentheses = left_paren_abc >> c(')');
     println!("abc_in_parentheses:");
     println!("{abc_in_parentheses}");
 

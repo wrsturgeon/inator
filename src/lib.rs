@@ -146,7 +146,7 @@ mod test;
 
 pub use {dfa::Graph as Dfa, expr::Expression, nfa::Graph as Nfa};
 
-/// Match exactly this argument as a character in an input stream.
+/// Match exactly this token.
 #[inline(always)]
 pub fn c<I: Clone + Ord>(input: I) -> Nfa<I> {
     Nfa::unit(input)

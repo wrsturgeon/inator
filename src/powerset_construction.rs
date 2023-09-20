@@ -18,14 +18,13 @@ impl<I: Clone + Ord> Nfa<I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
     pub(crate) fn subsets(self) -> Dfa<I> {
-        // Check if we have any states at all
-        if self.is_empty() {
-            return Dfa::invalid();
-        }
-
         // Map which _subsets_ of states transition to which _subsets_ of states
         let mut subset_states = BTreeMap::new();
-        let initial_state = traverse(&self, self.initial.clone(), &mut subset_states);
+        let initial_state = traverse(
+            &self,
+            self.initial.iter().copied().collect(),
+            &mut subset_states,
+        );
 
         // Fix an ordering on those subsets so each can be a DFA state
         let mut ordered: Vec<_> = subset_states.keys().collect();
@@ -67,7 +66,7 @@ impl<I: Clone + Ord> Nfa<I> {
 #[inline]
 fn traverse<I: Clone + Ord>(
     nfa: &Nfa<I>,
-    queue: BTreeSet<usize>,
+    queue: Vec<usize>,
     subset_states: &mut SubsetStates<I>,
 ) -> BTreeSet<usize> {
     // Take all epsilon transitions immediately
@@ -95,7 +94,7 @@ fn traverse<I: Clone + Ord>(
 
     // Now, follow epsilon transitions AND recurse
     for v in next_superposition.values_mut() {
-        *v = traverse(nfa, v.clone(), subset_states);
+        *v = traverse(nfa, v.iter().copied().collect(), subset_states);
     }
 
     // TODO:

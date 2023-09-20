@@ -9,6 +9,26 @@
 use crate::*;
 use std::collections::{BTreeMap, BTreeSet};
 
+mod unit {
+    use super::*;
+
+    #[test]
+    fn zero_state_nfa_subsets() {
+        let nfa = Nfa::<()>::empty();
+        let dfa = nfa.subsets();
+        assert_eq!(
+            dfa,
+            Dfa {
+                states: vec![dfa::State {
+                    transitions: BTreeMap::new(),
+                    accepting: false
+                }],
+                initial: 0
+            }
+        );
+    }
+}
+
 mod prop {
     #[allow(unused_imports)]
     use super::*;
@@ -61,9 +81,9 @@ mod prop {
             )
         }
 
-        fn brzozowski_reduces_size(nfa: Nfa<u8>) -> quickcheck::TestResult {
-            let nfa_size = nfa.size();
-            match nfa.compile().size().cmp(&nfa_size) {
+        fn brzozowski_reduces_size(dfa: Dfa<u8>) -> quickcheck::TestResult {
+            let orig_size = dfa.size();
+            match Nfa::from(dfa).compile().size().cmp(&orig_size) {
                 core::cmp::Ordering::Greater => quickcheck::TestResult::failed(),
                 core::cmp::Ordering::Equal => quickcheck::TestResult::discard(),
                 core::cmp::Ordering::Less => quickcheck::TestResult::passed(),
@@ -90,23 +110,25 @@ mod prop {
             }))
         }
 
-        fn bitand(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<(Vec<u8>, Vec<u8>)>) -> quickcheck::TestResult {
+        #[allow(clippy::arithmetic_side_effects)]
+        fn shr(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let fused = lhs.clone() & rhs.clone();
-            quickcheck::TestResult::from_bool(inputs.into_iter().all(|(input_l, input_r)| {
-                fused.accept(input_l.iter().chain(&input_r).copied())
-                    == (lhs.accept(input_l.iter().copied()) && rhs.accept(input_r))
-            }))
+            let fused = lhs.clone() >> rhs.clone();
+            quickcheck::TestResult::from_bool(
+                inputs
+                    .into_iter()
+                    .all(|input| fused.accept(&input) == nfa::chain(&lhs, &rhs, &input)),
+            )
         }
     }
 }
 
-mod prop_reduced {
+mod reduced {
     use super::*;
 
-    fn nfa_dfa_equal(nfa: &Nfa<u8>, input: &Vec<u8>) {
+    fn nfa_dfa_equal(nfa: &Nfa<u8>, input: &[u8]) {
         println!("NFA:");
         println!("{nfa}");
         let dfa = nfa.clone().subsets();
@@ -123,15 +145,11 @@ mod prop_reduced {
             } else {
                 "did not accept"
             },
-            if dfa_accepted {
-                "accepted"
-            } else {
-                "did not accept"
-            },
+            if dfa_accepted { "accepted" } else { "did not" },
         );
     }
 
-    fn brzozowski(nfa: &Nfa<u8>, input: &Vec<u8>) {
+    fn brzozowski(nfa: &Nfa<u8>, input: &[u8]) {
         println!("NFA:");
         println!("{nfa}");
         let dfa = nfa.clone().compile();
@@ -148,15 +166,25 @@ mod prop_reduced {
             } else {
                 "did not accept"
             },
-            if dfa_accepted {
-                "accepted"
-            } else {
-                "did not accept"
-            },
+            if dfa_accepted { "accepted" } else { "did not" },
         );
     }
 
-    fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &Vec<u8>) {
+    // fn brzozowski_reduces_size(dfa: &Dfa<u8>) {
+    //     let orig_size = dfa.size();
+    //     println!("Original DFA (size {orig_size}):");
+    //     println!("{dfa}");
+    //     let dfa = Nfa::from(dfa.clone()).compile();
+    //     let dfa_size = dfa.size();
+    //     println!("Reduced DFA (size {dfa_size}):");
+    //     println!("{dfa}");
+    //     assert!(
+    //         dfa_size < orig_size,
+    //         "Reducing a {orig_size}-state DFA increased its size to {dfa_size}",
+    //     );
+    // }
+
+    fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
         println!("LHS:");
         println!("{lhs}");
         println!("RHS:");
@@ -184,33 +212,28 @@ mod prop_reduced {
             if fused_accepted {
                 "accepted"
             } else {
-                "did not accept"
+                "did not"
             },
         );
     }
 
-    fn bitand(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input_l: &Vec<u8>, input_r: &Vec<u8>) {
+    #[allow(clippy::arithmetic_side_effects)]
+    fn shr(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
         println!("LHS:");
         println!("{lhs}");
         println!("RHS:");
         println!("{rhs}");
-        let fused = lhs.clone() & rhs.clone();
+        let fused = lhs.clone() >> rhs.clone();
         println!("Fused:");
         println!("{fused}");
-        let lhs_accepted = lhs.accept(input_l.iter().copied());
-        let rhs_accepted = rhs.accept(input_r.iter().copied());
-        let fused_accepted = fused.accept(input_l.iter().chain(input_r).copied());
+        let chain_accepted = nfa::chain(lhs, rhs, input);
+        let fused_accepted = fused.accept(input);
         assert_eq!(
             fused_accepted,
-            lhs_accepted && rhs_accepted,
-            "On inputs {input_l:?} and {input_r:?}, \
-            the LHS {} and the RHS {} but the fused NFA {}",
-            if lhs_accepted {
-                "accepted"
-            } else {
-                "did not accept"
-            },
-            if rhs_accepted {
+            chain_accepted,
+            "On input {input:?}, \
+            the LHS chained to the RHS {} but the fused NFA {}",
+            if chain_accepted {
                 "accepted"
             } else {
                 "did not accept"
@@ -218,7 +241,7 @@ mod prop_reduced {
             if fused_accepted {
                 "accepted"
             } else {
-                "did not accept"
+                "did not"
             },
         );
     }
@@ -234,7 +257,7 @@ mod prop_reduced {
                 }],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -256,7 +279,7 @@ mod prop_reduced {
                 ],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -271,7 +294,7 @@ mod prop_reduced {
                 }],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![255],
+            &[255],
         );
     }
 
@@ -294,7 +317,7 @@ mod prop_reduced {
                 ],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![255],
+            &[255],
         );
     }
 
@@ -316,7 +339,7 @@ mod prop_reduced {
                 ],
                 initial: core::iter::once(1).collect(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -327,7 +350,7 @@ mod prop_reduced {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -342,7 +365,7 @@ mod prop_reduced {
                 }],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -357,9 +380,31 @@ mod prop_reduced {
                 }],
                 initial: BTreeSet::new(),
             },
-            &vec![],
+            &[],
         );
     }
+
+    // #[test]
+    // fn brzozowski_reduces_size_1() {
+    //     brzozowski_reduces_size(&Nfa {
+    //         states: vec![
+    //             nfa::State {
+    //                 epsilon: BTreeSet::new(),
+    //                 non_epsilon: BTreeMap::new(),
+    //                 accepting: true,
+    //             },
+    //             nfa::State {
+    //                 epsilon: BTreeSet::new(),
+    //                 non_epsilon: [(0, 1), (1, 0)]
+    //                     .map(|(a, b)| (a, core::iter::once(b).collect()))
+    //                     .into_iter()
+    //                     .collect(),
+    //                 accepting: false,
+    //             },
+    //         ],
+    //         initial: [0, 1].into_iter().collect(),
+    //     });
+    // }
 
     #[test]
     fn bitor_1() {
@@ -376,7 +421,7 @@ mod prop_reduced {
                 }],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -395,7 +440,7 @@ mod prop_reduced {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
-            &vec![],
+            &[],
         );
     }
 
@@ -405,7 +450,7 @@ mod prop_reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((72, core::iter::once(0).collect())).collect(),
+                    non_epsilon: core::iter::once((1, core::iter::once(0).collect())).collect(),
                     accepting: false,
                 }],
                 initial: core::iter::once(0).collect(),
@@ -418,13 +463,13 @@ mod prop_reduced {
                 }],
                 initial: core::iter::once(0).collect(),
             },
-            &vec![72],
+            &[1],
         );
     }
 
     #[test]
-    fn bitand_1() {
-        bitand(
+    fn shr_1() {
+        shr(
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
@@ -437,8 +482,67 @@ mod prop_reduced {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
-            &vec![],
-            &vec![],
+            &[],
+        );
+    }
+
+    #[test]
+    fn shr_2() {
+        shr(
+            &Nfa {
+                states: vec![
+                    nfa::State {
+                        epsilon: BTreeSet::new(),
+                        non_epsilon: BTreeMap::new(),
+                        accepting: false,
+                    },
+                    nfa::State {
+                        epsilon: BTreeSet::new(),
+                        non_epsilon: core::iter::once((2, core::iter::once(1).collect())).collect(),
+                        accepting: true,
+                    },
+                ],
+                initial: core::iter::once(1).collect(),
+            },
+            &Nfa {
+                states: vec![
+                    nfa::State {
+                        epsilon: BTreeSet::new(),
+                        non_epsilon: core::iter::once((1, core::iter::once(1).collect())).collect(),
+                        accepting: false,
+                    },
+                    nfa::State {
+                        epsilon: BTreeSet::new(),
+                        non_epsilon: BTreeMap::new(),
+                        accepting: true,
+                    },
+                ],
+                initial: core::iter::once(0).collect(),
+            },
+            &[2, 1],
+        );
+    }
+
+    #[test]
+    fn shr_3() {
+        shr(
+            &Nfa {
+                states: vec![nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: true,
+                }],
+                initial: core::iter::once(0).collect(),
+            },
+            &Nfa {
+                states: vec![nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: true,
+                }],
+                initial: core::iter::once(0).collect(),
+            },
+            &[],
         );
     }
 }

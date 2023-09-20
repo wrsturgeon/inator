@@ -13,7 +13,7 @@ use syn::{Ident, Token, __private::ToTokens};
 /// Deterministic finite automata.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Graph<I: Clone + Ord> {
-    /// Every state in this graph.
+    /// Every state in this graph (should never be empty!).
     pub(crate) states: Vec<State<I>>,
     /// Initial set of states.
     pub(crate) initial: usize,
@@ -40,9 +40,6 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline(always)]
     #[allow(clippy::missing_panics_doc)]
     pub fn accept<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
-        if self.states.is_empty() {
-            return false;
-        }
         let mut state = self.initial;
         for input in iter {
             match get!(self.states, state).transition(&input) {
@@ -51,23 +48,6 @@ impl<I: Clone + Ord> Graph<I> {
             }
         }
         get!(self.states, state).accepting
-    }
-
-    /// DFA with zero states.
-    #[must_use]
-    #[inline(always)]
-    pub const fn invalid() -> Self {
-        Self {
-            states: vec![],
-            initial: usize::MAX,
-        }
-    }
-
-    /// Check if there are any states (empty would be illegal, but hey, why crash your program).
-    #[must_use]
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.states.is_empty()
     }
 
     /// Number of states.
@@ -562,7 +542,10 @@ impl State<crate::expr::Expression> {
 impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
     #[inline]
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        let mut states = quickcheck::Arbitrary::arbitrary(g);
+        let mut states = Vec::arbitrary(g);
+        while states.is_empty() {
+            states = Vec::arbitrary(g);
+        }
         cut_nonsense(&mut states);
         let size = states.len();
         Self {

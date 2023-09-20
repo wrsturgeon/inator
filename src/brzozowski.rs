@@ -73,14 +73,8 @@ impl<I: Clone + Ord> Nfa<I> {
     #[allow(clippy::missing_assert_message)]
     pub fn compile(self) -> Dfa<I> {
         let rev = self.reverse();
-        if rev.is_empty() {
-            return Dfa::invalid();
-        }
-        debug_assert!(!rev.is_empty());
         let halfway = rev.subsets();
-        debug_assert!(!halfway.is_empty());
         let nfa = Nfa::from(halfway);
-        debug_assert!(!nfa.is_empty());
         let revrev = nfa.reverse();
         revrev.subsets()
     }
