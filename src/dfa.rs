@@ -56,6 +56,44 @@ impl<I: Clone + Ord> Graph<I> {
     pub fn size(&self) -> usize {
         self.states.len()
     }
+
+    /// Generalize to an identical NFA.
+    #[inline]
+    #[must_use]
+    pub fn generalize(&self) -> crate::Nfa<I> {
+        crate::Nfa {
+            states: self
+                .states
+                .iter()
+                .map(|state| crate::nfa::State {
+                    epsilon: std::collections::BTreeSet::new(),
+                    non_epsilon: state
+                        .transitions
+                        .iter()
+                        .map(|(k, &v)| (k.clone(), core::iter::once(v).collect()))
+                        .collect(),
+                    accepting: state.accepting,
+                })
+                .collect(),
+            initial: core::iter::once(self.initial).collect(),
+        }
+    }
+
+    /// Randomly generate inputs that are all guaranteed to be accepted.
+    /// NOTE: returns an infinite iterator! `for input in automaton.fuzz()?` will loop forever . . .
+    /// # Errors
+    /// If this automaton never accepts any input.
+    #[inline]
+    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts> {
+        self.generalize().fuzz()
+    }
+
+    /// Check if there exists a string this DFA will accept.
+    #[inline]
+    #[must_use]
+    pub fn would_ever_accept(&self) -> bool {
+        self.states.iter().any(|state| state.accepting)
+    }
 }
 
 impl Graph<crate::expr::Expression> {

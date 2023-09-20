@@ -137,6 +137,7 @@ macro_rules! get_mut {
 mod brzozowski;
 mod dfa;
 mod expr;
+mod fuzz;
 mod nfa;
 mod ops;
 mod powerset_construction;
@@ -144,7 +145,12 @@ mod powerset_construction;
 #[cfg(test)]
 mod test;
 
-pub use {dfa::Graph as Dfa, expr::Expression, nfa::Graph as Nfa};
+pub use {
+    dfa::Graph as Dfa,
+    expr::Expression,
+    fuzz::{Fuzzer, NeverAccepts},
+    nfa::Graph as Nfa,
+};
 
 /// Match exactly this token.
 #[inline(always)]

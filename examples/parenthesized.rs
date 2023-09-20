@@ -26,5 +26,9 @@ fn main() {
     println!("compiled:");
     println!("{compiled}");
 
+    for fuzz in compiled.fuzz().unwrap().take(10) {
+        println!("Fuzz: {}", fuzz.into_iter().collect::<String>());
+    }
+
     assert!(compiled.accept("(A)".chars()));
 }

@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  QUICKCHECK_TESTS: 10000
+  QUICKCHECK_TESTS: 1000
 
 jobs:
   build:

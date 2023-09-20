@@ -16,6 +16,6 @@ cargo run --example 2>&1 | grep '^ ' | xargs -n 1 cargo +nightly miri run --no-d
 cargo +nightly miri test --no-default-features
 cargo +nightly miri test --no-default-features --examples
 cargo test --no-default-features
+cargo test --no-default-features --examples
 cargo test --all-features
-cargo test --examples --no-default-features
-cargo test --examples --all-features
+cargo test --all-features --examples

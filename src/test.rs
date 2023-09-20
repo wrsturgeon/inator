@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-#![allow(clippy::print_stdout)]
+#![allow(clippy::print_stdout, clippy::unwrap_used)]
 
 use crate::*;
 use std::collections::{BTreeMap, BTreeSet};
@@ -26,6 +26,46 @@ mod unit {
                 initial: 0
             }
         );
+    }
+
+    #[test]
+    fn zero_state_nfa_fuzz() {
+        let _ = Nfa::<()>::empty().fuzz().unwrap_err();
+    }
+
+    #[test]
+    fn zero_initial_nfa_fuzz() {
+        let _ = Nfa::<()> {
+            states: vec![nfa::State {
+                epsilon: BTreeSet::new(),
+                non_epsilon: BTreeMap::new(),
+                accepting: true,
+            }],
+            initial: BTreeSet::new(),
+        }
+        .fuzz()
+        .unwrap_err();
+    }
+
+    #[test]
+    fn isolated_state_nfa_fuzz() {
+        let _ = Nfa::<()> {
+            states: vec![
+                nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: false,
+                },
+                nfa::State {
+                    epsilon: BTreeSet::new(),
+                    non_epsilon: BTreeMap::new(),
+                    accepting: true,
+                },
+            ],
+            initial: core::iter::once(0).collect(),
+        }
+        .fuzz()
+        .unwrap_err();
     }
 }
 
@@ -51,7 +91,7 @@ mod prop {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let nfa = Nfa::from(dfa.clone());
+            let nfa =dfa.generalize();
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -61,19 +101,19 @@ mod prop {
 
         fn nfa_dfa_one_and_a_half_roundtrip(nfa: Nfa<u8>) -> bool {
             let dfa = nfa.subsets();
-            Nfa::from(dfa.clone()).subsets() == dfa
+            dfa.generalize().subsets() == dfa
         }
 
         fn dfa_nfa_double_roundtrip(dfa: Dfa<u8>) -> bool {
-            let once = Nfa::from(dfa).subsets();
-            Nfa::from(once.clone()).subsets() == once
+            let once = dfa.generalize().subsets();
+            once.generalize().subsets() == once
         }
 
         fn brzozowski(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let dfa = nfa.clone().compile();
+            let dfa = nfa.compile();
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -83,7 +123,7 @@ mod prop {
 
         fn brzozowski_reduces_size(dfa: Dfa<u8>) -> quickcheck::TestResult {
             let orig_size = dfa.size();
-            match Nfa::from(dfa).compile().size().cmp(&orig_size) {
+            match dfa.generalize().compile().size().cmp(&orig_size) {
                 core::cmp::Ordering::Greater => quickcheck::TestResult::failed(),
                 core::cmp::Ordering::Equal => quickcheck::TestResult::discard(),
                 core::cmp::Ordering::Less => quickcheck::TestResult::passed(),
@@ -121,6 +161,13 @@ mod prop {
                     .into_iter()
                     .all(|input| fused.accept(&input) == nfa::chain(&lhs, &rhs, &input)),
             )
+        }
+
+        fn fuzz_roundtrip(nfa: Nfa<u8>) -> quickcheck::TestResult {
+            nfa.fuzz()
+                .map_or(quickcheck::TestResult::discard(), |fuzz| {
+                    quickcheck::TestResult::from_bool(fuzz.take(100).all(|input| nfa.accept(input)))
+                })
         }
     }
 }

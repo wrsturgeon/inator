@@ -65,10 +65,17 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
     }
 }
 
+impl<I: Clone + Ord> Default for Graph<I> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 impl<I: Clone + Ord> Graph<I> {
     /// NFA with zero states.
-    #[must_use]
     #[inline]
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             states: vec![],
@@ -150,6 +157,22 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline(always)]
     pub fn size(&self) -> usize {
         self.states.len()
+    }
+
+    /// Randomly generate inputs that are all guaranteed to be accepted.
+    /// NOTE: returns an infinite iterator! `for input in automaton.fuzz()?` will loop forever . . .
+    /// # Errors
+    /// If this automaton never accepts any input.
+    #[inline]
+    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts> {
+        crate::Fuzzer::try_from_reversed(self.reverse().compile())
+    }
+
+    /// Check if there exists a string this DFA will accept.
+    #[inline]
+    #[must_use]
+    pub fn would_ever_accept(&self) -> bool {
+        self.states.iter().any(|state| state.accepting) && !self.initial.is_empty()
     }
 }
 
