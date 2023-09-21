@@ -97,9 +97,11 @@ macro_rules! unwrap {
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! unwrap {
-    ($expr:expr) => {
-        unsafe { $expr.unwrap_unchecked() }
-    };
+    ($expr:expr) => {{
+        #[allow(unsafe_code)]
+        let result = unsafe { $expr.unwrap_unchecked() };
+        result
+    }};
 }
 
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
@@ -113,9 +115,11 @@ macro_rules! get {
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! get {
-    ($expr:expr, $index:expr) => {
-        unsafe { $expr.get_unchecked($index) }
-    };
+    ($expr:expr, $index:expr) => {{
+        #[allow(unsafe_code)]
+        let result = unsafe { $expr.get_unchecked($index) };
+        result
+    }};
 }
 
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
@@ -129,9 +133,11 @@ macro_rules! get_mut {
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! get_mut {
-    ($expr:expr, $index:expr) => {
-        unsafe { $expr.get_unchecked_mut($index) }
-    };
+    ($expr:expr, $index:expr) => {{
+        #[allow(unsafe_code)]
+        let result = unsafe { $expr.get_unchecked_mut($index) };
+        result
+    }};
 }
 
 mod decision;

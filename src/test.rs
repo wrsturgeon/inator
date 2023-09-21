@@ -636,8 +636,8 @@ mod reduced {
     }
 
     #[test]
-    fn repeat_optional_swap_1() {
-        repeat_optional_swap(Nfa {
+    fn star_def_swap_eq_1() {
+        star_def_swap_eq(Nfa {
             states: vec![],
             initial: BTreeSet::new(),
         });

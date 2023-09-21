@@ -42,7 +42,7 @@ impl<I: Clone + Ord> Nfa<I> {
         let states = ordered
             .iter()
             .map(|subset| {
-                let &(ref set, accepting) = get!(subset_states, subset);
+                let &(ref set, accepting) = unwrap!(subset_states.get(subset));
                 crate::decision::dfa::State {
                     transitions: set
                         .iter()
@@ -102,7 +102,7 @@ fn traverse<I: Clone + Ord>(
     // think about how to make this iterative instead
 
     // Insert the new values!
-    get_mut!(subset_states, &superposition).0 = next_superposition;
+    unwrap!(subset_states.get_mut(&superposition)).0 = next_superposition;
 
     superposition
 }
