@@ -140,6 +140,10 @@ macro_rules! get_mut {
     }};
 }
 
+// TODO: write an inherent impl for `Nfa<char>` with a bunch of stuff like `parenthesized`
+
+// TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
+
 mod decision;
 mod expr;
 
