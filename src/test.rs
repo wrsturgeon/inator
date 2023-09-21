@@ -186,7 +186,7 @@ mod prop {
             quickcheck::TestResult::passed()
         }
 
-        fn repeat_optional_swap(nfa: Nfa<u8>) -> bool {
+        fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
             nfa.clone().repeat().optional().compile() == nfa.optional().repeat().compile()
         }
 
@@ -323,7 +323,7 @@ mod reduced {
         );
     }
 
-    fn repeat_optional_swap(nfa: Nfa<u8>) {
+    fn star_def_swap_eq(nfa: Nfa<u8>) {
         assert_eq!(
             nfa.clone().repeat().optional().compile(),
             nfa.optional().repeat().compile()

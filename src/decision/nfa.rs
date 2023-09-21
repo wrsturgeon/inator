@@ -195,6 +195,13 @@ impl<I: Clone + Ord> Graph<I> {
         });
         self
     }
+
+    /// Match zero or more times (a.k.a. Kleene star).
+    #[inline]
+    #[must_use]
+    pub fn star(self) -> Self {
+        self.repeat().optional()
+    }
 }
 
 impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
