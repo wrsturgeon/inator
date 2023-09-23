@@ -144,19 +144,72 @@ macro_rules! get_mut {
 
 // TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
 
-mod decision;
+// TODO: minimal path from any node to an initial state (then print this as a doc-comment above each state function)
+
+// TODO (related to the above):
+// trait carrying the minimal string as a `const` member,
+// plus a type to be defined by the user,
+// plus a `const _CHECK: ()` which checks that
+// whenever a DFA changes, we don't just
+// arbitrarily continue using the wrong node's info,
+// and so users don't have to remember node numbers
+// Actually, could we make traits generic over `const &'static str`?
+// Then nodes could just look up their minimal paths,
+// which should all be unique (mental proof but make a bit more sure)
+// Basically the idea is that we can't minimze a pushdown automaton
+// but any DFA that can format input should be able to reach all relevant states,
+// so if we allow the users to "ride" these states,
+// they can do the hard work while guaranteeing minimal size
+
+// TODO: move to functions from input to output rather than just inputs
+// so e.g. we can write functions that take any uppercase letter instead of manually enumerating A, B, C, ..., Z
+// technically Russell's paradox if we allow functions to determine membership but _come on_
+
+pub mod decision;
 mod expr;
+pub mod format;
 
-#[cfg(test)]
-mod test;
+pub use expr::Expression;
 
-pub use {
-    decision::{Dfa as Compiled, Nfa as Parser, *},
-    expr::Expression,
-};
-
-/// Decide whether the next input token equals this token.
+/// Accept exactly this token.
 #[inline(always)]
-pub fn d<I: Clone + Ord>(input: I) -> Nfa<I> {
-    Nfa::unit(input)
+pub fn a<I: Clone + Ord>(input: I) -> decision::Parser<I> {
+    decision::Parser::unit(input)
+}
+
+/// When formatting, accept and spit back out this exact token.
+#[inline(always)]
+pub fn f<I: Clone + Ord>(input: I) -> format::Parser<I> {
+    format::Parser::unit(input.clone(), vec![input])
+}
+
+/// When formatting, accept this token but replace it with this other stuff.
+#[inline(always)]
+pub fn r<I: Clone + Ord>(input: I, replace: Vec<I>) -> format::Parser<I> {
+    format::Parser::unit(input, replace)
+}
+
+/// When formatting, accept this token but delete it.
+// TODO: rename to `d`
+#[inline(always)]
+pub fn opt<I: Clone + Ord>(input: I) -> format::Parser<I> {
+    r(input, vec![]).optional()
+}
+
+/// When formatting, accept this token but don't spit it out again.
+#[inline(always)]
+pub fn space() -> format::Parser<char> {
+    (f(' ') >> r(' ', vec![]).star()).optional()
+}
+
+/// When formatting, accept this token but don't spit it out again.
+#[inline(always)]
+pub fn no_space() -> format::Parser<char> {
+    opt(' ').repeat()
+}
+
+/// When formatting, accept this token but don't spit it out again.
+#[inline(always)]
+pub fn req_space() -> format::Parser<char> {
+    f(' ') >> opt(' ').repeat()
 }

@@ -113,7 +113,7 @@ impl<I: Clone + Ord> Graph<I> {
         // Take all epsilon transitions immediately
         let mut superposition = BTreeSet::<usize>::new();
         while let Some(state) = queue.pop() {
-            for next in get!(self.states, state).epsilon_transitions() {
+            for next in &get!(self.states, state).epsilon {
                 if !superposition.contains(next) {
                     queue.push(*next);
                 }
@@ -157,8 +157,8 @@ impl<I: Clone + Ord> Graph<I> {
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts> {
-        crate::Fuzzer::try_from_reversed(self.reverse().compile())
+    pub fn fuzz(&self) -> Result<super::Fuzzer<I>, super::NeverAccepts> {
+        super::Fuzzer::try_from_reversed(self.reverse().compile())
     }
 
     /// Check if there exists a string this DFA will accept.
@@ -235,34 +235,15 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
     }
 }
 
-impl<I: Clone + Ord> State<I> {
-    /// Valid inputs mapped to the set of states to which this state can transition on that input.
-    #[inline(always)]
-    pub const fn non_epsilon_transitions(&self) -> &BTreeMap<I, BTreeSet<usize>> {
-        &self.non_epsilon
-    }
-
-    /// Set of states to which this state can immediately transition without input.
-    #[inline(always)]
-    pub const fn epsilon_transitions(&self) -> &BTreeSet<usize> {
-        &self.epsilon
-    }
-
-    /// Set of states to which this state can transition on a given input.
-    #[inline]
-    pub fn transition(&self, input: &I) -> Option<&BTreeSet<usize>> {
-        self.non_epsilon.get(input)
-    }
-}
-
 #[cfg(feature = "quickcheck")]
+#[allow(clippy::arithmetic_side_effects)]
 impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
     #[inline]
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let mut states = quickcheck::Arbitrary::arbitrary(g);
         cut_nonsense(&mut states);
         let mut initial = BTreeSet::arbitrary(g);
-        initial.retain(|i| i < &states.len());
+        initial = initial.into_iter().map(|i| i % states.len()).collect();
         Self { states, initial }
     }
 
@@ -271,7 +252,7 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
         Box::new((self.states.clone(), self.initial.clone()).shrink().map(
             |(mut states, mut initial)| {
                 cut_nonsense(&mut states);
-                initial.retain(|i| i < &states.len());
+                initial = initial.into_iter().map(|i| i % states.len()).collect();
                 Self { states, initial }
             },
         ))
@@ -309,12 +290,13 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
 
 /// Remove impossible transitions from automatically generated automata.
 #[cfg(feature = "quickcheck")]
+#[allow(clippy::arithmetic_side_effects)]
 fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
-        state.epsilon.retain(|i| i < &size);
-        for destination in state.non_epsilon.values_mut() {
-            destination.retain(|index| index < &size);
+        state.epsilon = state.epsilon.iter().map(|i| i % size).collect();
+        for set in state.non_epsilon.values_mut() {
+            *set = set.iter().map(|i| i % size).collect();
         }
     }
 }
@@ -324,7 +306,7 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
 pub(crate) struct Stepper<'graph, I: Clone + Ord> {
     /// The graph we're riding.
     graph: &'graph Graph<I>,
-    /// Current state after the input we've received so far.
+    /// Current states after the input we've received so far.
     state: BTreeSet<usize>,
 }
 
@@ -348,7 +330,8 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
                 .iter()
                 .flat_map(|&index| {
                     get!(self.graph.states, index)
-                        .transition(token)
+                        .non_epsilon
+                        .get(token)
                         .map_or(BTreeSet::new(), Clone::clone)
                 })
                 .collect(),

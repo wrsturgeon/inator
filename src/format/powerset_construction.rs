@@ -9,20 +9,27 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{Compiled as Dfa, Parser as Nfa};
+use super::{dfa::Recommendation, Compiled as Dfa, Parser as Nfa};
 
 /// Type for transitions from _subsets_ of states to _subsets_ of states.
-type SubsetStates<I> = BTreeMap<BTreeSet<usize>, (BTreeMap<I, BTreeSet<usize>>, bool)>;
+type SubsetStates<I> =
+    BTreeMap<BTreeSet<Recommendation<I>>, (BTreeMap<I, BTreeSet<Recommendation<I>>>, bool)>;
 
 impl<I: Clone + Ord> Nfa<I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
     pub(crate) fn subsets(self) -> Dfa<I> {
         // Map which _subsets_ of states transition to which _subsets_ of states
-        let mut subset_states = BTreeMap::new();
+        let mut subset_states = SubsetStates::new();
         let initial_state = traverse(
             &self,
-            self.initial.iter().copied().collect(),
+            self.initial
+                .iter()
+                .map(|&next_state| Recommendation {
+                    next_state,
+                    append: vec![],
+                })
+                .collect(),
             &mut subset_states,
         );
 
@@ -46,8 +53,17 @@ impl<I: Clone + Ord> Nfa<I> {
                 super::dfa::State {
                     transitions: set
                         .iter()
-                        .map(|(k, v)| (k.clone(), unwrap!(ordered.binary_search(&v))))
-                        .collect::<BTreeMap<I, usize>>(),
+                        .map(|(k, v)| {
+                            let next_state = unwrap!(ordered.binary_search(&v));
+                            (
+                                k.clone(),
+                                Recommendation {
+                                    next_state,
+                                    append: vec![],
+                                },
+                            )
+                        })
+                        .collect(),
                     accepting,
                 }
             })
@@ -66,9 +82,9 @@ impl<I: Clone + Ord> Nfa<I> {
 #[inline]
 fn traverse<I: Clone + Ord>(
     nfa: &Nfa<I>,
-    queue: Vec<usize>,
+    queue: Vec<Recommendation<I>>,
     subset_states: &mut SubsetStates<I>,
-) -> BTreeSet<usize> {
+) -> BTreeSet<Recommendation<I>> {
     // Take all epsilon transitions immediately
     let superposition = nfa.take_all_epsilon_transitions(queue);
 
@@ -79,22 +95,30 @@ fn traverse<I: Clone + Ord>(
     };
 
     // Get all _states_ from indices
-    let states = superposition.iter().map(|&i| get!(nfa.states, i));
+    let states = superposition
+        .iter()
+        .map(|&Recommendation { next_state, .. }| get!(nfa.states, next_state));
 
     // For now, so we can't get stuck in a cycle, cache an empty map:
     let _ = entry.insert((BTreeMap::new(), states.clone().any(|state| state.accepting)));
 
     // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
-    let mut next_superposition = BTreeMap::<I, BTreeSet<usize>>::new();
+    let mut next_superposition = BTreeMap::<I, BTreeSet<Recommendation<I>>>::new();
     for state in states {
-        for (k, v) in &state.non_epsilon {
-            next_superposition.entry(k.clone()).or_default().extend(v);
+        for (k, rec) in &state.non_epsilon {
+            let next_superposition_entry = next_superposition.entry(k.clone()).or_default();
+            for &next_state in &rec.set {
+                let _ = next_superposition_entry.insert(Recommendation {
+                    next_state,
+                    append: rec.append.clone(),
+                });
+            }
         }
     }
 
-    // Now, follow epsilon transitions AND recurse
+    // Now, follow epsilon transitions AND RECURSE
     for v in next_superposition.values_mut() {
-        *v = traverse(nfa, v.iter().copied().collect(), subset_states);
+        *v = traverse(nfa, v.iter().cloned().collect(), subset_states);
     }
 
     // TODO:

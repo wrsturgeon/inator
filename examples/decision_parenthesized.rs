@@ -1,4 +1,4 @@
-use inator::*;
+use inator::{d, decision::*};
 
 #[inline]
 fn parenthesized(automaton: Parser<char>) -> Parser<char> {
@@ -10,20 +10,6 @@ fn main() {
     println!("abc:");
     println!("{abc}");
 
-    // let left_paren = d('(');
-    // println!("left_paren:");
-    // println!("{left_paren}");
-
-    // let right_paren = d(')');
-    // println!("right_paren:");
-    // println!("{right_paren}");
-
-    // let left_paren_abc = d('(') >> abc;
-    // println!("left_paren_abc:");
-    // println!("{left_paren_abc}");
-
-    // let in_parentheses = left_paren_abc << d(')');
-    // let in_parentheses = left_paren_abc >> d(')');
     let in_parentheses = parenthesized(abc);
     println!("in_parentheses:");
     println!("{in_parentheses}");

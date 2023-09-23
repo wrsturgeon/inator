@@ -1,4 +1,4 @@
-use inator::*;
+use inator::{d, decision::*};
 
 #[inline]
 fn parenthesized(p: Parser<char>) -> Parser<char> {

@@ -6,6 +6,8 @@
 
 //! Deterministic finite automata.
 
+#![allow(clippy::unneeded_field_pattern)] // FIXME: remove
+
 use proc_macro2::Span;
 use std::collections::BTreeMap;
 use syn::{Ident, Token, __private::ToTokens};
@@ -23,24 +25,33 @@ pub struct Graph<I: Clone + Ord> {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that require consuming and matching input.
-    pub(crate) transitions: BTreeMap<I, usize>,
+    pub(crate) transitions: BTreeMap<I, Recommendation<I>>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
 
+/// Set with a recommended element.
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Recommendation<I> {
+    /// Set of all elements.
+    pub(crate) next_state: usize,
+    /// What to append to our running output vector when we take this transition.
+    pub(crate) append: Vec<I>,
+}
+
 impl<I: Clone + Ord> Graph<I> {
-    /// Decide whether an input belongs to the regular langage this NFA accepts.
+    /// Format input iff it belongs to the regular langage this NFA accepts.
     #[inline(always)]
     #[allow(clippy::missing_panics_doc)]
-    pub fn accept<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
+    pub fn format<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> Option<Vec<I>> {
+        let mut v = vec![];
         let mut state = self.initial;
         for input in iter {
-            match get!(self.states, state).transition(&input) {
-                Some(&next_state) => state = next_state,
-                None => return false,
-            }
+            let rec = get!(self.states, state).transition(&input)?;
+            state = rec.next_state;
+            v.extend(rec.append.iter().cloned());
         }
-        get!(self.states, state).accepting
+        get!(self.states, state).accepting.then_some(v)
     }
 
     /// Number of states.
@@ -63,7 +74,15 @@ impl<I: Clone + Ord> Graph<I> {
                     non_epsilon: state
                         .transitions
                         .iter()
-                        .map(|(k, &v)| (k.clone(), core::iter::once(v).collect()))
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                super::nfa::Recommendation {
+                                    set: core::iter::once(v.next_state).collect(),
+                                    append: v.append.clone(),
+                                },
+                            )
+                        })
                         .collect(),
                     accepting: state.accepting,
                 })
@@ -261,7 +280,7 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display for Graph<I> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Initial state: {}", self.initial)?;
@@ -272,7 +291,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
+impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display for State<I> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
@@ -287,10 +306,20 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
     }
 }
 
+impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display
+    for Recommendation<I>
+{
+    #[inline]
+    #[allow(clippy::use_debug)]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{} (recommends {:?})", self.next_state, self.append)
+    }
+}
+
 impl<I: Clone + Ord> State<I> {
     /// State to which this state can transition on a given input.
     #[inline]
-    pub fn transition(&self, input: &I) -> Option<&usize> {
+    pub fn transition(&self, input: &I) -> Option<&Recommendation<I>> {
         self.transitions.get(input)
     }
 }
@@ -401,58 +430,66 @@ impl State<crate::expr::Expression> {
                         arms: self
                             .transitions
                             .iter()
-                            .map(|(input, dst)| syn::Arm {
-                                attrs: vec![],
-                                pat: syn::Pat::TupleStruct(syn::PatTupleStruct {
-                                    attrs: vec![],
-                                    qself: None,
-                                    path: syn::Path {
-                                        leading_colon: None,
-                                        segments: core::iter::once(syn::PathSegment {
-                                            ident: Ident::new("Some", Span::call_site()),
-                                            arguments: syn::PathArguments::None,
-                                        })
-                                        .collect(),
+                            .map(
+                                |(
+                                    input,
+                                    &Recommendation {
+                                        next_state: dst,
+                                        append: _, // <-- TODO
                                     },
-                                    paren_token: syn::token::Paren::default(),
-                                    elems: core::iter::once(input.as_pattern()).collect(),
-                                }),
-                                guard: None,
-                                fat_arrow_token: Token!(=>)(Span::call_site()),
-                                body: Box::new(syn::Expr::Call(syn::ExprCall {
+                                )| syn::Arm {
                                     attrs: vec![],
-                                    func: Box::new(syn::Expr::Path(syn::ExprPath {
+                                    pat: syn::Pat::TupleStruct(syn::PatTupleStruct {
                                         attrs: vec![],
                                         qself: None,
                                         path: syn::Path {
                                             leading_colon: None,
                                             segments: core::iter::once(syn::PathSegment {
-                                                ident: Ident::new(
-                                                    &format!("s{dst}"),
-                                                    Span::call_site(),
-                                                ),
+                                                ident: Ident::new("Some", Span::call_site()),
                                                 arguments: syn::PathArguments::None,
                                             })
                                             .collect(),
                                         },
+                                        paren_token: syn::token::Paren::default(),
+                                        elems: core::iter::once(input.as_pattern()).collect(),
+                                    }),
+                                    guard: None,
+                                    fat_arrow_token: Token!(=>)(Span::call_site()),
+                                    body: Box::new(syn::Expr::Call(syn::ExprCall {
+                                        attrs: vec![],
+                                        func: Box::new(syn::Expr::Path(syn::ExprPath {
+                                            attrs: vec![],
+                                            qself: None,
+                                            path: syn::Path {
+                                                leading_colon: None,
+                                                segments: core::iter::once(syn::PathSegment {
+                                                    ident: Ident::new(
+                                                        &format!("s{dst}"),
+                                                        Span::call_site(),
+                                                    ),
+                                                    arguments: syn::PathArguments::None,
+                                                })
+                                                .collect(),
+                                            },
+                                        })),
+                                        paren_token: syn::token::Paren::default(),
+                                        args: core::iter::once(syn::Expr::Path(syn::ExprPath {
+                                            attrs: vec![],
+                                            qself: None,
+                                            path: syn::Path {
+                                                leading_colon: None,
+                                                segments: core::iter::once(syn::PathSegment {
+                                                    ident: Ident::new("i", Span::call_site()),
+                                                    arguments: syn::PathArguments::None,
+                                                })
+                                                .collect(),
+                                            },
+                                        }))
+                                        .collect(),
                                     })),
-                                    paren_token: syn::token::Paren::default(),
-                                    args: core::iter::once(syn::Expr::Path(syn::ExprPath {
-                                        attrs: vec![],
-                                        qself: None,
-                                        path: syn::Path {
-                                            leading_colon: None,
-                                            segments: core::iter::once(syn::PathSegment {
-                                                ident: Ident::new("i", Span::call_site()),
-                                                arguments: syn::PathArguments::None,
-                                            })
-                                            .collect(),
-                                        },
-                                    }))
-                                    .collect(),
-                                })),
-                                comma: Some(Token!(,)(Span::call_site())),
-                            })
+                                    comma: Some(Token!(,)(Span::call_site())),
+                                },
+                            )
                             .chain(core::iter::once(syn::Arm {
                                 attrs: vec![],
                                 pat: syn::Pat::Path(syn::ExprPath {
@@ -603,6 +640,26 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
     }
 }
 
+#[cfg(feature = "quickcheck")]
+impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Recommendation<I> {
+    #[inline]
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            next_state: quickcheck::Arbitrary::arbitrary(g),
+            append: quickcheck::Arbitrary::arbitrary(g),
+        }
+    }
+
+    #[inline]
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            (self.next_state, self.append.clone())
+                .shrink()
+                .map(|(next_state, append)| Self { next_state, append }),
+        )
+    }
+}
+
 /// Remove impossible transitions from automatically generated automata.
 #[cfg(feature = "quickcheck")]
 #[allow(clippy::arithmetic_side_effects)]
@@ -612,7 +669,15 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
         state.transitions = state
             .transitions
             .iter()
-            .map(|(k, &i)| (k.clone(), i % size))
+            .map(|(token, rec)| {
+                (
+                    token.clone(),
+                    Recommendation {
+                        next_state: rec.next_state % size,
+                        append: rec.append.clone(),
+                    },
+                )
+            })
             .collect();
     }
 }

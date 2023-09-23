@@ -26,12 +26,13 @@ impl<I: Clone + Ord> Nfa<I> {
             for &dst in &state.epsilon {
                 let _ = get_mut!(states, dst).epsilon.insert(src);
             }
-            for (k, v) in &state.non_epsilon {
-                for &dst in v {
+            for (token, rec) in &state.non_epsilon {
+                for &dst in &rec.set {
                     let _ = get_mut!(states, dst)
                         .non_epsilon
-                        .entry(k.clone())
+                        .entry(token.clone())
                         .or_default()
+                        .set
                         .insert(src);
                 }
             }

@@ -6,7 +6,7 @@
 
 #![allow(clippy::print_stdout, clippy::unwrap_used)]
 
-use crate::decision::*;
+use super::{dfa, nfa, Compiled as Dfa, Parser as Nfa};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod unit {
@@ -69,11 +69,10 @@ mod unit {
     }
 }
 
+#[cfg(feature = "quickcheck")]
 mod prop {
-    #[allow(unused_imports)]
     use super::*;
 
-    #[cfg(feature = "quickcheck")]
     quickcheck::quickcheck! {
         fn nfa_dfa_equal(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
@@ -198,8 +197,6 @@ mod prop {
             let abc = a >> b.optional() >> c;
             #[allow(clippy::default_numeric_fallback)]
             for ((ai, bi), ci) in af.zip(bf).zip(cf).take(10) {
-                // if !abc.accept(ai.iter().chain(bi.iter()).chain(ci.iter())) { return quickcheck::TestResult::failed(); }
-                // if !abc.accept(ai.iter().chain(bi.iter())) { return quickcheck::TestResult::failed(); }
                 assert!(
                     abc.accept(ai.iter().chain(bi.iter()).chain(ci.iter())),
                     "Sandwiched optional did not accept the concatenation of \
@@ -329,33 +326,6 @@ mod reduced {
             nfa.optional().repeat().compile()
         );
     }
-
-    // fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) {
-    //     println!("a:");
-    //     println!("{a}");
-    //     println!("b:");
-    //     println!("{b}");
-    //     println!("c:");
-    //     println!("{c}");
-    //     let af = a.fuzz().unwrap();
-    //     let bf = b.fuzz().unwrap();
-    //     let cf = c.fuzz().unwrap();
-    //     #[allow(clippy::arithmetic_side_effects)]
-    //     let abc = a >> b.optional() >> c;
-    //     #[allow(clippy::default_numeric_fallback)]
-    //     for ((ai, bi), ci) in af.zip(bf).zip(cf).take(100000) {
-    //         assert!(
-    //             abc.accept(ai.iter().chain(bi.iter()).chain(ci.iter())),
-    //             "Sandwiched optional did not accept the concatenation of \
-    //             three valid inputs: {ai:?}, {bi:?}, & {ci:?}",
-    //         );
-    //         assert!(
-    //             abc.accept(ai.iter().chain(ci.iter())),
-    //             "Sandwiched optional did not accept the concatenation of \
-    //             two valid inputs: {ai:?} & {ci:?}",
-    //         );
-    //     }
-    // }
 
     #[test]
     fn nfa_dfa_equal_1() {
@@ -642,78 +612,4 @@ mod reduced {
             initial: BTreeSet::new(),
         });
     }
-
-    // #[test]
-    // fn sandwich_1() {
-    //     sandwich(
-    //         Nfa {
-    //             states: vec![nfa::State {
-    //                 epsilon: BTreeSet::new(),
-    //                 non_epsilon: BTreeMap::new(),
-    //                 accepting: true,
-    //             }],
-    //             initial: core::iter::once(0).collect(),
-    //         },
-    //         Nfa {
-    //             states: vec![nfa::State {
-    //                 epsilon: BTreeSet::new(),
-    //                 non_epsilon: BTreeMap::new(),
-    //                 accepting: true,
-    //             }],
-    //             initial: core::iter::once(0).collect(),
-    //         },
-    //         Nfa {
-    //             states: vec![
-    //                 nfa::State {
-    //                     epsilon: BTreeSet::new(),
-    //                     non_epsilon: BTreeMap::new(),
-    //                     accepting: true,
-    //                 },
-    //                 nfa::State {
-    //                     epsilon: BTreeSet::new(),
-    //                     non_epsilon: core::iter::once((0, core::iter::once(0).collect())).collect(),
-    //                     accepting: false,
-    //                 },
-    //             ],
-    //             initial: core::iter::once(1).collect(),
-    //         },
-    //     );
-    // }
-
-    // #[test]
-    // fn sandwich_2() {
-    //     sandwich(
-    //         Nfa {
-    //             states: vec![nfa::State {
-    //                 epsilon: BTreeSet::new(),
-    //                 non_epsilon: BTreeMap::new(),
-    //                 accepting: true,
-    //             }],
-    //             initial: core::iter::once(0).collect(),
-    //         },
-    //         Nfa {
-    //             states: vec![nfa::State {
-    //                 epsilon: BTreeSet::new(),
-    //                 non_epsilon: BTreeMap::new(),
-    //                 accepting: true,
-    //             }],
-    //             initial: core::iter::once(0).collect(),
-    //         },
-    //         Nfa {
-    //             states: vec![
-    //                 nfa::State {
-    //                     epsilon: BTreeSet::new(),
-    //                     non_epsilon: core::iter::once((0, core::iter::once(1).collect())).collect(),
-    //                     accepting: false,
-    //                 },
-    //                 nfa::State {
-    //                     epsilon: BTreeSet::new(),
-    //                     non_epsilon: BTreeMap::new(),
-    //                     accepting: true,
-    //                 },
-    //             ],
-    //             initial: core::iter::once(0).collect(),
-    //         },
-    //     );
-    // }
 }

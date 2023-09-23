@@ -18,7 +18,8 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
             .map(|x| x.checked_add(rhs).expect("Huge number of states"))
             .collect();
         for v in &mut self.non_epsilon.values_mut() {
-            *v = v
+            v.set = v
+                .set
                 .iter()
                 .map(|x| x.checked_add(rhs).expect("Huge number of states"))
                 .collect();

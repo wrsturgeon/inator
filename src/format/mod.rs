@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! Automata that can only decide whether an input is in a given language.
+//! Automata that can format any input in a given language.
 
 mod brzozowski;
 pub(crate) mod dfa;
