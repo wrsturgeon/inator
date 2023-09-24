@@ -157,19 +157,38 @@ mod test;
 
 pub use {
     dfa::Graph as Compiled,
-    expr::{Expression, ToExpression},
+    expr::Expression,
     fuzz::{Fuzzer, NeverAccepts},
     nfa::Graph as Parser,
 };
 
 /// Accept this token if we see it here.
+#[must_use]
 #[inline(always)]
 pub fn c<I: Clone + Ord>(token: I) -> Parser<I> {
     Parser::unit(token)
 }
 
-/// Accept any of these tokens here.
+/// Accept this token.
+#[must_use]
+#[inline(always)]
+pub fn empty<I: Clone + Ord>() -> Parser<I> {
+    Parser::empty()
+}
+
+/// Accept this sequence of tokens.
 #[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
+pub fn s<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
+    tokens
+        .into_iter()
+        .fold(Parser::empty(), |acc, token| acc >> c(token))
+}
+
+/// Accept any of these tokens.
+#[inline]
+#[must_use]
 pub fn any<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
     tokens
         .into_iter()
@@ -178,21 +197,23 @@ pub fn any<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> 
 
 /// Accept either this token or nothing.
 #[inline]
+#[must_use]
 pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
     c(token).optional()
 }
 
 /// Any amount of whitespace.
 #[inline]
+#[must_use]
 pub fn space() -> Parser<char> {
-    any((0..u8::MAX)
-        .filter(|c| c.is_ascii_whitespace())
-        .map(char::from))
+    any((0..u8::MAX).filter(u8::is_ascii_whitespace).map(char::from))
 }
 
 /// Surround this language in parentheses.
 /// Note that whitespace around the language--e.g. "( A )"--is fine.
 #[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
 pub fn parenthesized(p: Parser<char>) -> Parser<char> {
     c('(') >> space() >> p >> space() >> c(')')
 }

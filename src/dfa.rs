@@ -6,11 +6,10 @@
 
 //! Deterministic finite automata.
 
+use crate::Expression;
 use proc_macro2::Span;
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 use syn::{Ident, Token, __private::ToTokens};
-
-use crate::ToExpression;
 
 /// Deterministic finite automata.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -97,71 +96,77 @@ impl<I: Clone + Ord> Graph<I> {
     }
 
     /// Find the minimal input that reaches this state.
-    /// Like Dijkstra's, but optimized to leverage that each edge is 0 (if epsilon) or 1 (otherwise).
+    /// Like Dijkstra's but optimized to leverage that each edge is 1 unit long
     #[inline]
     #[must_use]
     #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
-    pub(crate) fn dijkstra<Init: IntoIterator<Item = usize>>(
-        &self,
-        initial: Init,
-        endpoint: usize,
-    ) -> Option<Vec<I>> {
+    pub(crate) fn dijkstra(&self, initial: usize, endpoint: usize) -> Vec<I> {
         use core::cmp::Reverse;
         use std::collections::BinaryHeap;
 
         let mut cache = BTreeMap::<usize, Vec<I>>::new();
         let mut queue = BinaryHeap::new();
 
-        for init in initial {
-            drop(cache.insert(init, vec![]));
-            queue.push(Reverse(CmpFirst(0_usize, init)));
-        }
+        drop(cache.insert(initial, vec![]));
+        queue.push(Reverse(CmpFirst(0_usize, initial)));
 
         while let Some(Reverse(CmpFirst(distance, index))) = queue.pop() {
-            let mut cached = unwrap!(cache.get(&index)).clone(); // TODO: look into `Cow`
-            let state = get!(self.states, index);
-            for (&next, &formatted) in &state.epsilon {
-                if next == endpoint {
-                    return Some(cached);
-                }
-                if let Entry::Vacant(entry) = cache.entry(next) {
-                    let _ = entry.insert(cached.clone());
-                    queue.push(Reverse(CmpFirst(distance, next)));
-                }
+            let cached = unwrap!(cache.get(&index)).clone(); // TODO: look into `Cow`
+            if index == endpoint {
+                return cached;
             }
-            for (token, repl) in &state.non_epsilon {
-                for (&next, formatted) in repl {
-                    if next == endpoint {
-                        cached.push(token.clone());
-                        return Some(cached);
-                    }
-                    if let Entry::Vacant(entry) = cache.entry(next) {
-                        entry.insert(cached.clone()).push(token.clone());
-                        queue.push(Reverse(CmpFirst(distance.saturating_add(1), next)));
-                    }
+            let state = get!(self.states, index);
+            for (token, &next) in &state.transitions {
+                if let Entry::Vacant(entry) = cache.entry(next) {
+                    entry.insert(cached.clone()).push(token.clone());
+                    queue.push(Reverse(CmpFirst(distance.saturating_add(1), next)));
                 }
             }
         }
 
-        None
+        #[allow(clippy::unreachable)]
+        #[cfg(any(test, debug_assertions))]
+        {
+            unreachable!()
+        }
+
+        #[allow(unsafe_code)]
+        #[cfg(not(any(test, debug_assertions)))]
+        unsafe {
+            core::hint::unreachable_unchecked()
+        }
     }
 
     /// Find the minimal input that reaches this state.
     #[inline]
     #[must_use]
-    // #[cfg(test)] // <-- TODO: REINSTATE
-    #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
-    pub(crate) fn backtrack(&self, endpoint: usize) -> Option<Vec<I>> {
-        self.dijkstra(self.initial.iter().map(|(&k, _)| k), endpoint)
+    pub(crate) fn backtrack(&self, endpoint: usize) -> Vec<I> {
+        self.dijkstra(self.initial, endpoint)
     }
 
     /// Print as a set of Rust source-code functions.
     #[inline]
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn into_source(self, name: &str) -> (syn::ItemFn, Vec<syn::Item>)
+    pub fn into_source(self, name: &str) -> String
     where
-        I: ToExpression,
+        I: Expression,
+    {
+        let (ast_fn, ast_mod) = self.into_ast(name);
+        prettyplease::unparse(&syn::File {
+            shebang: None,
+            attrs: vec![],
+            items: vec![syn::Item::Fn(ast_fn), syn::Item::Mod(ast_mod)],
+        })
+    }
+
+    /// Print as a set of Rust source-code functions.
+    #[inline]
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn into_ast(self, name: &str) -> (syn::ItemFn, syn::ItemMod)
+    where
+        I: Expression,
     {
         let generics = syn::Generics {
             lt_token: Some(Token!(<)(Span::call_site())),
@@ -205,12 +210,22 @@ impl<I: Clone + Ord> Graph<I> {
             gt_token: Some(Token!(>)(Span::call_site())),
             where_clause: None,
         };
-        let states = self
-            .states
-            .iter()
-            .enumerate()
-            .map(|(i, state)| state.into_source(i, name, generics.clone(), self.backtrack(i)))
-            .collect();
+        let states = syn::ItemMod {
+            attrs: vec![],
+            vis: syn::Visibility::Inherited,
+            unsafety: None,
+            mod_token: Token!(mod)(Span::call_site()),
+            ident: Ident::new(&format!("_inator_automaton_{name}"), Span::call_site()),
+            content: Some((
+                syn::token::Brace::default(),
+                self.states
+                    .iter()
+                    .enumerate()
+                    .map(|(i, state)| state.to_source(i, name, generics.clone(), self.backtrack(i)))
+                    .collect(),
+            )),
+            semi: None,
+        };
         (
             syn::ItemFn {
                 attrs: vec![syn::Attribute {
@@ -286,7 +301,7 @@ impl<I: Clone + Ord> Graph<I> {
                     fn_token: Token!(fn)(Span::call_site()),
                     ident: Ident::new(name, Span::call_site()),
                     generics,
-                    paren_token: Default::default(),
+                    paren_token: syn::token::Paren::default(),
                     inputs: core::iter::once(syn::FnArg::Typed(syn::PatType {
                         attrs: vec![],
                         pat: Box::new(syn::Pat::Ident(syn::PatIdent {
@@ -348,6 +363,32 @@ impl<I: Clone + Ord> Graph<I> {
     }
 }
 
+/// Only the first element matters for equality and comparison.
+#[derive(Clone, Copy, Debug, Default)]
+struct CmpFirst<A: Ord, B>(pub(crate) A, pub(crate) B);
+
+impl<A: Ord, B> PartialEq for CmpFirst<A, B> {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<A: Ord, B> Eq for CmpFirst<A, B> {}
+
+impl<A: Ord, B> PartialOrd for CmpFirst<A, B> {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<A: Ord, B> Ord for CmpFirst<A, B> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
 impl<I: Clone + Ord> IntoIterator for Graph<I> {
     type Item = State<I>;
     type IntoIter = std::vec::IntoIter<State<I>>;
@@ -366,7 +407,7 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Initial state: {}", self.initial)?;
@@ -377,7 +418,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
+impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
@@ -386,7 +427,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
             if self.accepting { "" } else { "NOT " }
         )?;
         for (input, transitions) in &self.transitions {
-            writeln!(f, "    {input} --> {transitions}")?;
+            writeln!(f, "    {} --> {transitions}", input.to_source())?;
         }
         Ok(())
     }
@@ -402,15 +443,15 @@ impl<I: Clone + Ord> State<I> {
     /// Print as a Rust source-code function.
     #[inline]
     #[allow(clippy::too_many_lines)]
-    pub fn into_source(
+    pub fn to_source(
         &self,
         index: usize,
         name: &str,
         generics: syn::Generics,
-        minimal_input: &str,
+        minimal_input: Vec<I>,
     ) -> syn::Item
     where
-        I: ToExpression,
+        I: Expression,
     {
         let indexed = format!("s{index}");
         syn::Item::Fn(syn::ItemFn {
@@ -445,7 +486,13 @@ impl<I: Clone + Ord> State<I> {
                         value: syn::Expr::Lit(syn::ExprLit {
                             attrs: vec![],
                             lit: syn::Lit::Str(syn::LitStr::new(
-                                &format!("Minimal input to reach this state: {minimal_input}"),
+                                &format!(
+                                    "Minimal input to reach this state: [ {}]",
+                                    minimal_input
+                                        .into_iter()
+                                        .fold(String::new(), |acc, token| acc
+                                            + &format!("{}, ", token.to_source()))
+                                ),
                                 Span::call_site(),
                             )),
                         }),
@@ -599,7 +646,7 @@ impl<I: Clone + Ord> State<I> {
                                         .collect(),
                                     },
                                     paren_token: syn::token::Paren::default(),
-                                    elems: core::iter::once(input.to_expr().as_pattern()).collect(),
+                                    elems: core::iter::once(input.to_pattern()).collect(),
                                 }),
                                 guard: None,
                                 fat_arrow_token: Token!(=>)(Span::call_site()),

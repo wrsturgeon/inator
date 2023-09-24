@@ -8,82 +8,58 @@
 
 use proc_macro2::Span;
 
-/// Any possible expression to be matched against.
-#[non_exhaustive]
-#[allow(dead_code)] // <-- FIXME
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Expression {
-    /// Boolean.
-    Bool(bool),
-    /// Byte.
-    Byte(u8),
-    /// Character.
-    Char(char),
-    /// Integer (individual digits).
-    Int(Vec<u8>),
-    // /// Floating-point number.
-    // Float(f64),
-    /// Byte-string.
-    ByteString(Vec<u8>),
-    /// String.
-    String(String),
-}
-
-impl Expression {
-    /// Convert to a `syn::Pat`.
-    #[inline]
-    #[must_use]
-    pub fn as_pattern(&self) -> syn::Pat {
-        match *self {
-            Self::Bool(b) => syn::Pat::Lit(syn::ExprLit {
-                attrs: vec![],
-                lit: syn::Lit::Bool(syn::LitBool::new(b, Span::call_site())),
-            }),
-            Self::Byte(b) => syn::Pat::Lit(syn::ExprLit {
-                attrs: vec![],
-                lit: syn::Lit::Byte(syn::LitByte::new(b, Span::call_site())),
-            }),
-            Self::Char(c) => syn::Pat::Lit(syn::ExprLit {
-                attrs: vec![],
-                lit: syn::Lit::Char(syn::LitChar::new(c, Span::call_site())),
-            }),
-            Self::Int(ref i) => syn::Pat::Lit(syn::ExprLit {
-                attrs: vec![],
-                lit: syn::Lit::Int(syn::LitInt::new(
-                    #[allow(unsafe_code)]
-                    // SAFETY: Untouched from `syn`
-                    unsafe {
-                        core::str::from_utf8_unchecked(i)
-                    },
-                    Span::call_site(),
-                )),
-            }),
-            Self::ByteString(ref bs) => syn::Pat::Lit(syn::ExprLit {
-                attrs: vec![],
-                lit: syn::Lit::ByteStr(syn::LitByteStr::new(bs, Span::call_site())),
-            }),
-            Self::String(ref s) => syn::Pat::Lit(syn::ExprLit {
-                attrs: vec![],
-                lit: syn::Lit::Str(syn::LitStr::new(s, Span::call_site())),
-            }),
-        }
-    }
-}
-
-/// Convert `&Self -> inator::Expression`.
-pub trait ToExpression {
+/// Convert to a variety of source-code-related formats.
+pub trait Expression {
     /// Convert `&Self -> inator::Expression`.
     #[must_use]
-    fn to_expr(&self) -> Expression;
+    fn to_pattern(&self) -> syn::Pat;
+    /// Write a string that looks like Rust source (for pretty-printing only).
+    #[must_use]
+    fn to_source(&self) -> String;
     /// Write a `syn` type representing this type.
     #[must_use]
     fn to_type() -> syn::Type;
 }
 
-impl ToExpression for char {
+impl Expression for char {
     #[inline(always)]
-    fn to_expr(&self) -> Expression {
-        Expression::Char(*self)
+    fn to_pattern(&self) -> syn::Pat {
+        syn::Pat::Lit(syn::ExprLit {
+            attrs: vec![],
+            lit: syn::Lit::Char(syn::LitChar::new(*self, Span::call_site())),
+        })
+    }
+    #[inline]
+    fn to_source(&self) -> String {
+        format!("'{}'", self.escape_default())
+    }
+    #[inline]
+    fn to_type() -> syn::Type {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path: syn::Path {
+                leading_colon: None,
+                segments: core::iter::once(syn::PathSegment {
+                    ident: syn::Ident::new("char", Span::call_site()),
+                    arguments: syn::PathArguments::None,
+                })
+                .collect(),
+            },
+        })
+    }
+}
+
+impl Expression for u8 {
+    #[inline(always)]
+    fn to_pattern(&self) -> syn::Pat {
+        syn::Pat::Lit(syn::ExprLit {
+            attrs: vec![],
+            lit: syn::Lit::Byte(syn::LitByte::new(*self, Span::call_site())),
+        })
+    }
+    #[inline]
+    fn to_source(&self) -> String {
+        format!("b'{}'", char::from(*self).escape_default())
     }
     #[inline]
     fn to_type() -> syn::Type {

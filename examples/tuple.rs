@@ -1,8 +1,12 @@
 //! No tricks under the hood--here are some definitions from our "standard library":
 //! ```
 //!
+//! /// Surround this language in parentheses.
+//! pub fn parenthesized(p: Parser<char>) -> Parser<char> {
+//!     c('(') >> p >> c(')')
+//! }
+//!
 //! /// Accept any of these tokens here.
-//! #[inline]
 //! pub fn any<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
 //!     tokens
 //!         .into_iter()
@@ -10,59 +14,65 @@
 //! }
 //!
 //! /// Any amount of whitespace.
-//! #[inline]
 //! pub fn space() -> Parser<char> {
-//!     any((0..u8::MAX)
-//!         .filter(|c| c.is_ascii_whitespace())
-//!         .map(char::from))
-//! }
-//!
-//! /// Surround this language in parentheses.
-//! /// Note that whitespace around the language--e.g. "( A )"--is fine.
-//! #[inline]
-//! pub fn parenthesized(p: Parser<char>) -> Parser<char> {
-//!     c('(') >> space() >> p >> space() >> c(')')
+//!     any((0..u8::MAX).filter(u8::is_ascii_whitespace).map(char::from))
 //! }
 //!
 //! ```
 
-use inator::{base::*, *};
+use inator::{any, c, s, Parser};
 
-#[inline]
-fn definitely_comma(p: Parser<char>) -> Parser<char> {
-    p >> space() >> c(',') >> space()
+fn parenthesized(p: Parser<char>) -> Parser<char> {
+    c('(') >> p >> c(')')
 }
 
-#[inline]
-fn maybe_comma(p: Parser<char>) -> Parser<char> {
-    p >> space() >> opt(',') >> space()
+fn empty_tuple() -> Parser<char> {
+    parenthesized(Parser::empty())
+}
+
+fn singleton(p: Parser<char>) -> Parser<char> {
+    parenthesized(p >> c(','))
+}
+
+fn separator() -> Parser<char> {
+    s([',', ' '])
+}
+
+fn pair_or_more(p: Parser<char>) -> Parser<char> {
+    parenthesized(p.clone() >> separator() >> p.clone() >> (separator() >> p).star())
 }
 
 #[inline]
 fn tuple(p: Parser<char>) -> Parser<char> {
-    parenthesized(definitely_comma(p.clone()).repeat() >> maybe_comma(p))
+    empty_tuple() | singleton(p.clone()) | pair_or_more(p)
 }
 
 fn main() {
     // Specify what we want in parentheses
-    let def = tuple(any(['A', 'B', 'C']));
+    let spec = tuple(any(['A', 'B', 'C']));
 
     // Compile it to a provably optimal implementation
-    let parser = def.compile();
+    let parser = spec.compile();
 
-    // Some unit tests:
+    // Pretty-print the compiled version as a graph
+    println!("{parser}");
+
+    // Some unit tests
     assert!(parser.accept("()".chars())); // Empty tuple
-    assert!(parser.accept("(,)".chars())); // Still an empty tuple
-    assert!(parser.reject("(,,)".chars())); // Too many commas
+    assert!(parser.reject("(,)".chars())); // Unnecessary comma
     assert!(parser.reject("(A)".chars())); // Just parenthesized, not a tuple
     assert!(parser.accept("(A,)".chars())); // Singleton
     assert!(parser.reject("(A,,)".chars())); // Too many commas
     assert!(parser.accept("(A, B)".chars())); // 2-tuple, no extra comma
-    assert!(parser.accept("(A, B,)".chars())); // 2-tuple, extra comma
-    assert!(parser.accept("(  A  ,  B  ,  )".chars())); // Whitespace doesn't matter
+    assert!(parser.reject("(A, B,)".chars())); // 2-tuple, extra comma
+    assert!(parser.reject("(A, B, )".chars())); // 2-tuple, extra comma & space
+    assert!(parser.accept("(A, B, C)".chars())); // 3-tuple
 
-    // Generate random input:
+    // Randomly generate guaranteed valid input
     for fuzz in parser.fuzz().unwrap().take(32) {
         println!("Fuzz: {}", fuzz.into_iter().collect::<String>());
     }
+
+    // Compile to Rust source code (e.g. in `build.rs` dumping contents to a file in `src/`)
+    println!("{}", parser.into_source("abc_tuple"));
 }

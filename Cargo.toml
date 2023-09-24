@@ -15,6 +15,7 @@ rand = "0.8.5"
 
 # Optional dependencies:
 quickcheck = { version = "1.0.3", optional = true }
+prettyplease = "0.2.15"
 
 [features]
 quickcheck = ["dep:quickcheck"]

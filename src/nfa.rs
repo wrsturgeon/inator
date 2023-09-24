@@ -6,6 +6,7 @@
 
 //! Nondeterministic finite automata with epsilon transitions.
 
+use crate::Expression;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Nondeterministic finite automata with epsilon transitions.
@@ -198,7 +199,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// Match at most one time (i.e. ignore if not present).
     #[inline]
     #[must_use]
-    pub fn optional(mut self) -> Self {
+    pub fn optional(self) -> Self {
         Self::empty() | self
     }
 
@@ -210,7 +211,7 @@ impl<I: Clone + Ord> Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -222,7 +223,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
+impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -235,7 +236,7 @@ impl<I: Clone + Ord + core::fmt::Display> core::fmt::Display for State<I> {
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         }
         for (input, transitions) in &self.non_epsilon {
-            writeln!(f, "    {input} --> {transitions:?}")?;
+            writeln!(f, "    {} --> {transitions:?}", input.to_source())?;
         }
         Ok(())
     }
