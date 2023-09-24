@@ -294,7 +294,7 @@ impl<I: Clone + Ord> Graph<I> {
                     )],
                 }),
                 sig: syn::Signature {
-                    constness: Some(Token!(const)(Span::call_site())),
+                    constness: None,
                     asyncness: None,
                     unsafety: None,
                     abi: None,
@@ -332,31 +332,63 @@ impl<I: Clone + Ord> Graph<I> {
                             qself: None,
                             path: syn::Path {
                                 leading_colon: None,
-                                segments: [
-                                    syn::PathSegment {
-                                        ident: Ident::new("crate", Span::call_site()),
-                                        arguments: syn::PathArguments::None,
-                                    },
-                                    syn::PathSegment {
-                                        ident: Ident::new("inator_config", Span::call_site()),
-                                        arguments: syn::PathArguments::None,
-                                    },
-                                    syn::PathSegment {
-                                        ident: Ident::new(name, Span::call_site()),
-                                        arguments: syn::PathArguments::None,
-                                    },
-                                    syn::PathSegment {
-                                        ident: Ident::new("Output", Span::call_site()),
-                                        arguments: syn::PathArguments::None,
-                                    },
-                                ]
-                                .into_iter()
+                                segments: core::iter::once(syn::PathSegment {
+                                    ident: Ident::new("Option", Span::call_site()),
+                                    arguments: syn::PathArguments::AngleBracketed(
+                                        syn::AngleBracketedGenericArguments {
+                                            colon2_token: None,
+                                            lt_token: Token!(<)(Span::call_site()),
+                                            args: core::iter::once(syn::GenericArgument::Type(
+                                                syn::Type::Path(syn::TypePath {
+                                                    qself: None,
+                                                    path: syn::Path {
+                                                        leading_colon: None,
+                                                        segments: [
+                                                            syn::PathSegment {
+                                                                ident: Ident::new(
+                                                                    "crate",
+                                                                    Span::call_site(),
+                                                                ),
+                                                                arguments: syn::PathArguments::None,
+                                                            },
+                                                            syn::PathSegment {
+                                                                ident: Ident::new(
+                                                                    "inator_config",
+                                                                    Span::call_site(),
+                                                                ),
+                                                                arguments: syn::PathArguments::None,
+                                                            },
+                                                            syn::PathSegment {
+                                                                ident: Ident::new(
+                                                                    name,
+                                                                    Span::call_site(),
+                                                                ),
+                                                                arguments: syn::PathArguments::None,
+                                                            },
+                                                            syn::PathSegment {
+                                                                ident: Ident::new(
+                                                                    "Output",
+                                                                    Span::call_site(),
+                                                                ),
+                                                                arguments: syn::PathArguments::None,
+                                                            },
+                                                        ]
+                                                        .into_iter()
+                                                        .collect(),
+                                                    },
+                                                }),
+                                            ))
+                                            .collect(),
+                                            gt_token: Token!(>)(Span::call_site()),
+                                        },
+                                    ),
+                                })
                                 .collect(),
                             },
                         })),
                     ),
                 },
-                vis: syn::Visibility::Inherited,
+                vis: syn::Visibility::Public(Token!(pub)(Span::call_site())),
             },
             states,
         )
@@ -453,7 +485,6 @@ impl<I: Clone + Ord> State<I> {
     where
         I: Expression,
     {
-        let indexed = format!("s{index}");
         syn::Item::Fn(syn::ItemFn {
             attrs: vec![
                 syn::Attribute {
@@ -506,7 +537,7 @@ impl<I: Clone + Ord> State<I> {
                 unsafety: None,
                 abi: None,
                 fn_token: Token!(fn)(Span::call_site()),
-                ident: Ident::new(&indexed, Span::call_site()),
+                ident: Ident::new(&format!("s{index}"), Span::call_site()),
                 generics,
                 paren_token: syn::token::Paren::default(),
                 inputs: core::iter::once(syn::FnArg::Typed(syn::PatType {
@@ -514,7 +545,7 @@ impl<I: Clone + Ord> State<I> {
                     pat: Box::new(syn::Pat::Ident(syn::PatIdent {
                         attrs: vec![],
                         by_ref: None,
-                        mutability: None,
+                        mutability: Some(Token!(mut)(Span::call_site())),
                         ident: Ident::new("i", Span::call_site()),
                         subpat: None,
                     })),
@@ -540,7 +571,7 @@ impl<I: Clone + Ord> State<I> {
                         path: syn::Path {
                             leading_colon: None,
                             segments: core::iter::once(syn::PathSegment {
-                                ident: Ident::new("Result", Span::call_site()),
+                                ident: Ident::new("Option", Span::call_site()),
                                 arguments: syn::PathArguments::AngleBracketed(
                                     syn::AngleBracketedGenericArguments {
                                         colon2_token: None,
@@ -574,14 +605,7 @@ impl<I: Clone + Ord> State<I> {
                                                         },
                                                         syn::PathSegment {
                                                             ident: Ident::new(
-                                                                &indexed,
-                                                                Span::call_site(),
-                                                            ),
-                                                            arguments: syn::PathArguments::None,
-                                                        },
-                                                        syn::PathSegment {
-                                                            ident: Ident::new(
-                                                                "Output",
+                                                                &format!("S{index}"),
                                                                 Span::call_site(),
                                                             ),
                                                             arguments: syn::PathArguments::None,
@@ -709,7 +733,7 @@ impl<I: Clone + Ord> State<I> {
                                             path: syn::Path {
                                                 leading_colon: None,
                                                 segments: core::iter::once(syn::PathSegment {
-                                                    ident: Ident::new("Ok", Span::call_site()),
+                                                    ident: Ident::new("Some", Span::call_site()),
                                                     arguments: syn::PathArguments::None,
                                                 })
                                                 .collect(),
@@ -724,22 +748,17 @@ impl<I: Clone + Ord> State<I> {
                                         .collect(),
                                     })
                                 } else {
-                                    syn::Expr::Call(syn::ExprCall {
+                                    syn::Expr::Path(syn::ExprPath {
                                         attrs: vec![],
-                                        func: Box::new(syn::Expr::Path(syn::ExprPath {
-                                            attrs: vec![],
-                                            qself: None,
-                                            path: syn::Path {
-                                                leading_colon: None,
-                                                segments: core::iter::once(syn::PathSegment {
-                                                    ident: Ident::new("Err", Span::call_site()),
-                                                    arguments: syn::PathArguments::None,
-                                                })
-                                                .collect(),
-                                            },
-                                        })),
-                                        paren_token: syn::token::Paren::default(),
-                                        args: syn::punctuated::Punctuated::new(),
+                                        qself: None,
+                                        path: syn::Path {
+                                            leading_colon: None,
+                                            segments: core::iter::once(syn::PathSegment {
+                                                ident: Ident::new("None", Span::call_site()),
+                                                arguments: syn::PathArguments::None,
+                                            })
+                                            .collect(),
+                                        },
                                     })
                                 }),
                                 comma: Some(Token!(,)(Span::call_site())),
@@ -752,22 +771,17 @@ impl<I: Clone + Ord> State<I> {
                                 }),
                                 guard: None,
                                 fat_arrow_token: Token!(=>)(Span::call_site()),
-                                body: Box::new(syn::Expr::Call(syn::ExprCall {
+                                body: Box::new(syn::Expr::Path(syn::ExprPath {
                                     attrs: vec![],
-                                    func: Box::new(syn::Expr::Path(syn::ExprPath {
-                                        attrs: vec![],
-                                        qself: None,
-                                        path: syn::Path {
-                                            leading_colon: None,
-                                            segments: core::iter::once(syn::PathSegment {
-                                                ident: Ident::new("Err", Span::call_site()),
-                                                arguments: syn::PathArguments::None,
-                                            })
-                                            .collect(),
-                                        },
-                                    })),
-                                    paren_token: syn::token::Paren::default(),
-                                    args: syn::punctuated::Punctuated::new(),
+                                    qself: None,
+                                    path: syn::Path {
+                                        leading_colon: None,
+                                        segments: core::iter::once(syn::PathSegment {
+                                            ident: Ident::new("None", Span::call_site()),
+                                            arguments: syn::PathArguments::None,
+                                        })
+                                        .collect(),
+                                    },
                                 })),
                                 comma: Some(Token!(,)(Span::call_site())),
                             }))

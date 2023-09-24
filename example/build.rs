@@ -47,7 +47,7 @@ fn tuple(p: Parser<char>) -> Parser<char> {
     empty_tuple() | singleton(p.clone()) | pair_or_more(p)
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     // Specify what we want in parentheses
     let spec = tuple(any(['A', 'B', 'C']));
 
@@ -74,5 +74,7 @@ fn main() {
     }
 
     // Compile to Rust source code (e.g. in `build.rs` dumping contents to a file in `src/`)
-    println!("{}", parser.into_source("abc_tuple"));
+    let formatted = parser.into_source("abc_tuple"); // <-- `abc_tuple` is the function name
+    println!("{formatted}");
+    std::fs::write("src/autogen.rs", formatted)
 }
