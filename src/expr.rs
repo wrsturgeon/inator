@@ -69,3 +69,34 @@ impl Expression {
         }
     }
 }
+
+/// Convert `&Self -> inator::Expression`.
+pub trait ToExpression {
+    /// Convert `&Self -> inator::Expression`.
+    #[must_use]
+    fn to_expr(&self) -> Expression;
+    /// Write a `syn` type representing this type.
+    #[must_use]
+    fn to_type() -> syn::Type;
+}
+
+impl ToExpression for char {
+    #[inline(always)]
+    fn to_expr(&self) -> Expression {
+        Expression::Char(*self)
+    }
+    #[inline]
+    fn to_type() -> syn::Type {
+        syn::Type::Path(syn::TypePath {
+            qself: None,
+            path: syn::Path {
+                leading_colon: None,
+                segments: core::iter::once(syn::PathSegment {
+                    ident: syn::Ident::new("char", Span::call_site()),
+                    arguments: syn::PathArguments::None,
+                })
+                .collect(),
+            },
+        })
+    }
+}

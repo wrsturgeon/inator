@@ -145,10 +145,10 @@ macro_rules! get_mut {
 // TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
 
 mod brzozowski;
-pub(crate) mod dfa;
+mod dfa;
 mod expr;
 mod fuzz;
-pub(crate) mod nfa;
+mod nfa;
 mod ops;
 mod powerset_construction;
 
@@ -157,13 +157,42 @@ mod test;
 
 pub use {
     dfa::Graph as Compiled,
-    expr::Expression,
+    expr::{Expression, ToExpression},
     fuzz::{Fuzzer, NeverAccepts},
     nfa::Graph as Parser,
 };
 
-/// Decide whether the next input token equals this token.
+/// Accept this token if we see it here.
 #[inline(always)]
-pub fn d<I: Clone + Ord>(input: I) -> Parser<I> {
-    Parser::unit(input)
+pub fn c<I: Clone + Ord>(token: I) -> Parser<I> {
+    Parser::unit(token)
+}
+
+/// Accept any of these tokens here.
+#[inline]
+pub fn any<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
+    tokens
+        .into_iter()
+        .fold(Parser::void(), |acc, token| acc | c(token))
+}
+
+/// Accept either this token or nothing.
+#[inline]
+pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
+    c(token).optional()
+}
+
+/// Any amount of whitespace.
+#[inline]
+pub fn space() -> Parser<char> {
+    any((0..u8::MAX)
+        .filter(|c| c.is_ascii_whitespace())
+        .map(char::from))
+}
+
+/// Surround this language in parentheses.
+/// Note that whitespace around the language--e.g. "( A )"--is fine.
+#[inline]
+pub fn parenthesized(p: Parser<char>) -> Parser<char> {
+    c('(') >> space() >> p >> space() >> c(')')
 }

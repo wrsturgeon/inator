@@ -83,6 +83,20 @@ impl<I: Clone + Ord> Graph<I> {
         }
     }
 
+    /// NFA accepting only the empty string.
+    #[inline]
+    #[must_use]
+    pub fn empty() -> Self {
+        Self {
+            states: vec![State {
+                epsilon: BTreeSet::new(),
+                non_epsilon: BTreeMap::new(),
+                accepting: true,
+            }],
+            initial: core::iter::once(0).collect(),
+        }
+    }
+
     /// NFA accepting this exact token and only this exact token, only once.
     #[must_use]
     #[inline]
@@ -185,15 +199,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     pub fn optional(mut self) -> Self {
-        self.states.push(State {
-            epsilon: core::mem::replace(
-                &mut self.initial,
-                core::iter::once(self.states.len()).collect(),
-            ),
-            non_epsilon: BTreeMap::new(),
-            accepting: true,
-        });
-        self
+        Self::empty() | self
     }
 
     /// Match zero or more times (a.k.a. Kleene star).
