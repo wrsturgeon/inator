@@ -96,6 +96,65 @@ impl<I: Clone + Ord> Graph<I> {
         self.states.iter().any(|state| state.accepting)
     }
 
+    /// Find the minimal input that reaches this state.
+    /// Like Dijkstra's, but optimized to leverage that each edge is 0 (if epsilon) or 1 (otherwise).
+    #[inline]
+    #[must_use]
+    #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
+    pub(crate) fn dijkstra<Init: IntoIterator<Item = usize>>(
+        &self,
+        initial: Init,
+        endpoint: usize,
+    ) -> Option<Vec<I>> {
+        use core::cmp::Reverse;
+        use std::collections::BinaryHeap;
+
+        let mut cache = BTreeMap::<usize, Vec<I>>::new();
+        let mut queue = BinaryHeap::new();
+
+        for init in initial {
+            drop(cache.insert(init, vec![]));
+            queue.push(Reverse(CmpFirst(0_usize, init)));
+        }
+
+        while let Some(Reverse(CmpFirst(distance, index))) = queue.pop() {
+            let mut cached = unwrap!(cache.get(&index)).clone(); // TODO: look into `Cow`
+            let state = get!(self.states, index);
+            for (&next, &formatted) in &state.epsilon {
+                if next == endpoint {
+                    return Some(cached);
+                }
+                if let Entry::Vacant(entry) = cache.entry(next) {
+                    let _ = entry.insert(cached.clone());
+                    queue.push(Reverse(CmpFirst(distance, next)));
+                }
+            }
+            for (token, repl) in &state.non_epsilon {
+                for (&next, formatted) in repl {
+                    if next == endpoint {
+                        cached.push(token.clone());
+                        return Some(cached);
+                    }
+                    if let Entry::Vacant(entry) = cache.entry(next) {
+                        entry.insert(cached.clone()).push(token.clone());
+                        queue.push(Reverse(CmpFirst(distance.saturating_add(1), next)));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Find the minimal input that reaches this state.
+    #[inline]
+    #[must_use]
+    // #[cfg(test)] // <-- TODO: REINSTATE
+    #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
+    pub(crate) fn backtrack(&self, endpoint: usize) -> Option<Vec<I>> {
+        self.dijkstra(self.initial.iter().map(|(&k, _)| k), endpoint)
+    }
+
     /// Print as a set of Rust source-code functions.
     #[inline]
     #[must_use]
