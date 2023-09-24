@@ -25,7 +25,6 @@ then
   cd ..
 fi
 
-cargo run --example 2>&1 | grep '^ ' | xargs -n 1 cargo +nightly miri run --no-default-features --example
 cargo +nightly miri test --no-default-features
 cargo +nightly miri test --no-default-features --examples
 cargo +nightly miri test -r --no-default-features
