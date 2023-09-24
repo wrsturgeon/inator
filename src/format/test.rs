@@ -11,14 +11,14 @@
 )]
 
 use super::{dfa, nfa, Compiled as Dfa, Parser as Nfa};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 mod unit {
     use super::*;
 
     #[test]
     fn zero_state_nfa_subsets() {
-        let nfa = Nfa::<()>::empty();
+        let nfa = Nfa::<()>::void();
         let dfa = nfa.subsets();
         assert_eq!(
             dfa,
@@ -34,18 +34,18 @@ mod unit {
 
     #[test]
     fn zero_state_nfa_fuzz() {
-        let _ = Nfa::<()>::empty().fuzz().unwrap_err();
+        let _ = Nfa::<()>::void().fuzz().unwrap_err();
     }
 
     #[test]
     fn zero_initial_nfa_fuzz() {
         let _ = Nfa::<()> {
             states: vec![nfa::State {
-                epsilon: BTreeSet::new(),
+                epsilon: BTreeMap::new(),
                 non_epsilon: BTreeMap::new(),
                 accepting: true,
             }],
-            initial: BTreeSet::new(),
+            initial: BTreeMap::new(),
         }
         .fuzz()
         .unwrap_err();
@@ -56,17 +56,17 @@ mod unit {
         let _ = Nfa::<()> {
             states: vec![
                 nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: false,
                 },
                 nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 },
             ],
-            initial: core::iter::once(0).collect(),
+            initial: core::iter::once((0, true)).collect(),
         }
         .fuzz()
         .unwrap_err();
@@ -177,7 +177,7 @@ mod prop {
             let Ok(mut fuzzer) = nfa.fuzz() else {
                 return quickcheck::TestResult::discard();
             };
-            let repeated = nfa.repeat();
+            let repeated = nfa.or_more();
             #[allow(clippy::default_numeric_fallback)]
             for _ in 0..100 {
                 let fst = fuzzer.next().unwrap();
@@ -190,7 +190,7 @@ mod prop {
         }
 
         fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
-            nfa.clone().repeat().optional().compile() == nfa.optional().repeat().compile()
+            nfa.clone().or_more().ignore().compile() == nfa.ignore().or_more().compile()
         }
 
         fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) -> quickcheck::TestResult {
@@ -198,17 +198,17 @@ mod prop {
             let Ok(bf) = b.fuzz() else { return quickcheck::TestResult::discard(); };
             let Ok(cf) = c.fuzz() else { return quickcheck::TestResult::discard(); };
             #[allow(clippy::arithmetic_side_effects)]
-            let abc = a >> b.optional() >> c;
+            let abc = a >> b.ignore() >> c;
             #[allow(clippy::default_numeric_fallback)]
             for ((ai, bi), ci) in af.zip(bf).zip(cf).take(10) {
                 assert!(
                     abc.format(ai.iter().chain(bi.iter()).chain(ci.iter())).is_some(),
-                    "Sandwiched optional did not accept the concatenation of \
+                    "Sandwiched ignore did not accept the concatenation of \
                     three valid inputs: {ai:?}, {bi:?}, & {ci:?}",
                 );
                 assert!(
                     abc.format(ai.iter().chain(ci.iter())).is_some(),
-                    "Sandwiched optional did not accept the concatenation of \
+                    "Sandwiched ignore did not accept the concatenation of \
                     two valid inputs: {ai:?} & {ci:?}",
                 );
             }
@@ -300,8 +300,8 @@ mod reduced {
 
     fn star_def_swap_eq(nfa: Nfa<u8>) {
         assert_eq!(
-            nfa.clone().repeat().optional().compile(),
-            nfa.optional().repeat().compile()
+            nfa.clone().or_more().ignore().compile(),
+            nfa.ignore().or_more().compile()
         );
     }
 
@@ -310,11 +310,11 @@ mod reduced {
         nfa_dfa_equal(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((0, nfa::Recommendation::empty())).collect(),
+                    epsilon: BTreeMap::new(),
+                    non_epsilon: core::iter::once((0, BTreeMap::new())).collect(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, true)).collect(),
             },
             &[],
         );
@@ -331,7 +331,7 @@ mod reduced {
                         accepting: false,
                     },
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: true,
                     },
@@ -347,8 +347,8 @@ mod reduced {
         nfa_dfa_equal(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((255, nfa::Recommendation::empty())).collect(),
+                    epsilon: BTreeMap::new(),
+                    non_epsilon: core::iter::once((255, BTreeMap::new())).collect(),
                     accepting: true,
                 }],
                 initial: core::iter::once(0).collect(),
@@ -368,7 +368,7 @@ mod reduced {
                         accepting: false,
                     },
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: core::iter::once((
                             255,
                             nfa::Recommendation {
@@ -392,12 +392,12 @@ mod reduced {
             &Nfa {
                 states: vec![
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: false,
                     },
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: true,
                     },
@@ -413,7 +413,7 @@ mod reduced {
         brzozowski(
             &Nfa {
                 states: vec![],
-                initial: BTreeSet::new(),
+                initial: BTreeMap::new(),
             },
             &[],
         );
@@ -424,7 +424,7 @@ mod reduced {
         brzozowski(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: false,
                 }],
@@ -439,7 +439,7 @@ mod reduced {
         brzozowski(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: core::iter::once((
                         0,
                         nfa::Recommendation {
@@ -450,7 +450,7 @@ mod reduced {
                     .collect(),
                     accepting: false,
                 }],
-                initial: BTreeSet::new(),
+                initial: BTreeMap::new(),
             },
             &[],
         );
@@ -461,11 +461,11 @@ mod reduced {
         bitor(
             &Nfa {
                 states: vec![],
-                initial: BTreeSet::new(),
+                initial: BTreeMap::new(),
             },
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
@@ -480,7 +480,7 @@ mod reduced {
         bitor(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: false,
                 }],
@@ -488,7 +488,7 @@ mod reduced {
             },
             &Nfa {
                 states: vec![],
-                initial: BTreeSet::new(),
+                initial: BTreeMap::new(),
             },
             &[],
         );
@@ -499,7 +499,7 @@ mod reduced {
         bitor(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: core::iter::once((
                         1,
                         nfa::Recommendation {
@@ -514,7 +514,7 @@ mod reduced {
             },
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
@@ -529,7 +529,7 @@ mod reduced {
         shr(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
@@ -537,7 +537,7 @@ mod reduced {
             },
             &Nfa {
                 states: vec![],
-                initial: BTreeSet::new(),
+                initial: BTreeMap::new(),
             },
             &[],
         );
@@ -549,12 +549,12 @@ mod reduced {
             &Nfa {
                 states: vec![
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: false,
                     },
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: core::iter::once((
                             2,
                             nfa::Recommendation {
@@ -571,7 +571,7 @@ mod reduced {
             &Nfa {
                 states: vec![
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: core::iter::once((
                             1,
                             nfa::Recommendation {
@@ -583,7 +583,7 @@ mod reduced {
                         accepting: false,
                     },
                     nfa::State {
-                        epsilon: BTreeSet::new(),
+                        epsilon: BTreeMap::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: true,
                     },
@@ -599,7 +599,7 @@ mod reduced {
         shr(
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
@@ -607,7 +607,7 @@ mod reduced {
             },
             &Nfa {
                 states: vec![nfa::State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
@@ -621,7 +621,7 @@ mod reduced {
     fn star_def_swap_eq_1() {
         star_def_swap_eq(Nfa {
             states: vec![],
-            initial: BTreeSet::new(),
+            initial: BTreeMap::new(),
         });
     }
 }

@@ -14,7 +14,7 @@ mod unit {
 
     #[test]
     fn zero_state_nfa_subsets() {
-        let nfa = Nfa::<()>::empty();
+        let nfa = Nfa::<()>::void();
         let dfa = nfa.subsets();
         assert_eq!(
             dfa,
@@ -30,7 +30,7 @@ mod unit {
 
     #[test]
     fn zero_state_nfa_fuzz() {
-        let _ = Nfa::<()>::empty().fuzz().unwrap_err();
+        let _ = Nfa::<()>::void().fuzz().unwrap_err();
     }
 
     #[test]

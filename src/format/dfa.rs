@@ -17,26 +17,28 @@ use syn::{Ident, Token, __private::ToTokens};
 pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph (should never be empty!).
     pub(crate) states: Vec<State<I>>,
-    /// Initial set of states.
+    /// Initial state.
+    /// No `bool`: MUST BE VALID AND PROPERLY FORMATTED, or else no input could be properly formatted.
     pub(crate) initial: usize,
+    // TODO: a second initial state for improperly formatted input?
 }
 
 /// State transitions from one state to no more than one other.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that require consuming and matching input.
-    pub(crate) transitions: BTreeMap<I, Recommendation<I>>,
+    pub(crate) transitions: BTreeMap<I, Replace<I>>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
 
-/// Set with a recommended element.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Recommendation<I> {
-    /// Set of all elements.
-    pub(crate) next_state: usize,
-    /// What to append to our running output vector when we take this transition.
-    pub(crate) append: Vec<I>,
+/// Edge that writes a specified list of tokens to the output vector.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Replace<I> {
+    /// Next state.
+    pub(crate) next: usize,
+    /// What to write to our running output vector when we take this transition.
+    pub(crate) repl: Vec<I>,
 }
 
 impl<I: Clone + Ord> Graph<I> {
@@ -48,8 +50,8 @@ impl<I: Clone + Ord> Graph<I> {
         let mut state = self.initial;
         for input in iter {
             let rec = get!(self.states, state).transition(&input)?;
-            state = rec.next_state;
-            v.extend(rec.append.iter().cloned());
+            state = rec.next;
+            v.extend(rec.repl.iter().cloned());
         }
         get!(self.states, state).accepting.then_some(v)
     }
@@ -70,24 +72,21 @@ impl<I: Clone + Ord> Graph<I> {
                 .states
                 .iter()
                 .map(|state| super::nfa::State {
-                    epsilon: std::collections::BTreeSet::new(),
+                    epsilon: std::collections::BTreeMap::new(),
                     non_epsilon: state
                         .transitions
                         .iter()
-                        .map(|(k, v)| {
+                        .map(|(token, edge)| {
                             (
-                                k.clone(),
-                                super::nfa::Recommendation {
-                                    set: core::iter::once(v.next_state).collect(),
-                                    append: v.append.clone(),
-                                },
+                                token.clone(),
+                                core::iter::once((edge.next, edge.repl)).collect(),
                             )
                         })
                         .collect(),
                     accepting: state.accepting,
                 })
                 .collect(),
-            initial: core::iter::once(self.initial).collect(),
+            initial: core::iter::once((self.initial, true)).collect(),
         }
     }
 
@@ -306,20 +305,18 @@ impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display 
     }
 }
 
-impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display
-    for Recommendation<I>
-{
+impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display for Replace<I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{} (recommends {:?})", self.next_state, self.append)
+        write!(f, "{} (replaces with {:?})", self.next, self.repl)
     }
 }
 
 impl<I: Clone + Ord> State<I> {
     /// State to which this state can transition on a given input.
     #[inline]
-    pub fn transition(&self, input: &I) -> Option<&Recommendation<I>> {
+    pub fn transition(&self, input: &I) -> Option<&Replace<I>> {
         self.transitions.get(input)
     }
 }
@@ -433,9 +430,9 @@ impl State<crate::expr::Expression> {
                             .map(
                                 |(
                                     input,
-                                    &Recommendation {
-                                        next_state: dst,
-                                        append: _, // <-- TODO
+                                    &Replace {
+                                        next: dst,
+                                        repl: _, // <-- TODO
                                     },
                                 )| syn::Arm {
                                     attrs: vec![],
@@ -641,7 +638,7 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Recommendation<I> {
+impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Replace<I> {
     #[inline]
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self {
@@ -672,7 +669,7 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
             .map(|(token, rec)| {
                 (
                     token.clone(),
-                    Recommendation {
+                    Edge {
                         next_state: rec.next_state % size,
                         append: rec.append.clone(),
                     },

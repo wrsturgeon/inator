@@ -6,7 +6,7 @@
 
 //! Nondeterministic finite automata with epsilon transitions.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap};
 
 /// Nondeterministic finite automata with epsilon transitions.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -14,27 +14,18 @@ pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
     /// Initial set of states.
-    pub(crate) initial: BTreeSet<usize>,
+    pub(crate) initial: BTreeMap<usize, bool>,
 }
 
 /// Transitions from one state to arbitrarily many others, possibly without even consuming input.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that doesn't require consuming input.
-    pub(crate) epsilon: BTreeSet<usize>,
+    pub(crate) epsilon: BTreeMap<usize, bool>,
     /// Transitions that require consuming and matching input.
-    pub(crate) non_epsilon: BTreeMap<I, Recommendation<I>>,
+    pub(crate) non_epsilon: BTreeMap<I, BTreeMap<usize, Vec<I>>>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
-}
-
-/// Set with a recommended element.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) struct Recommendation<I: Clone + Ord> {
-    /// Set of all elements.
-    pub(crate) set: BTreeSet<usize>,
-    /// What to append to our running output vector when we take this transition.
-    pub(crate) append: Vec<I>,
 }
 
 /// Test if there is a way to split the input such that
@@ -87,7 +78,7 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
 impl<I: Clone + Ord> Default for Graph<I> {
     #[inline(always)]
     fn default() -> Self {
-        Self::empty()
+        Self::void()
     }
 }
 
@@ -95,38 +86,49 @@ impl<I: Clone + Ord> Graph<I> {
     /// NFA with zero states.
     #[inline]
     #[must_use]
-    pub fn empty() -> Self {
+    pub fn void() -> Self {
         Self {
             states: vec![],
-            initial: BTreeSet::new(),
+            initial: BTreeMap::new(),
+        }
+    }
+
+    /// NFA accepting only the empty string.
+    #[inline]
+    #[must_use]
+    pub fn empty() -> Self {
+        Self {
+            states: vec![State {
+                epsilon: BTreeMap::new(),
+                non_epsilon: BTreeMap::new(),
+                accepting: true,
+            }],
+            initial: core::iter::once((0, true)).collect(),
         }
     }
 
     /// NFA accepting this exact token and only this exact token, only once.
     #[must_use]
     #[inline]
-    pub fn unit(singleton: I, append: Vec<I>) -> Self {
+    pub fn unit(singleton: I, repl: Vec<I>) -> Self {
         Self {
             states: vec![
                 State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: core::iter::once((
                         singleton,
-                        Recommendation {
-                            set: core::iter::once(1).collect(),
-                            append,
-                        },
+                        core::iter::once((1, repl)).collect(),
                     ))
                     .collect(),
                     accepting: false,
                 },
                 State {
-                    epsilon: BTreeSet::new(),
+                    epsilon: BTreeMap::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 },
             ],
-            initial: core::iter::once(0).collect(),
+            initial: core::iter::once((0, true)).collect(),
         }
     }
 
@@ -136,20 +138,17 @@ impl<I: Clone + Ord> Graph<I> {
     #[allow(clippy::missing_panics_doc)]
     pub fn take_all_epsilon_transitions(
         &self,
-        mut queue: Vec<super::dfa::Recommendation<I>>,
-    ) -> BTreeSet<super::dfa::Recommendation<I>> {
+        mut queue: BTreeMap<usize, (bool, Vec<I>)>,
+    ) -> BTreeMap<usize, (bool, Vec<I>)> {
         // Take all epsilon transitions immediately
-        let mut superposition = BTreeSet::new();
-        while let Some(rec) = queue.pop() {
-            for next in &get!(self.states, rec.next_state).epsilon {
-                if !superposition.contains(&rec) {
-                    queue.push(super::dfa::Recommendation {
-                        next_state: *next,
-                        append: rec.append.clone(),
-                    });
+        let mut superposition = BTreeMap::new();
+        while let Some((next, (proper, repl))) = queue.pop_first() {
+            if let Entry::Vacant(entry) = superposition.entry(next) {
+                for (&eps_next, &eps_proper) in &get!(self.states, next).epsilon {
+                    queue.insert(eps_next, (proper && eps_proper, repl.clone()));
                 }
+                entry.insert((proper, repl));
             }
-            let _ = superposition.insert(rec);
         }
         superposition
     }
@@ -209,51 +208,86 @@ impl<I: Clone + Ord> Graph<I> {
     /// Note that if ANY number of times leads to an accepting state, we take it!
     #[inline]
     #[must_use]
-    pub fn repeat(mut self) -> Self {
+    pub fn or_more(mut self) -> Self {
         for state in &mut self.states {
             if state.accepting {
-                state.epsilon.extend(self.initial.iter());
+                state
+                    .epsilon
+                    .extend(self.initial.iter().map(|(&i, _)| (i, false)));
             }
         }
         self
     }
 
-    /// Match at most one time (i.e. ignore if not present).
+    /// Match at most one time and don't write to formatted output.
     #[inline]
     #[must_use]
-    pub fn optional(mut self) -> Self {
-        self.states.push(State {
-            epsilon: core::mem::replace(
-                &mut self.initial,
-                core::iter::once(self.states.len()).collect(),
-            ),
-            non_epsilon: BTreeMap::new(),
-            accepting: true,
-        });
-        self
+    pub fn ignore(mut self) -> Self {
+        // self.states.push(State {
+        //     epsilon: core::mem::replace(
+        //         &mut self.initial,
+        //         core::iter::once(self.states.len()).collect(),
+        //     )
+        //     .into_iter()
+        //     .map(|i| (i, false))
+        //     .collect(),
+        //     non_epsilon: BTreeMap::new(),
+        //     accepting: true,
+        // });
+        // self
+        for proper in self.initial.values_mut() {
+            *proper = false
+        }
+        self | Self::empty()
     }
 
-    /// Match zero or more times (a.k.a. Kleene star).
+    /// Match at most one time and write to formatted output (even if it wasn't there).
+    #[inline]
+    #[must_use]
+    pub fn supply(mut self) -> Self {
+        // self.states.push(State {
+        //     epsilon: core::mem::replace(
+        //         &mut self.initial,
+        //         core::iter::once(self.states.len()).collect(),
+        //     )
+        //     .into_iter()
+        //     .map(|i| (i, true))
+        //     .collect(),
+        //     non_epsilon: BTreeMap::new(),
+        //     accepting: true,
+        // });
+        // self
+        let mut empty = Self::empty();
+        for proper in empty.initial.values_mut() {
+            *proper = false;
+        }
+        self | empty
+    }
+
+    /// Match zero or more times (a.k.a. Kleene star) and never write to formatted output.
     #[inline]
     #[must_use]
     pub fn star(self) -> Self {
-        self.repeat().optional()
+        self.or_more().ignore()
     }
 
     /// Find the minimal input that reaches this state.
-    /// Like Dijkstra's, but each edge is 0 (if epsilon) or 1 (otherwise).
+    /// Like Dijkstra's, but optimized to leverage that each edge is 0 (if epsilon) or 1 (otherwise).
     #[inline]
     #[must_use]
-    // #[cfg(test)] // <-- TODO: REINSTATE
     #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
-    pub(crate) fn backtrack(&self, endpoint: usize) -> Option<Vec<I>> {
+    pub(crate) fn dijkstra<Init: IntoIterator<Item = usize>>(
+        &self,
+        initial: Init,
+        endpoint: usize,
+    ) -> Option<Vec<I>> {
         use core::cmp::Reverse;
-        use std::collections::{btree_map::Entry, BinaryHeap};
+        use std::collections::BinaryHeap;
 
         let mut cache = BTreeMap::<usize, Vec<I>>::new();
         let mut queue = BinaryHeap::new();
 
-        for &init in &self.initial {
+        for init in initial {
             drop(cache.insert(init, vec![]));
             queue.push(Reverse(CmpFirst(0_usize, init)));
         }
@@ -261,7 +295,7 @@ impl<I: Clone + Ord> Graph<I> {
         while let Some(Reverse(CmpFirst(distance, index))) = queue.pop() {
             let mut cached = unwrap!(cache.get(&index)).clone(); // TODO: look into `Cow`
             let state = get!(self.states, index);
-            for &next in &state.epsilon {
+            for (&next, &formatted) in &state.epsilon {
                 if next == endpoint {
                     return Some(cached);
                 }
@@ -270,8 +304,8 @@ impl<I: Clone + Ord> Graph<I> {
                     queue.push(Reverse(CmpFirst(distance, next)));
                 }
             }
-            for (token, &Recommendation { ref set, .. }) in &state.non_epsilon {
-                for &next in set {
+            for (token, repl) in &state.non_epsilon {
+                for (&next, formatted) in repl {
                     if next == endpoint {
                         cached.push(token.clone());
                         return Some(cached);
@@ -285,6 +319,15 @@ impl<I: Clone + Ord> Graph<I> {
         }
 
         None
+    }
+
+    /// Find the minimal input that reaches this state.
+    #[inline]
+    #[must_use]
+    // #[cfg(test)] // <-- TODO: REINSTATE
+    #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
+    pub(crate) fn backtrack(&self, endpoint: usize) -> Option<Vec<I>> {
+        self.dijkstra(self.initial.iter().map(|(&k, _)| k), endpoint)
     }
 }
 
@@ -314,17 +357,6 @@ impl<A: Ord, B> Ord for CmpFirst<A, B> {
     }
 }
 
-impl<I: Clone + Ord> Recommendation<I> {
-    /// Empty.
-    #[inline]
-    pub(crate) const fn empty() -> Self {
-        Self {
-            set: BTreeSet::new(),
-            append: vec![],
-        }
-    }
-}
-
 impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display for Graph<I> {
     #[inline]
     #[allow(clippy::use_debug)]
@@ -350,26 +382,9 @@ impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display 
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         }
         for (input, transitions) in &self.non_epsilon {
-            writeln!(f, "    {input} --> {transitions}")?;
+            writeln!(f, "    {input} --> {transitions:?}")?;
         }
         Ok(())
-    }
-}
-
-impl<I: Clone + Ord> Default for Recommendation<I> {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::empty()
-    }
-}
-
-impl<I: Clone + Ord + core::fmt::Debug + core::fmt::Display> core::fmt::Display
-    for Recommendation<I>
-{
-    #[inline]
-    #[allow(clippy::use_debug)]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?} (recommends {:?})", self.set, self.append)
     }
 }
 
@@ -380,8 +395,11 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let mut states = quickcheck::Arbitrary::arbitrary(g);
         cut_nonsense(&mut states);
-        let mut initial = BTreeSet::arbitrary(g);
-        initial = initial.into_iter().map(|i| i % states.len()).collect();
+        let mut initial = BTreeMap::arbitrary(g);
+        initial = initial
+            .into_iter()
+            .map(|(k, v)| (k % states.len(), v))
+            .collect();
         Self { states, initial }
     }
 
@@ -426,26 +444,6 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
     }
 }
 
-#[cfg(feature = "quickcheck")]
-impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Recommendation<I> {
-    #[inline]
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        Self {
-            set: quickcheck::Arbitrary::arbitrary(g),
-            append: quickcheck::Arbitrary::arbitrary(g),
-        }
-    }
-
-    #[inline]
-    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new(
-            (self.set.clone(), self.append.clone())
-                .shrink()
-                .map(|(set, append)| Self { set, append }),
-        )
-    }
-}
-
 /// Remove impossible transitions from automatically generated automata.
 #[cfg(feature = "quickcheck")]
 #[allow(clippy::arithmetic_side_effects)]
@@ -453,7 +451,7 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
         state.epsilon = state.epsilon.iter().map(|i| i % size).collect();
-        for &mut Recommendation { ref mut set, .. } in state.non_epsilon.values_mut() {
+        for &mut Replace { ref mut set, .. } in state.non_epsilon.values_mut() {
             *set = set.iter().map(|i| i % size).collect();
         }
     }
@@ -465,7 +463,7 @@ pub(crate) struct Stepper<'graph, I: Clone + Ord> {
     /// The graph we're riding.
     graph: &'graph Graph<I>,
     /// Current states after the input we've received so far.
-    state: BTreeSet<super::dfa::Recommendation<I>>,
+    threads: BTreeMap<usize, (bool, Vec<I>)>,
 }
 
 // #[cfg(test)] // <-- TODO: REINSTATE
@@ -477,14 +475,11 @@ impl<'graph, I: Clone + Ord + core::fmt::Debug> Stepper<'graph, I> {
     fn new(graph: &'graph Graph<I>) -> Self {
         Self {
             graph,
-            state: graph.take_all_epsilon_transitions(
+            threads: graph.take_all_epsilon_transitions(
                 graph
                     .initial
                     .iter()
-                    .map(|&i| super::dfa::Recommendation {
-                        next_state: i,
-                        append: vec![],
-                    })
+                    .map(|(&index, &proper)| (index, (|| -> Vec<_> { todo!() })()))
                     .collect(),
             ),
         }
@@ -493,35 +488,24 @@ impl<'graph, I: Clone + Ord + core::fmt::Debug> Stepper<'graph, I> {
     /// Append an input token.
     #[inline]
     fn step(&mut self, token: &I) {
-        let mut v = vec![];
-        for &super::dfa::Recommendation {
-            next_state: index,
-            append: ref formatted,
-        } in &self.state
-        {
-            if let Some(rec) = get!(self.graph.states, index).non_epsilon.get(token) {
-                for &i in &rec.set {
+        let mut threads = BTreeMap::new();
+        for (&index, formatted) in &self.threads {
+            if let Some(edges) = get!(self.graph.states, index).non_epsilon.get(token) {
+                for (&i, &extend) in edges {
                     let mut append = formatted.clone();
-                    append.extend(rec.append.iter().cloned());
-                    v.push(super::dfa::Recommendation {
-                        next_state: i,
-                        append,
-                    });
+                    append.extend(append.iter().cloned());
+                    threads.insert(i, append);
                 }
             }
         }
-        self.state = self.graph.take_all_epsilon_transitions(v);
+        self.threads = self.graph.take_all_epsilon_transitions(threads);
     }
 
     /// Check if the automaton accepts the input we've received so far.
     #[inline]
     fn currently_accepting(&self) -> Option<&Vec<I>> {
         let mut winner_winner = None;
-        for &super::dfa::Recommendation {
-            next_state: index,
-            append: ref formatted,
-        } in &self.state
-        {
+        for (&index, formatted) in &self.threads {
             if get!(self.graph.states, index).accepting {
                 #[allow(clippy::option_if_let_else)] // Borrowing issues
                 match winner_winner {
@@ -544,11 +528,7 @@ impl<'graph, I: Clone + Ord + core::fmt::Debug> Stepper<'graph, I> {
     #[inline]
     fn take(self) -> Option<Vec<I>> {
         let mut winner_winner = None;
-        for super::dfa::Recommendation {
-            next_state: index,
-            append: formatted,
-        } in self.state
-        {
+        for (index, formatted) in self.threads {
             if get!(self.graph.states, index).accepting {
                 match winner_winner {
                     Some(ref v) => {

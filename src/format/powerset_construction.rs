@@ -7,13 +7,12 @@
 //! The powerset construction algorithm for constructing an equivalent DFA from an arbitrary NFA.
 //! Also known as the subset construction algorithm.
 
+use super::{Compiled as Dfa, Parser as Nfa};
 use std::collections::{BTreeMap, BTreeSet};
-
-use super::{dfa::Recommendation, Compiled as Dfa, Parser as Nfa};
 
 /// Type for transitions from _subsets_ of states to _subsets_ of states.
 type SubsetStates<I> =
-    BTreeMap<BTreeSet<Recommendation<I>>, (BTreeMap<I, BTreeSet<Recommendation<I>>>, bool)>;
+    BTreeMap<BTreeMap<usize, (bool, Vec<I>)>, (BTreeMap<I, BTreeMap<usize, (bool, Vec<I>)>>, bool)>;
 
 impl<I: Clone + Ord> Nfa<I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
@@ -21,17 +20,7 @@ impl<I: Clone + Ord> Nfa<I> {
     pub(crate) fn subsets(self) -> Dfa<I> {
         // Map which _subsets_ of states transition to which _subsets_ of states
         let mut subset_states = SubsetStates::new();
-        let initial_state = traverse(
-            &self,
-            self.initial
-                .iter()
-                .map(|&next_state| Recommendation {
-                    next_state,
-                    append: vec![],
-                })
-                .collect(),
-            &mut subset_states,
-        );
+        let initial_state = traverse(&self, self.initial, &mut subset_states);
 
         // Fix an ordering on those subsets so each can be a DFA state
         let mut ordered: Vec<_> = subset_states.keys().collect();
@@ -82,9 +71,9 @@ impl<I: Clone + Ord> Nfa<I> {
 #[inline]
 fn traverse<I: Clone + Ord>(
     nfa: &Nfa<I>,
-    queue: Vec<Recommendation<I>>,
+    queue: BTreeMap<usize, Vec<I>>,
     subset_states: &mut SubsetStates<I>,
-) -> BTreeSet<Recommendation<I>> {
+) -> BTreeMap<usize, Vec<I>> {
     // Take all epsilon transitions immediately
     let superposition = nfa.take_all_epsilon_transitions(queue);
 
@@ -96,23 +85,20 @@ fn traverse<I: Clone + Ord>(
 
     // Get all _states_ from indices
     let states = superposition
-        .iter()
-        .map(|&Recommendation { next_state, .. }| get!(nfa.states, next_state));
+        .keys()
+        .map(|&next_state| get!(nfa.states, next_state));
 
     // For now, so we can't get stuck in a cycle, cache an empty map:
     let _ = entry.insert((BTreeMap::new(), states.clone().any(|state| state.accepting)));
 
     // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
-    let mut next_superposition = BTreeMap::<I, BTreeSet<Recommendation<I>>>::new();
+    let mut next_superposition = BTreeMap::<I, BTreeMap<usize, Vec<I>>>::new();
     for state in states {
-        for (k, rec) in &state.non_epsilon {
-            let next_superposition_entry = next_superposition.entry(k.clone()).or_default();
-            for &next_state in &rec.set {
-                let _ = next_superposition_entry.insert(Recommendation {
-                    next_state,
-                    append: rec.append.clone(),
-                });
-            }
+        for (token, edge) in &state.non_epsilon {
+            next_superposition
+                .entry(token.clone())
+                .or_default()
+                .extend(edge.iter().map(|(a, b)| (a.clone(), b.clone())));
         }
     }
 
@@ -126,6 +112,7 @@ fn traverse<I: Clone + Ord>(
     // think about how to make this iterative instead
 
     // Insert the new values!
+    let shit = unwrap!(subset_states.get_mut(&superposition)).0;
     unwrap!(subset_states.get_mut(&superposition)).0 = next_superposition;
 
     superposition
