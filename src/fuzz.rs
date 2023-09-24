@@ -6,7 +6,7 @@
 
 //! Infinite iterators over inputs guaranteed to be accepted by a given automaton.
 
-use crate::Dfa;
+use crate::Compiled as Dfa;
 use rand::RngCore;
 
 /// Infinite iterator over inputs guaranteed to be accepted by a given automaton.

@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Dfa, Nfa};
+use crate::{Compiled as Dfa, Parser as Nfa};
 
 /// Type for transitions from _subsets_ of states to _subsets_ of states.
 type SubsetStates<I> = BTreeMap<BTreeSet<usize>, (BTreeMap<I, BTreeSet<usize>>, bool)>;
@@ -43,7 +43,7 @@ impl<I: Clone + Ord> Nfa<I> {
             .iter()
             .map(|subset| {
                 let &(ref set, accepting) = unwrap!(subset_states.get(subset));
-                crate::decision::dfa::State {
+                crate::dfa::State {
                     transitions: set
                         .iter()
                         .map(|(k, v)| (k.clone(), unwrap!(ordered.binary_search(&v))))

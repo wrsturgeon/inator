@@ -6,7 +6,7 @@
 
 //! Brzozowski's algorithm for minimizing automata.
 
-use crate::{decision::nfa, Dfa, Nfa};
+use crate::{nfa, Compiled as Dfa, Parser as Nfa};
 use std::collections::{BTreeMap, BTreeSet};
 
 impl<I: Clone + Ord> Nfa<I> {

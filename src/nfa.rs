@@ -68,7 +68,7 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
 impl<I: Clone + Ord> Default for Graph<I> {
     #[inline(always)]
     fn default() -> Self {
-        Self::empty()
+        Self::void()
     }
 }
 
@@ -76,7 +76,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// NFA with zero states.
     #[inline]
     #[must_use]
-    pub fn empty() -> Self {
+    pub fn void() -> Self {
         Self {
             states: vec![],
             initial: BTreeSet::new(),

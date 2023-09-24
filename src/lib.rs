@@ -144,19 +144,26 @@ macro_rules! get_mut {
 
 // TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
 
-mod decision;
+mod brzozowski;
+pub(crate) mod dfa;
 mod expr;
+mod fuzz;
+pub(crate) mod nfa;
+mod ops;
+mod powerset_construction;
 
 #[cfg(test)]
 mod test;
 
 pub use {
-    decision::{Dfa as Compiled, Nfa as Parser, *},
+    dfa::Graph as Compiled,
     expr::Expression,
+    fuzz::{Fuzzer, NeverAccepts},
+    nfa::Graph as Parser,
 };
 
 /// Decide whether the next input token equals this token.
 #[inline(always)]
-pub fn d<I: Clone + Ord>(input: I) -> Nfa<I> {
-    Nfa::unit(input)
+pub fn d<I: Clone + Ord>(input: I) -> Parser<I> {
+    Parser::unit(input)
 }
