@@ -2,8 +2,9 @@
 
 mod autogen; // <-- Automatically generated with `inator` in `build.rs`.
 mod inator_config;
+mod test;
 
-use autogen::abc_tuple as parse;
+use autogen::{abc_tuple as parse, abc_tuple_fuzz as fuzz};
 
 fn main() {
     // Same unit tests as in `build.rs`,
@@ -17,4 +18,15 @@ fn main() {
     assert!(parse("(A, B,)".chars()).is_none()); // 2-tuple, extra comma
     assert!(parse("(A, B, )".chars()).is_none()); // 2-tuple, extra comma & space
     assert!(parse("(A, B, C)".chars()).is_some()); // 3-tuple
+
+    // Property-testing:
+    let mut g = quickcheck::Gen::new(10);
+    for _ in 0..10 {
+        test::roundtrip(&mut g);
+    }
+
+    // Print some inputs (guaranteed to be valid and cover the whole range of valid sequences):
+    // for input in autogen::fuzz().take(100) {
+    //     println!("{input}");
+    // }
 }
