@@ -473,23 +473,42 @@ impl<I: Clone + Ord> Graph<I> {
             where_clause: None,
         };
         let states = syn::ItemMod {
-            attrs: vec![syn::Attribute {
-                pound_token: Token!(#)(Span::call_site()),
-                style: syn::AttrStyle::Outer,
-                bracket_token: syn::token::Bracket::default(),
-                meta: syn::Meta::List(syn::MetaList {
-                    path: syn::Path {
-                        leading_colon: None,
-                        segments: core::iter::once(syn::PathSegment {
-                            ident: Ident::new("allow", Span::call_site()),
-                            arguments: syn::PathArguments::None,
-                        })
-                        .collect(),
-                    },
-                    delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
-                    tokens: Ident::new("non_snake_case", Span::call_site()).into_token_stream(),
-                }),
-            }],
+            attrs: vec![
+                syn::Attribute {
+                    pound_token: Token!(#)(Span::call_site()),
+                    style: syn::AttrStyle::Outer,
+                    bracket_token: syn::token::Bracket::default(),
+                    meta: syn::Meta::List(syn::MetaList {
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("allow", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                        delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
+                        tokens: Ident::new("non_snake_case", Span::call_site()).into_token_stream(),
+                    }),
+                },
+                syn::Attribute {
+                    pound_token: Token!(#)(Span::call_site()),
+                    style: syn::AttrStyle::Outer,
+                    bracket_token: syn::token::Bracket::default(),
+                    meta: syn::Meta::List(syn::MetaList {
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("allow", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                        delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
+                        tokens: Ident::new("unused_mut", Span::call_site()).into_token_stream(),
+                    }),
+                },
+            ],
             vis: syn::Visibility::Inherited,
             unsafety: None,
             mod_token: Token!(mod)(Span::call_site()),
@@ -1553,7 +1572,6 @@ impl<I: Clone + Ord> State<I> {
                                 ident: Ident::new(&format!("s{initial}"), Span::call_site()),
                                 arguments: syn::PathArguments::None,
                             })
-                            .into_iter()
                             .collect(),
                         },
                     })),
