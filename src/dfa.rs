@@ -24,7 +24,7 @@ pub struct Graph<I: Clone + Ord> {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that require consuming and matching input.
-    pub(crate) transitions: BTreeMap<I, usize>,
+    pub(crate) transitions: BTreeMap<I, (usize, Option<&'static str>)>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
@@ -37,7 +37,7 @@ impl<I: Clone + Ord> Graph<I> {
         let mut state = self.initial;
         for input in iter {
             match get!(self.states, state).transition(&input) {
-                Some(&next_state) => state = next_state,
+                Some(&(next_state, _)) => state = next_state,
                 None => return false,
             }
         }
@@ -70,7 +70,9 @@ impl<I: Clone + Ord> Graph<I> {
                     non_epsilon: state
                         .transitions
                         .iter()
-                        .map(|(k, &v)| (k.clone(), core::iter::once(v).collect()))
+                        .map(|(token, &(dst, fn_name))| {
+                            (token.clone(), (core::iter::once(dst).collect(), fn_name))
+                        })
                         .collect(),
                     accepting: state.accepting,
                 })
@@ -116,7 +118,7 @@ impl<I: Clone + Ord> Graph<I> {
                 return cached;
             }
             let state = get!(self.states, index);
-            for (token, &next) in &state.transitions {
+            for (token, &(next, _fn_name)) in &state.transitions {
                 if let Entry::Vacant(entry) = cache.entry(next) {
                     entry.insert(cached.clone()).push(token.clone());
                     queue.push(Reverse(CmpFirst(distance.saturating_add(1), next)));
@@ -254,6 +256,41 @@ impl<I: Clone + Ord> Graph<I> {
                         },
                         delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
                         tokens: Ident::new("non_camel_case_types", Span::call_site())
+                            .into_token_stream(),
+                    }),
+                },
+                syn::Attribute {
+                    pound_token: Token!(#)(Span::call_site()),
+                    style: syn::AttrStyle::Outer,
+                    bracket_token: syn::token::Bracket::default(),
+                    meta: syn::Meta::List(syn::MetaList {
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("allow", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                        delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
+                        tokens: Ident::new("unused_parens", Span::call_site()).into_token_stream(),
+                    }),
+                },
+                syn::Attribute {
+                    pound_token: Token!(#)(Span::call_site()),
+                    style: syn::AttrStyle::Outer,
+                    bracket_token: syn::token::Bracket::default(),
+                    meta: syn::Meta::List(syn::MetaList {
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("allow", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                        delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
+                        tokens: Ident::new("unused_variables", Span::call_site())
                             .into_token_stream(),
                     }),
                 },
@@ -795,8 +832,8 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
             "({}accepting):",
             if self.accepting { "" } else { "NOT " }
         )?;
-        for (input, transitions) in &self.transitions {
-            writeln!(f, "    {input:?} --> {transitions}")?;
+        for (input, &(transitions, fn_name)) in &self.transitions {
+            writeln!(f, "    {input:?} --> {transitions} >>= {fn_name:?}")?;
         }
         Ok(())
     }
@@ -839,18 +876,6 @@ fn output_type(name: &str) -> syn::Type {
     })
 }
 
-/// Turn this sequence into a valid Rust identifier.
-#[inline]
-fn escape_name<'a, I: 'a + Expression, II: IntoIterator<Item = &'a I>>(
-    minimal_input: II,
-) -> String {
-    let mut acc = String::new();
-    for i in minimal_input {
-        acc.push_str(&i.escape());
-    }
-    acc
-}
-
 /// Map from outputs to all inputs which were mapped to them.
 #[inline]
 fn invert<K: Ord, V: Ord>(map: &BTreeMap<K, V>) -> BTreeMap<&V, BTreeSet<&K>> {
@@ -864,7 +889,7 @@ fn invert<K: Ord, V: Ord>(map: &BTreeMap<K, V>) -> BTreeMap<&V, BTreeSet<&K>> {
 impl<I: Clone + Ord> State<I> {
     /// State to which this state can transition on a given input.
     #[inline]
-    pub fn transition(&self, input: &I) -> Option<&usize> {
+    pub fn transition(&self, input: &I) -> Option<&(usize, Option<&'static str>)> {
         self.transitions.get(input)
     }
 
@@ -882,7 +907,7 @@ impl<I: Clone + Ord> State<I> {
         I: Expression,
     {
         let inverted = invert(&self.transitions);
-        let mut v = vec![syn::Item::Fn(syn::ItemFn {
+        vec![syn::Item::Fn(syn::ItemFn {
             attrs: vec![
                 syn::Attribute {
                     pound_token: Token!(#)(Span::call_site()),
@@ -1033,48 +1058,77 @@ impl<I: Clone + Ord> State<I> {
                         brace_token: syn::token::Brace::default(),
                         arms: {
                             let mut v = vec![];
-                            for (&&dst, inputs) in &inverted {
+                            for (&&(dst, fn_name), inputs) in &inverted {
                                 let sdst = format!("s{dst}");
-                                let escaped = escape_name(
-                                    minimal_input
-                                        .iter()
-                                        .chain(core::iter::once(*unwrap!(inputs.first()))),
-                                );
-                                for &input in inputs {
-                                    v.push(syn::Arm {
+                                v.push(syn::Arm {
+                                    attrs: vec![],
+                                    pat: syn::Pat::TupleStruct(syn::PatTupleStruct {
                                         attrs: vec![],
-                                        pat: syn::Pat::TupleStruct(syn::PatTupleStruct {
+                                        qself: None,
+                                        path: syn::Path {
+                                            leading_colon: None,
+                                            segments: core::iter::once(syn::PathSegment {
+                                                ident: Ident::new("Some", Span::call_site()),
+                                                arguments: syn::PathArguments::None,
+                                            })
+                                            .collect(),
+                                        },
+                                        paren_token: syn::token::Paren::default(),
+                                        elems: core::iter::once(syn::Pat::Ident(syn::PatIdent{
+                                            attrs: vec![],
+                                            by_ref: None,
+                                            mutability: None,
+                                            ident: Ident::new("token", Span::call_site()),
+                                            subpat: Some((
+                                                Token!(@)(Span::call_site()),
+                                                Box::new(syn::Pat::Paren(syn::PatParen {
+                                                    attrs: vec![],
+                                                    paren_token: syn::token::Paren::default(),
+                                                    pat: Box::new(syn::Pat::Or(syn::PatOr {
+                                                        attrs: vec![],
+                                                        leading_vert: None,
+                                                        cases: inputs.iter().map(|input| input.to_pattern()).collect(),
+                                                    })),
+                                                })),
+                                            )),
+                                        })).collect(),
+                                    }),
+                                    guard: None,
+                                    fat_arrow_token: Token!(=>)(Span::call_site()),
+                                    body: Box::new(syn::Expr::Call(syn::ExprCall {
+                                        attrs: vec![],
+                                        func: Box::new(syn::Expr::Path(syn::ExprPath {
                                             attrs: vec![],
                                             qself: None,
                                             path: syn::Path {
                                                 leading_colon: None,
                                                 segments: core::iter::once(syn::PathSegment {
-                                                    ident: Ident::new("Some", Span::call_site()),
+                                                    ident: Ident::new(&sdst, Span::call_site()),
                                                     arguments: syn::PathArguments::None,
                                                 })
                                                 .collect(),
                                             },
-                                            paren_token: syn::token::Paren::default(),
-                                            elems: core::iter::once(input.to_pattern()).collect(),
-                                        }),
-                                        guard: None,
-                                        fat_arrow_token: Token!(=>)(Span::call_site()),
-                                        body: Box::new(syn::Expr::Call(syn::ExprCall {
-                                            attrs: vec![],
-                                            func: Box::new(syn::Expr::Path(syn::ExprPath {
+                                        })),
+                                        paren_token: syn::token::Paren::default(),
+                                        args: [
+                                            syn::Expr::Path(syn::ExprPath {
                                                 attrs: vec![],
                                                 qself: None,
                                                 path: syn::Path {
                                                     leading_colon: None,
-                                                    segments: core::iter::once(syn::PathSegment {
-                                                        ident: Ident::new(&sdst, Span::call_site()),
-                                                        arguments: syn::PathArguments::None,
-                                                    })
+                                                    segments: core::iter::once(
+                                                        syn::PathSegment {
+                                                            ident: Ident::new(
+                                                                "i",
+                                                                Span::call_site(),
+                                                            ),
+                                                            arguments: syn::PathArguments::None,
+                                                        },
+                                                    )
                                                     .collect(),
                                                 },
-                                            })),
-                                            paren_token: syn::token::Paren::default(),
-                                            args: [
+                                            }),
+                                            fn_name.map_or_else(|| {
                                                 syn::Expr::Path(syn::ExprPath {
                                                     attrs: vec![],
                                                     qself: None,
@@ -1083,93 +1137,75 @@ impl<I: Clone + Ord> State<I> {
                                                         segments: core::iter::once(
                                                             syn::PathSegment {
                                                                 ident: Ident::new(
-                                                                    "i",
+                                                                    "acc",
                                                                     Span::call_site(),
                                                                 ),
-                                                                arguments: syn::PathArguments::None,
+                                                                arguments:
+                                                                    syn::PathArguments::None,
                                                             },
                                                         )
                                                         .collect(),
                                                     },
-                                                }),
+                                                })
+                                            }, |f| {
                                                 syn::Expr::Call(syn::ExprCall {
                                                     attrs: vec![],
                                                     func: Box::new(syn::Expr::Path(
                                                         syn::ExprPath {
                                                             attrs: vec![],
                                                             qself: None,
-                                                            path: config_path(
-                                                                name,
-                                                                &format!(
-                                                                    "on_{escaped}"
-                                                                ),
-                                                            ),
+                                                            path: config_path(name, f),
                                                         },
                                                     )),
                                                     paren_token: syn::token::Paren::default(),
-                                                    args: {
-                                                        let mut acc = vec![
-                                                            syn::Expr::Path(syn::ExprPath {
-                                                                attrs: vec![],
-                                                                qself: None,
-                                                                path: syn::Path {
-                                                                    leading_colon: None,
-                                                                    segments: core::iter::once(
-                                                                        syn::PathSegment {
-                                                                            ident: Ident::new(
-                                                                                "acc",
-                                                                                Span::call_site(),
-                                                                            ),
-                                                                            arguments:
-                                                                                syn::PathArguments::None,
-                                                                        },
-                                                                    )
-                                                                    .collect(),
-                                                                },
-                                                            })
-                                                        ];
-                                                        if inputs.len() > 1 {
-                                                            acc.push(syn::Expr::Path(syn::ExprPath {
-                                                                attrs: vec![],
-                                                                qself: None,
-                                                                path: syn::Path {
-                                                                    leading_colon: None,
-                                                                    segments: [
-                                                                        syn::PathSegment {
-                                                                            ident: Ident::new(
-                                                                                &format!(
-                                                                                    "Alternates_{escaped}"
-                                                                                ),
-                                                                                Span::call_site(),
-                                                                            ),
-                                                                            arguments: syn::PathArguments::None,
-                                                                        },
-                                                                        syn::PathSegment {
-                                                                            ident: Ident::new(
-                                                                                &format!(
-                                                                                    "V_{}",
-                                                                                    escape_name(core::iter::once(input)),
-                                                                                ),
-                                                                                Span::call_site(),
-                                                                            ),
-                                                                            arguments: syn::PathArguments::None,
-                                                                        },
-                                                                    ].into_iter().collect(),
-                                                                },
-                                                            }));
-                                                        }
-                                                        acc
-                                                    }
+                                                    args: [
+                                                        syn::Expr::Path(syn::ExprPath {
+                                                            attrs: vec![],
+                                                            qself: None,
+                                                            path: syn::Path {
+                                                                leading_colon: None,
+                                                                segments: core::iter::once(
+                                                                    syn::PathSegment {
+                                                                        ident: Ident::new(
+                                                                            "acc",
+                                                                            Span::call_site(),
+                                                                        ),
+                                                                        arguments:
+                                                                            syn::PathArguments::None,
+                                                                    },
+                                                                )
+                                                                .collect(),
+                                                            },
+                                                        }),
+                                                        syn::Expr::Path(syn::ExprPath {
+                                                            attrs: vec![],
+                                                            qself: None,
+                                                            path: syn::Path {
+                                                                leading_colon: None,
+                                                                segments: core::iter::once(
+                                                                    syn::PathSegment {
+                                                                        ident: Ident::new(
+                                                                            "token",
+                                                                            Span::call_site(),
+                                                                        ),
+                                                                        arguments:
+                                                                            syn::PathArguments::None,
+                                                                    },
+                                                                )
+                                                                .collect(),
+                                                            },
+                                                        }),
+                                                    ]
                                                     .into_iter()
                                                     .collect(),
-                                                }),
-                                            ]
-                                            .into_iter()
-                                            .collect(),
-                                        })),
-                                        comma: Some(Token!(,)(Span::call_site())),
-                                    });
-                                }
+                                                })
+                                            }),
+                                        ]
+                                        .into_iter()
+                                        .collect(),
+                                    })),
+                                    comma: Some(Token!(,)(Span::call_site())),
+                                });
                             }
                             v.push(syn::Arm {
                                 attrs: vec![],
@@ -1261,236 +1297,7 @@ impl<I: Clone + Ord> State<I> {
                     None,
                 )],
             }),
-        })];
-        v.extend(
-            inverted
-                .into_iter()
-                .filter(|&(_, ref inputs)| inputs.len() > 1)
-                .flat_map(|(_, inputs)| {
-                    let variants = inputs
-                        .iter()
-                        .map(|&i| syn::Variant {
-                            attrs: vec![],
-                            ident: Ident::new(&format!("V_{}", i.escape()), Span::call_site()),
-                            fields: syn::Fields::Unit,
-                            discriminant: None,
-                        })
-                        .collect();
-                    let ident = Ident::new(
-                        &format!(
-                            "Alternates_{}",
-                            escape_name(minimal_input.iter().chain(inputs.first().copied()))
-                        ),
-                        Span::call_site(),
-                    );
-                    [
-                        syn::Item::Enum(syn::ItemEnum {
-                            attrs: vec![],
-                            vis: syn::Visibility::Public(Token!(pub)(Span::call_site())),
-                            enum_token: Token!(enum)(Span::call_site()),
-                            ident: ident.clone(),
-                            generics: syn::Generics {
-                                lt_token: None,
-                                params: syn::punctuated::Punctuated::new(),
-                                gt_token: None,
-                                where_clause: None,
-                            },
-                            brace_token: syn::token::Brace::default(),
-                            variants,
-                        }),
-                        syn::Item::Impl(syn::ItemImpl {
-                            attrs: vec![],
-                            defaultness: None,
-                            unsafety: None,
-                            impl_token: Token!(impl)(Span::call_site()),
-                            generics: syn::Generics {
-                                lt_token: None,
-                                params: syn::punctuated::Punctuated::new(),
-                                gt_token: None,
-                                where_clause: None,
-                            },
-                            trait_: Some((
-                                None,
-                                syn::Path {
-                                    leading_colon: None,
-                                    segments: core::iter::once(syn::PathSegment {
-                                        ident: Ident::new("From", Span::call_site()),
-                                        arguments: syn::PathArguments::AngleBracketed(
-                                            syn::AngleBracketedGenericArguments {
-                                                colon2_token: None,
-                                                lt_token: Token!(<)(Span::call_site()),
-                                                args: core::iter::once(syn::GenericArgument::Type(
-                                                    syn::Type::Path(syn::TypePath {
-                                                        qself: None,
-                                                        path: syn::Path {
-                                                            leading_colon: None,
-                                                            segments: core::iter::once(
-                                                                syn::PathSegment {
-                                                                    ident: ident.clone(),
-                                                                    arguments:
-                                                                        syn::PathArguments::None,
-                                                                },
-                                                            )
-                                                            .collect(),
-                                                        },
-                                                    }),
-                                                ))
-                                                .collect(),
-                                                gt_token: Token!(>)(Span::call_site()),
-                                            },
-                                        ),
-                                    })
-                                    .collect(),
-                                },
-                                Token!(for)(Span::call_site()),
-                            )),
-                            self_ty: Box::new(I::to_type()),
-                            brace_token: syn::token::Brace::default(),
-                            items: vec![syn::ImplItem::Fn(syn::ImplItemFn {
-                                attrs: vec![syn::Attribute {
-                                    pound_token: Token!(#)(Span::call_site()),
-                                    style: syn::AttrStyle::Outer,
-                                    bracket_token: syn::token::Bracket::default(),
-                                    meta: syn::Meta::List(syn::MetaList {
-                                        path: syn::Path {
-                                            leading_colon: None,
-                                            segments: core::iter::once(syn::PathSegment {
-                                                ident: Ident::new("inline", Span::call_site()),
-                                                arguments: syn::PathArguments::None,
-                                            })
-                                            .collect(),
-                                        },
-                                        delimiter: syn::MacroDelimiter::Paren(
-                                            syn::token::Paren::default(),
-                                        ),
-                                        tokens: Ident::new("always", Span::call_site())
-                                            .into_token_stream(),
-                                    }),
-                                }],
-                                vis: syn::Visibility::Inherited,
-                                defaultness: None,
-                                sig: syn::Signature {
-                                    constness: None,
-                                    asyncness: None,
-                                    unsafety: None,
-                                    abi: None,
-                                    fn_token: Token!(fn)(Span::call_site()),
-                                    ident: Ident::new("from", Span::call_site()),
-                                    generics: syn::Generics {
-                                        lt_token: None,
-                                        params: syn::punctuated::Punctuated::new(),
-                                        gt_token: None,
-                                        where_clause: None,
-                                    },
-                                    paren_token: syn::token::Paren::default(),
-                                    inputs: core::iter::once(syn::FnArg::Typed(syn::PatType {
-                                        attrs: vec![],
-                                        pat: Box::new(syn::Pat::Ident(syn::PatIdent {
-                                            attrs: vec![],
-                                            by_ref: None,
-                                            mutability: None,
-                                            ident: Ident::new("value", Span::call_site()),
-                                            subpat: None,
-                                        })),
-                                        colon_token: Token!(:)(Span::call_site()),
-                                        ty: Box::new(syn::Type::Path(syn::TypePath {
-                                            qself: None,
-                                            path: syn::Path {
-                                                leading_colon: None,
-                                                segments: core::iter::once(syn::PathSegment {
-                                                    ident: ident.clone(),
-                                                    arguments: syn::PathArguments::None,
-                                                })
-                                                .collect(),
-                                            },
-                                        })),
-                                    }))
-                                    .collect(),
-                                    variadic: None,
-                                    output: syn::ReturnType::Type(
-                                        Token!(->)(Span::call_site()),
-                                        Box::new(syn::Type::Path(syn::TypePath {
-                                            qself: None,
-                                            path: syn::Path {
-                                                leading_colon: None,
-                                                segments: core::iter::once(syn::PathSegment {
-                                                    ident: Ident::new("char", Span::call_site()),
-                                                    arguments: syn::PathArguments::None,
-                                                })
-                                                .collect(),
-                                            },
-                                        })),
-                                    ),
-                                },
-                                block: syn::Block {
-                                    brace_token: syn::token::Brace::default(),
-                                    stmts: vec![syn::Stmt::Expr(
-                                        syn::Expr::Match(syn::ExprMatch {
-                                            attrs: vec![],
-                                            match_token: Token!(match)(Span::call_site()),
-                                            expr: Box::new(syn::Expr::Path(syn::ExprPath {
-                                                attrs: vec![],
-                                                qself: None,
-                                                path: syn::Path {
-                                                    leading_colon: None,
-                                                    segments: core::iter::once(syn::PathSegment {
-                                                        ident: Ident::new(
-                                                            "value",
-                                                            Span::call_site(),
-                                                        ),
-                                                        arguments: syn::PathArguments::None,
-                                                    })
-                                                    .collect(),
-                                                },
-                                            })),
-                                            brace_token: syn::token::Brace::default(),
-                                            arms: inputs
-                                                .iter()
-                                                .map(|&i| syn::Arm {
-                                                    attrs: vec![],
-                                                    pat: syn::Pat::Path(syn::ExprPath {
-                                                        attrs: vec![],
-                                                        qself: None,
-                                                        path: syn::Path {
-                                                            leading_colon: None,
-                                                            segments: [
-                                                                syn::PathSegment {
-                                                                    ident: ident.clone(),
-                                                                    arguments:
-                                                                        syn::PathArguments::None,
-                                                                },
-                                                                syn::PathSegment {
-                                                                    ident: Ident::new(
-                                                                        &format!(
-                                                                            "V_{}",
-                                                                            i.escape()
-                                                                        ),
-                                                                        Span::call_site(),
-                                                                    ),
-                                                                    arguments:
-                                                                        syn::PathArguments::None,
-                                                                },
-                                                            ]
-                                                            .into_iter()
-                                                            .collect(),
-                                                        },
-                                                    }),
-                                                    guard: None,
-                                                    fat_arrow_token: Token!(=>)(Span::call_site()),
-                                                    body: Box::new(i.to_expr()),
-                                                    comma: None,
-                                                })
-                                                .collect(),
-                                        }),
-                                        None,
-                                    )],
-                                },
-                            })],
-                        }),
-                    ]
-                }),
-        );
-        v
+        })]
     }
 
     /// Print as a Rust source-code function.
@@ -1614,7 +1421,7 @@ impl<I: Clone + Ord> State<I> {
                 None,
             )),
             1 => stmts.extend({
-                let (token, &dst) = unwrap!(self.transitions.first_key_value());
+                let (token, &(dst, _fn_name)) = unwrap!(self.transitions.first_key_value());
                 fuzz_stmts(token, dst)
             }),
             _ => stmts.push(syn::Stmt::Expr(
@@ -1661,7 +1468,7 @@ impl<I: Clone + Ord> State<I> {
                         .transitions
                         .iter()
                         .enumerate()
-                        .map(|(i, (token, &dst))| syn::Arm {
+                        .map(|(i, (token, &(dst, _fn_name)))| syn::Arm {
                             attrs: vec![],
                             pat: syn::Pat::Lit(syn::ExprLit {
                                 attrs: vec![],
@@ -2013,19 +1820,33 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
     #[inline]
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self {
-            transitions: quickcheck::Arbitrary::arbitrary(g),
+            transitions: BTreeMap::arbitrary(g)
+                .into_iter()
+                .map(|(k, v)| (k, (v, None)))
+                .collect(),
             accepting: quickcheck::Arbitrary::arbitrary(g),
         }
     }
 
     #[inline]
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new((self.transitions.clone(), self.accepting).shrink().map(
-            |(transitions, accepting)| Self {
-                transitions,
-                accepting,
-            },
-        ))
+        Box::new(
+            (
+                self.transitions
+                    .iter()
+                    .map(|(k, &(dst, _))| (k.clone(), dst))
+                    .collect::<Vec<_>>(),
+                self.accepting,
+            )
+                .shrink()
+                .map(|(transitions, accepting)| Self {
+                    transitions: transitions
+                        .into_iter()
+                        .map(|(k, v)| (k, (v, None)))
+                        .collect(),
+                    accepting,
+                }),
+        )
     }
 }
 
@@ -2034,6 +1855,6 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
 fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
-        state.transitions.retain(|_, index| *index < size);
+        state.transitions.retain(|_, &mut (index, _)| index < size);
     }
 }

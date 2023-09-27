@@ -7,10 +7,12 @@
 //! Brzozowski's algorithm for minimizing automata.
 
 use crate::{nfa, Compiled as Dfa, Parser as Nfa};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 impl<I: Clone + Ord> Nfa<I> {
-    /// Reverrse all transitions and swap initial with accepting states.
+    /// Reverse all transitions and swap initial with accepting states.
+    /// # Panics
+    /// TODO
     #[inline]
     #[must_use]
     pub fn reverse(&self) -> Self {
@@ -26,13 +28,18 @@ impl<I: Clone + Ord> Nfa<I> {
             for &dst in &state.epsilon {
                 let _ = get_mut!(states, dst).epsilon.insert(src);
             }
-            for (k, v) in &state.non_epsilon {
-                for &dst in v {
-                    let _ = get_mut!(states, dst)
-                        .non_epsilon
-                        .entry(k.clone())
-                        .or_default()
-                        .insert(src);
+            for (token, &(ref set, fn_name)) in &state.non_epsilon {
+                for &dst in set {
+                    match get_mut!(states, dst).non_epsilon.entry(token.clone()) {
+                        Entry::Vacant(entry) => {
+                            let _ = entry.insert((core::iter::once(src).collect(), fn_name));
+                        }
+                        Entry::Occupied(entry) => {
+                            let &mut (ref mut mut_set, existing_fn_name) = entry.into_mut();
+                            assert_eq!(fn_name, existing_fn_name, "MESSAGE TODO");
+                            let _ = mut_set.insert(src);
+                        }
+                    }
                 }
             }
             if state.accepting {

@@ -33,8 +33,11 @@ fn main() {
     println!("Fuzzing inputs...");
     let mut rng = rand::thread_rng();
     for input in core::iter::from_fn(|| Some(fuzz(&mut rng))).take(10) {
-        println!("{}", input.iter().copied().collect::<String>());
-        assert!(parse(input.into_iter()).is_some());
+        println!(
+            "\"{}\" => {:?}",
+            input.iter().copied().collect::<String>(),
+            parse(input.into_iter()).unwrap()
+        );
     }
     println!();
 }

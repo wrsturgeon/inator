@@ -135,7 +135,7 @@ mod prop {
             if reject == accept {
                 return quickcheck::TestResult::discard();
             }
-            let nfa = Nfa::unit(singleton);
+            let nfa = Nfa::unit(singleton, None);
             quickcheck::TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
         }
 
@@ -333,7 +333,7 @@ mod reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((0, BTreeSet::new())).collect(),
+                    non_epsilon: core::iter::once((0, (BTreeSet::new(), None))).collect(),
                     accepting: true,
                 }],
                 initial: core::iter::once(0).collect(),
@@ -370,7 +370,7 @@ mod reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((255, BTreeSet::new())).collect(),
+                    non_epsilon: core::iter::once((255, (BTreeSet::new(), None))).collect(),
                     accepting: true,
                 }],
                 initial: core::iter::once(0).collect(),
@@ -391,7 +391,7 @@ mod reduced {
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
-                        non_epsilon: core::iter::once((255, core::iter::once(0).collect()))
+                        non_epsilon: core::iter::once((255, (core::iter::once(0).collect(), None)))
                             .collect(),
                         accepting: true,
                     },
@@ -456,7 +456,8 @@ mod reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((0, core::iter::once(0).collect())).collect(),
+                    non_epsilon: core::iter::once((0, (core::iter::once(0).collect(), None)))
+                        .collect(),
                     accepting: false,
                 }],
                 initial: BTreeSet::new(),
@@ -509,7 +510,8 @@ mod reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((1, core::iter::once(0).collect())).collect(),
+                    non_epsilon: core::iter::once((1, (core::iter::once(0).collect(), None)))
+                        .collect(),
                     accepting: false,
                 }],
                 initial: core::iter::once(0).collect(),
@@ -557,7 +559,8 @@ mod reduced {
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
-                        non_epsilon: core::iter::once((2, core::iter::once(1).collect())).collect(),
+                        non_epsilon: core::iter::once((2, (core::iter::once(1).collect(), None)))
+                            .collect(),
                         accepting: true,
                     },
                 ],
@@ -567,7 +570,8 @@ mod reduced {
                 states: vec![
                     nfa::State {
                         epsilon: BTreeSet::new(),
-                        non_epsilon: core::iter::once((1, core::iter::once(1).collect())).collect(),
+                        non_epsilon: core::iter::once((1, (core::iter::once(1).collect(), None)))
+                            .collect(),
                         accepting: false,
                     },
                     nfa::State {

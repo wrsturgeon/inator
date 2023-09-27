@@ -17,10 +17,10 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
             .iter()
             .map(|x| x.checked_add(rhs).expect("Huge number of states"))
             .collect();
-        for v in &mut self.non_epsilon.values_mut() {
-            *v = v
+        for &mut (ref mut set, _fn_name) in &mut self.non_epsilon.values_mut() {
+            *set = set
                 .iter()
-                .map(|x| x.checked_add(rhs).expect("Huge number of states"))
+                .map(|&x| x.checked_add(rhs).expect("Huge number of states"))
                 .collect();
         }
     }
@@ -45,10 +45,38 @@ impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
     }
 }
 
+impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I> {
+    type Output = Self;
+    #[inline]
+    #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
+    fn shr(mut self, (token, fn_name, mut rhs): (I, Option<&'static str>, Nfa<I>)) -> Self::Output {
+        let index = self.states.len();
+        for state in &mut rhs.states {
+            *state += index;
+        }
+        let incr_initial = rhs
+            .initial
+            .iter()
+            .map(|x| x.checked_add(index).expect("Huge number of states"));
+        for state in &mut self.states {
+            if state.accepting {
+                state.accepting = false;
+                state.non_epsilon.extend(
+                    incr_initial
+                        .clone()
+                        .map(|i| (token.clone(), (core::iter::once(i).collect(), fn_name)))
+                        .clone(),
+                );
+            }
+        }
+        self.states.extend(rhs.states);
+        self
+    }
+}
+
 impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
     type Output = Self;
     #[inline]
-    #[allow(clippy::todo)] // FIXME
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
     fn shr(mut self, mut rhs: Self) -> Self::Output {
         let index = self.states.len();

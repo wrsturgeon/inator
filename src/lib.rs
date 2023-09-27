@@ -162,51 +162,48 @@ pub use {
     nfa::Graph as Parser,
 };
 
-/// Accept this token if we see it here.
-#[must_use]
-#[inline(always)]
-pub fn c<I: Clone + Ord>(token: I) -> Parser<I> {
-    Parser::unit(token)
-}
-
-/// Accept this token.
+/// Accept only the empty string.
 #[must_use]
 #[inline(always)]
 pub fn empty<I: Clone + Ord>() -> Parser<I> {
     Parser::empty()
 }
 
-/// Accept this sequence of tokens.
-#[inline]
+/// Accept this token if we see it here, but throw it away.
 #[must_use]
-#[allow(clippy::arithmetic_side_effects)]
-pub fn s<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
-    tokens
-        .into_iter()
-        .fold(Parser::empty(), |acc, token| acc >> c(token))
+#[inline(always)]
+pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
+    Parser::unit(token, None)
 }
 
-/// Accept any of these tokens.
-#[inline]
+/// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
-pub fn any<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
-    tokens
-        .into_iter()
-        .fold(Parser::void(), |acc, token| acc | c(token))
+#[inline(always)]
+pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
+    Parser::unit(token, Some(fn_name))
 }
 
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
-    c(token).optional()
+pub fn opt<I: Clone + Ord>(token: I, fn_name: Option<&'static str>) -> Parser<I> {
+    Parser::unit(token, fn_name).optional()
+}
+
+/// A single character of whitespace (or exactly one "\r\n").
+#[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
+pub fn single_space() -> Parser<char> {
+    ignore(' ') | ignore('\n') | (ignore('\r') >> ignore('\n'))
 }
 
 /// Any amount of whitespace.
 #[inline]
 #[must_use]
+#[allow(clippy::arithmetic_side_effects)]
 pub fn space() -> Parser<char> {
-    any((0..u8::MAX).filter(u8::is_ascii_whitespace).map(char::from)).star()
+    single_space().star()
 }
 
 /// Surround this language in parentheses.
@@ -215,5 +212,5 @@ pub fn space() -> Parser<char> {
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
 pub fn parenthesized(p: Parser<char>) -> Parser<char> {
-    c('(') + p + c(')')
+    ignore('(') + p + ignore(')')
 }

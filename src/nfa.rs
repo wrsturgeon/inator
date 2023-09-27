@@ -24,7 +24,7 @@ pub struct State<I: Clone + Ord> {
     /// Transitions that doesn't require consuming input.
     pub(crate) epsilon: BTreeSet<usize>,
     /// Transitions that require consuming and matching input.
-    pub(crate) non_epsilon: BTreeMap<I, BTreeSet<usize>>,
+    pub(crate) non_epsilon: BTreeMap<I, (BTreeSet<usize>, Option<&'static str>)>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
@@ -99,25 +99,11 @@ impl<I: Clone + Ord> Graph<I> {
     }
 
     /// NFA accepting this exact token and only this exact token, only once.
-    #[must_use]
     #[inline]
-    pub fn unit(singleton: I) -> Self {
-        Self {
-            states: vec![
-                State {
-                    epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((singleton, core::iter::once(1).collect()))
-                        .collect(),
-                    accepting: false,
-                },
-                State {
-                    epsilon: BTreeSet::new(),
-                    non_epsilon: BTreeMap::new(),
-                    accepting: true,
-                },
-            ],
-            initial: core::iter::once(0).collect(),
-        }
+    #[must_use]
+    #[allow(clippy::arithmetic_side_effects)]
+    pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self {
+        Self::empty() >> (singleton, fn_name, Self::empty())
     }
 
     /// Take every transition that doesn't require input.
@@ -128,7 +114,7 @@ impl<I: Clone + Ord> Graph<I> {
         // Take all epsilon transitions immediately
         let mut superposition = BTreeSet::<usize>::new();
         while let Some(state) = queue.pop() {
-            for next in get!(self.states, state).epsilon_transitions() {
+            for next in &get!(self.states, state).epsilon {
                 if !superposition.contains(next) {
                     queue.push(*next);
                 }
@@ -141,23 +127,27 @@ impl<I: Clone + Ord> Graph<I> {
     /// Step through each input token one at a time.
     #[inline]
     #[must_use]
-    #[cfg(test)]
-    pub(crate) fn step(&self) -> Stepper<'_, I> {
+    pub fn step(&self) -> Stepper<'_, I> {
         Stepper::new(self)
     }
 
     /// Decide whether an input belongs to the regular langage this NFA accepts.
     #[inline]
     #[must_use]
-    #[cfg(test)]
     #[allow(clippy::missing_panics_doc)]
-    pub(crate) fn accept<Iter: IntoIterator>(&self, iter: Iter) -> bool
+    pub fn accept<Iter: IntoIterator>(&self, iter: Iter) -> bool
     where
         Iter::Item: core::borrow::Borrow<I>,
     {
         let mut stepper = self.step();
         stepper.extend(iter);
         stepper.currently_accepting()
+    }
+
+    /// Decide whether an input belongs to the regular langage this NFA accepts.
+    #[inline(always)]
+    pub fn reject<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
+        !self.accept(iter)
     }
 
     /// Number of states.
@@ -235,29 +225,17 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
         if !self.epsilon.is_empty() {
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         }
-        for (input, transitions) in &self.non_epsilon {
-            writeln!(f, "    {input:?} --> {transitions:?}")?;
+        for (input, &(ref transitions, fn_name)) in &self.non_epsilon {
+            writeln!(f, "    {input:?} --> {transitions:?} >>= {fn_name:?}")?;
         }
         Ok(())
     }
 }
 
 impl<I: Clone + Ord> State<I> {
-    /// Valid inputs mapped to the set of states to which this state can transition on that input.
-    #[inline(always)]
-    pub const fn non_epsilon_transitions(&self) -> &BTreeMap<I, BTreeSet<usize>> {
-        &self.non_epsilon
-    }
-
-    /// Set of states to which this state can immediately transition without input.
-    #[inline(always)]
-    pub const fn epsilon_transitions(&self) -> &BTreeSet<usize> {
-        &self.epsilon
-    }
-
     /// Set of states to which this state can transition on a given input.
     #[inline]
-    pub fn transition(&self, input: &I) -> Option<&BTreeSet<usize>> {
+    pub fn transition(&self, input: &I) -> Option<&(BTreeSet<usize>, Option<&'static str>)> {
         self.non_epsilon.get(input)
     }
 }
@@ -291,7 +269,10 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self {
             epsilon: quickcheck::Arbitrary::arbitrary(g),
-            non_epsilon: quickcheck::Arbitrary::arbitrary(g),
+            non_epsilon: BTreeMap::<I, BTreeSet<usize>>::arbitrary(g)
+                .into_iter()
+                .map(|(k, v)| (k, (v, None)))
+                .collect(),
             accepting: quickcheck::Arbitrary::arbitrary(g),
         }
     }
@@ -301,13 +282,19 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
         Box::new(
             (
                 self.epsilon.clone(),
-                self.non_epsilon.clone(),
+                self.non_epsilon
+                    .iter()
+                    .map(|(token, &(ref map, _))| (token.clone(), map.clone()))
+                    .collect::<BTreeMap<_, _>>(),
                 self.accepting,
             )
                 .shrink()
                 .map(|(epsilon, non_epsilon, accepting)| Self {
                     epsilon,
-                    non_epsilon,
+                    non_epsilon: non_epsilon
+                        .into_iter()
+                        .map(|(dst, set)| (dst, (set, None)))
+                        .collect(),
                     accepting,
                 }),
         )
@@ -320,22 +307,21 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
         state.epsilon.retain(|i| i < &size);
-        for destination in state.non_epsilon.values_mut() {
+        for &mut (ref mut destination, _) in state.non_epsilon.values_mut() {
             destination.retain(|index| index < &size);
         }
     }
 }
 
 /// Step through an automaton one token at a time.
-#[cfg(test)]
-pub(crate) struct Stepper<'graph, I: Clone + Ord> {
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Stepper<'graph, I: Clone + Ord> {
     /// The graph we're riding.
     graph: &'graph Graph<I>,
     /// Current state after the input we've received so far.
     state: BTreeSet<usize>,
 }
 
-#[cfg(test)]
 impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     /// Start from the empty string on a certain automaton.
     #[inline]
@@ -353,11 +339,8 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
         self.state = self.graph.take_all_epsilon_transitions(
             self.state
                 .iter()
-                .flat_map(|&index| {
-                    get!(self.graph.states, index)
-                        .transition(token)
-                        .map_or(BTreeSet::new(), Clone::clone)
-                })
+                .filter_map(|&index| get!(self.graph.states, index).transition(token))
+                .flat_map(|&(ref map, _)| map.iter().copied())
                 .collect(),
         );
     }
@@ -374,7 +357,6 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     }
 }
 
-#[cfg(test)]
 impl<I: Clone + Ord, B: core::borrow::Borrow<I>> Extend<B> for Stepper<'_, I> {
     #[inline]
     fn extend<T: IntoIterator<Item = B>>(&mut self, iter: T) {

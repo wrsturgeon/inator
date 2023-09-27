@@ -1,29 +1,11 @@
-//! No tricks under the hood--here are some definitions from our "standard library":
-//! ```
-//!
-//! /// Surround this language in parentheses.
-//! pub fn parenthesized(p: Parser<char>) -> Parser<char> {
-//!     c('(') + p + c(')')
-//! }
-//!
-//! /// Accept any of these tokens here.
-//! pub fn any<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II) -> Parser<I> {
-//!     tokens
-//!         .into_iter()
-//!         .fold(Parser::void(), |acc, token| acc | c(token))
-//! }
-//!
-//! /// Any amount of whitespace.
-//! pub fn space() -> Parser<char> {
-//!     any((0..u8::MAX).filter(u8::is_ascii_whitespace).map(char::from))
-//! }
-//!
-//! ```
+use inator::{ignore, on, Parser};
 
-use inator::{any, c, s, Parser};
+fn append(c: char) -> Parser<char> {
+    on(c, "append") // We define `append` in `src/inator_config.rs`!
+}
 
 fn parenthesized(p: Parser<char>) -> Parser<char> {
-    c('(') >> p >> c(')')
+    ignore('(') + p + ignore(')')
 }
 
 fn empty_tuple() -> Parser<char> {
@@ -31,15 +13,11 @@ fn empty_tuple() -> Parser<char> {
 }
 
 fn singleton(p: Parser<char>) -> Parser<char> {
-    parenthesized(p >> c(','))
-}
-
-fn separator() -> Parser<char> {
-    s([',', ' '])
+    parenthesized(p + ignore(','))
 }
 
 fn pair_or_more(p: Parser<char>) -> Parser<char> {
-    parenthesized(p.clone() >> separator() >> p.clone() >> (separator() >> p).star())
+    parenthesized(p.clone() + ignore(',') + p.clone() + (ignore(',') + p).star())
 }
 
 #[inline]
@@ -49,7 +27,18 @@ fn tuple(p: Parser<char>) -> Parser<char> {
 
 fn main() -> std::io::Result<()> {
     // Specify what we want in parentheses
-    let spec = tuple(any(['A', 'B', 'C']));
+    let spec = tuple(append('A') | append('B') | append('C'));
+
+    // Some unit tests
+    assert!(spec.accept("()".chars())); // Empty tuple
+    assert!(spec.reject("(,)".chars())); // Unnecessary comma
+    assert!(spec.reject("(A)".chars())); // Just parenthesized, not a tuple
+    assert!(spec.accept("(A,)".chars())); // Singleton
+    assert!(spec.reject("(A,,)".chars())); // Too many commas
+    assert!(spec.accept("(A, B)".chars())); // 2-tuple, no extra comma
+    assert!(spec.reject("(A, B,)".chars())); // 2-tuple, extra comma
+    assert!(spec.reject("(A, B, )".chars())); // 2-tuple, extra comma & space
+    assert!(spec.accept("(A, B, C)".chars())); // 3-tuple
 
     // Compile it to a provably optimal implementation
     let parser = spec.compile();
@@ -57,7 +46,7 @@ fn main() -> std::io::Result<()> {
     // Pretty-print the compiled version as a graph
     println!("{parser}");
 
-    // Some unit tests
+    // Same unit tests
     assert!(parser.accept("()".chars())); // Empty tuple
     assert!(parser.reject("(,)".chars())); // Unnecessary comma
     assert!(parser.reject("(A)".chars())); // Just parenthesized, not a tuple

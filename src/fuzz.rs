@@ -46,7 +46,7 @@ impl<I: Clone + Ord> Iterator for Fuzzer<I> {
                     .keys()
                     .nth(self.rng.gen_range(0..state.transitions.len())));
                 v.push(key.clone());
-                index = *unwrap!(state.transitions.get(key));
+                index = unwrap!(state.transitions.get(key)).0;
             }
         }
     }
