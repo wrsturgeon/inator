@@ -1,6 +1,6 @@
 //! See `build.rs` first!
 
-mod autogen; // <-- Automatically generated with `inator` in `build.rs`.
+mod autogen; // <-- Automatically generated in `build.rs`! Should be `.gitignore`d.
 mod inator_config;
 mod test;
 
@@ -25,8 +25,11 @@ fn main() {
         test::roundtrip(&mut g);
     }
 
-    // Print some inputs (guaranteed to be valid and cover the whole range of valid sequences):
-    // for input in autogen::fuzz().take(100) {
-    //     println!("{input}");
+    // TODO:
+
+    // // Print some inputs (guaranteed to be valid and cover the whole range of valid sequences):
+    // let mut rng = rand::thread_rng();
+    // for input in core::iter::from_fn(|| Some(fuzz(&mut rng))).take(100) {
+    //     println!("{}", input.into_iter().collect::<String>());
     // }
 }

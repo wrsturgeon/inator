@@ -1,6 +1,6 @@
 //! Boilerplate to generate property-test input.
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Alphabet {
     A,
     B,
@@ -33,10 +33,8 @@ impl quickcheck::Arbitrary for Alphabet {
     }
 }
 
-pub fn roundtrip(g: &mut quickcheck::Gen) {
-    let v = <Vec<Alphabet> as quickcheck::Arbitrary>::arbitrary(g);
-
-    let input = v.split_first().map_or_else(
+pub fn mk_input(v: &[Alphabet]) -> String {
+    v.split_first().map_or_else(
         || "()".to_owned(),
         |(head, tail)| {
             if tail.is_empty() {
@@ -50,11 +48,21 @@ pub fn roundtrip(g: &mut quickcheck::Gen) {
                 )
             }
         },
-    );
+    )
+}
 
+pub fn roundtrip(g: &mut quickcheck::Gen) {
+    let v = <Vec<Alphabet> as quickcheck::Arbitrary>::arbitrary(g);
+    let input = mk_input(&v);
     let parsed = crate::parse(input.chars()).unwrap();
-
     println!("\"{input}\" -> {parsed:?}");
-
     assert_eq!(parsed, v.into_iter().map(char::from).collect::<Vec<_>>());
 }
+
+// quickcheck::quickcheck! {
+//     fn prop_roundtrip(v: Vec<Alphabet>) -> bool {
+//         let input = mk_input(&v);
+//         let parsed = crate::parse(input.chars()).unwrap();
+//         parsed.into_iter().eq(v.into_iter().map(char::from))
+//     }
+// }

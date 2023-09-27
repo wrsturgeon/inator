@@ -9,32 +9,35 @@
 use proc_macro2::Span;
 
 /// Convert to a variety of source-code-related formats.
-pub trait Expression {
-    /// Convert `&Self -> inator::Expression`.
+pub trait Expression: core::fmt::Display {
+    /// Convert `&Self -> syn::Expr`.
+    #[must_use]
+    fn to_expr(&self) -> syn::Expr;
+    /// Convert `&Self -> syn::Pat`.
     #[must_use]
     fn to_pattern(&self) -> syn::Pat;
-    /// Write a string that looks like Rust source (for pretty-printing only).
-    #[must_use]
-    fn to_source(&self) -> String;
-    /// Write a `syn` type representing this type.
+    /// Write a `syn::Type` type representing this value's type.
     #[must_use]
     fn to_type() -> syn::Type;
-    /// Escape to characters that can unambiguously represent this input as a Rust identifier.
+    /// Escape to characters that can unambiguously represent this input as a Rust *identifier*.
     #[must_use]
     fn escape(&self) -> String;
 }
 
 impl Expression for char {
-    #[inline(always)]
-    fn to_pattern(&self) -> syn::Pat {
-        syn::Pat::Lit(syn::ExprLit {
+    #[inline]
+    fn to_expr(&self) -> syn::Expr {
+        syn::Expr::Lit(syn::ExprLit {
             attrs: vec![],
             lit: syn::Lit::Char(syn::LitChar::new(*self, Span::call_site())),
         })
     }
     #[inline]
-    fn to_source(&self) -> String {
-        format!("'{}'", self.escape_default())
+    fn to_pattern(&self) -> syn::Pat {
+        syn::Pat::Lit(syn::ExprLit {
+            attrs: vec![],
+            lit: syn::Lit::Char(syn::LitChar::new(*self, Span::call_site())),
+        })
     }
     #[inline]
     fn to_type() -> syn::Type {
@@ -104,16 +107,19 @@ impl Expression for char {
 }
 
 impl Expression for u8 {
-    #[inline(always)]
-    fn to_pattern(&self) -> syn::Pat {
-        syn::Pat::Lit(syn::ExprLit {
+    #[inline]
+    fn to_expr(&self) -> syn::Expr {
+        syn::Expr::Lit(syn::ExprLit {
             attrs: vec![],
             lit: syn::Lit::Byte(syn::LitByte::new(*self, Span::call_site())),
         })
     }
     #[inline]
-    fn to_source(&self) -> String {
-        format!("b'{}'", char::from(*self).escape_default())
+    fn to_pattern(&self) -> syn::Pat {
+        syn::Pat::Lit(syn::ExprLit {
+            attrs: vec![],
+            lit: syn::Lit::Byte(syn::LitByte::new(*self, Span::call_site())),
+        })
     }
     #[inline]
     fn to_type() -> syn::Type {

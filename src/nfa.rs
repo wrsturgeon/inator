@@ -236,7 +236,7 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         }
         for (input, transitions) in &self.non_epsilon {
-            writeln!(f, "    {} --> {transitions:?}", input.to_source())?;
+            writeln!(f, "    {input} --> {transitions:?}")?;
         }
         Ok(())
     }

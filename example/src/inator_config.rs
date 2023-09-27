@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 pub mod abc_tuple {
     pub type Output = Vec<char>;
 
@@ -20,22 +22,11 @@ pub mod abc_tuple {
 
     /// "(A"
     #[inline(always)]
-    pub fn on__lparen_A(mut acc: Output) -> Output {
-        acc.push('A');
-        acc
-    }
-
-    /// "(B"
-    #[inline(always)]
-    pub fn on__lparen_B(mut acc: Output) -> Output {
-        acc.push('B');
-        acc
-    }
-
-    /// "(C"
-    #[inline(always)]
-    pub fn on__lparen_C(mut acc: Output) -> Output {
-        acc.push('C');
+    pub fn on__lparen_A(
+        mut acc: Output,
+        alt: crate::autogen::abc_tuple_states::Alternates__lparen_A,
+    ) -> Output {
+        acc.push(alt.into());
         acc
     }
 
@@ -70,20 +61,11 @@ pub mod abc_tuple {
     }
 
     /// "(A, A"
-    pub fn on__lparen_A_comma__space_A(mut acc: Output) -> Output {
-        acc.push('A');
-        acc
-    }
-
-    /// "(A, B"
-    pub fn on__lparen_A_comma__space_B(mut acc: Output) -> Output {
-        acc.push('B');
-        acc
-    }
-
-    /// "(A, C"
-    pub fn on__lparen_A_comma__space_C(mut acc: Output) -> Output {
-        acc.push('C');
+    pub fn on__lparen_A_comma__space_A(
+        mut acc: Output,
+        alt: crate::autogen::abc_tuple_states::Alternates__lparen_A_comma__space_A,
+    ) -> Output {
+        acc.push(alt.into());
         acc
     }
 
