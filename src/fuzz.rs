@@ -7,7 +7,7 @@
 //! Infinite iterators over inputs guaranteed to be accepted by a given automaton.
 
 use crate::Compiled as Dfa;
-use rand::RngCore;
+use rand::Rng;
 
 /// Infinite iterator over inputs guaranteed to be accepted by a given automaton.
 #[derive(Clone, Debug)]
@@ -33,7 +33,7 @@ impl<I: Clone + Ord> Iterator for Fuzzer<I> {
             let mut v = vec![];
             loop {
                 let state = get!(self.dfa.states, index);
-                if state.accepting && ((self.rng.next_u32() & 1) == 0) {
+                if state.accepting && self.rng.gen() {
                     v.reverse();
                     return Some(v);
                 }
@@ -44,7 +44,7 @@ impl<I: Clone + Ord> Iterator for Fuzzer<I> {
                 let key = unwrap!(state
                     .transitions
                     .keys()
-                    .nth((self.rng.next_u32() as usize) % state.transitions.len()));
+                    .nth(self.rng.gen_range(0..state.transitions.len())));
                 v.push(key.clone());
                 index = *unwrap!(state.transitions.get(key));
             }

@@ -9,6 +9,7 @@ use autogen::{abc_tuple as parse, abc_tuple_fuzz as fuzz};
 fn main() {
     // Same unit tests as in `build.rs`,
     // this time "on the metal" with compiled Rust:
+    println!("Unit tests...");
     assert!(parse("()".chars()).is_some()); // Empty tuple
     assert!(parse("(,)".chars()).is_none()); // Unnecessary comma
     assert!(parse("(A)".chars()).is_none()); // Just parenthesized, not a tuple
@@ -18,18 +19,22 @@ fn main() {
     assert!(parse("(A, B,)".chars()).is_none()); // 2-tuple, extra comma
     assert!(parse("(A, B, )".chars()).is_none()); // 2-tuple, extra comma & space
     assert!(parse("(A, B, C)".chars()).is_some()); // 3-tuple
+    println!();
 
     // Property-testing:
+    println!("Property tests...");
     let mut g = quickcheck::Gen::new(10);
     for _ in 0..10 {
         test::roundtrip(&mut g);
     }
+    println!();
 
-    // TODO:
-
-    // // Print some inputs (guaranteed to be valid and cover the whole range of valid sequences):
-    // let mut rng = rand::thread_rng();
-    // for input in core::iter::from_fn(|| Some(fuzz(&mut rng))).take(100) {
-    //     println!("{}", input.into_iter().collect::<String>());
-    // }
+    // Print some inputs (guaranteed to be valid and cover the whole range of valid sequences):
+    println!("Fuzzing inputs...");
+    let mut rng = rand::thread_rng();
+    for input in core::iter::from_fn(|| Some(fuzz(&mut rng))).take(10) {
+        println!("{}", input.iter().copied().collect::<String>());
+        assert!(parse(input.into_iter()).is_some());
+    }
+    println!();
 }

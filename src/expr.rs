@@ -129,7 +129,7 @@ impl Expression for u8 {
             path: syn::Path {
                 leading_colon: None,
                 segments: core::iter::once(syn::PathSegment {
-                    ident: syn::Ident::new("char", Span::call_site()),
+                    ident: syn::Ident::new("u8", Span::call_site()),
                     arguments: syn::PathArguments::None,
                 })
                 .collect(),

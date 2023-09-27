@@ -456,7 +456,7 @@ impl<I: Clone + Ord> Graph<I> {
                                 arguments: syn::PathArguments::None,
                             },
                             syn::PathSegment {
-                                ident: Ident::new("RngCore", Span::call_site()),
+                                ident: Ident::new("Rng", Span::call_site()),
                                 arguments: syn::PathArguments::None,
                             },
                         ]
@@ -499,7 +499,9 @@ impl<I: Clone + Ord> Graph<I> {
                 self.states
                     .iter()
                     .enumerate()
-                    .map(|(i, state)| state.to_fuzz_source(i, generics.clone(), &self.backtrack(i)))
+                    .map(|(i, state)| {
+                        state.to_fuzz_source(i, self.initial, generics.clone(), &self.backtrack(i))
+                    })
                     .collect(),
             )),
             semi: None,
@@ -510,17 +512,13 @@ impl<I: Clone + Ord> Graph<I> {
                     pound_token: Token!(#)(Span::call_site()),
                     style: syn::AttrStyle::Outer,
                     bracket_token: syn::token::Bracket::default(),
-                    meta: syn::Meta::List(syn::MetaList {
-                        path: syn::Path {
-                            leading_colon: None,
-                            segments: core::iter::once(syn::PathSegment {
-                                ident: Ident::new("inline", Span::call_site()),
-                                arguments: syn::PathArguments::None,
-                            })
-                            .collect(),
-                        },
-                        delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
-                        tokens: Ident::new("always", Span::call_site()).into_token_stream(),
+                    meta: syn::Meta::Path(syn::Path {
+                        leading_colon: None,
+                        segments: core::iter::once(syn::PathSegment {
+                            ident: Ident::new("inline", Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        })
+                        .collect(),
                     }),
                 }],
                 vis: syn::Visibility::Public(Token!(pub)(Span::call_site())),
@@ -1478,17 +1476,256 @@ impl<I: Clone + Ord> State<I> {
 
     /// Print as a Rust source-code function.
     #[inline]
-    #[allow(clippy::unused_self)] // FIXME
     #[allow(clippy::too_many_lines)]
     pub fn to_fuzz_source(
         &self,
         index: usize,
+        initial: usize,
         generics: syn::Generics,
         minimal_input: &[I],
     ) -> syn::Item
     where
         I: Expression,
     {
+        let mut stmts = vec![];
+        if self.accepting {
+            stmts.push(syn::Stmt::Expr(
+                syn::Expr::If(syn::ExprIf {
+                    attrs: vec![],
+                    if_token: Token!(if)(Span::call_site()),
+                    cond: Box::new(syn::Expr::MethodCall(syn::ExprMethodCall {
+                        attrs: vec![],
+                        receiver: Box::new(syn::Expr::Path(syn::ExprPath {
+                            attrs: vec![],
+                            qself: None,
+                            path: syn::Path {
+                                leading_colon: None,
+                                segments: core::iter::once(syn::PathSegment {
+                                    ident: Ident::new("r", Span::call_site()),
+                                    arguments: syn::PathArguments::None,
+                                })
+                                .collect(),
+                            },
+                        })),
+                        dot_token: Token!(.)(Span::call_site()),
+                        method: Ident::new("gen", Span::call_site()),
+                        turbofish: None,
+                        paren_token: syn::token::Paren::default(),
+                        args: syn::punctuated::Punctuated::new(),
+                    })),
+                    then_branch: syn::Block {
+                        brace_token: syn::token::Brace::default(),
+                        stmts: vec![syn::Stmt::Expr(
+                            syn::Expr::Return(syn::ExprReturn {
+                                attrs: vec![],
+                                return_token: Token!(return)(Span::call_site()),
+                                expr: Some(Box::new(syn::Expr::Path(syn::ExprPath {
+                                    attrs: vec![],
+                                    qself: None,
+                                    path: syn::Path {
+                                        leading_colon: None,
+                                        segments: core::iter::once(syn::PathSegment {
+                                            ident: Ident::new("acc", Span::call_site()),
+                                            arguments: syn::PathArguments::None,
+                                        })
+                                        .collect(),
+                                    },
+                                }))),
+                            }),
+                            Some(Token!(;)(Span::call_site())),
+                        )],
+                    },
+                    else_branch: None,
+                }),
+                None,
+            ));
+        }
+        match self.transitions.len() {
+            0 => stmts.push(syn::Stmt::Expr(
+                syn::Expr::Call(syn::ExprCall {
+                    attrs: vec![],
+                    func: Box::new(syn::Expr::Path(syn::ExprPath {
+                        attrs: vec![],
+                        qself: None,
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new(&format!("s{initial}"), Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .into_iter()
+                            .collect(),
+                        },
+                    })),
+                    paren_token: syn::token::Paren::default(),
+                    args: [
+                        syn::Expr::Path(syn::ExprPath {
+                            attrs: vec![],
+                            qself: None,
+                            path: syn::Path {
+                                leading_colon: None,
+                                segments: core::iter::once(syn::PathSegment {
+                                    ident: Ident::new("r", Span::call_site()),
+                                    arguments: syn::PathArguments::None,
+                                })
+                                .collect(),
+                            },
+                        }),
+                        syn::Expr::Macro(syn::ExprMacro {
+                            attrs: vec![],
+                            mac: syn::Macro {
+                                path: syn::Path {
+                                    leading_colon: None,
+                                    segments: core::iter::once(syn::PathSegment {
+                                        ident: Ident::new("vec", Span::call_site()),
+                                        arguments: syn::PathArguments::None,
+                                    })
+                                    .collect(),
+                                },
+                                bang_token: Token!(!)(Span::call_site()),
+                                delimiter: syn::MacroDelimiter::Bracket(
+                                    syn::token::Bracket::default(),
+                                ),
+                                tokens: proc_macro2::TokenStream::new(),
+                            },
+                        }),
+                    ]
+                    .into_iter()
+                    .collect(),
+                }),
+                None,
+            )),
+            1 => stmts.extend({
+                let (token, &dst) = unwrap!(self.transitions.first_key_value());
+                fuzz_stmts(token, dst)
+            }),
+            _ => stmts.push(syn::Stmt::Expr(
+                syn::Expr::Match(syn::ExprMatch {
+                    attrs: vec![],
+                    match_token: Token!(match)(Span::call_site()),
+                    expr: Box::new(syn::Expr::MethodCall(syn::ExprMethodCall {
+                        attrs: vec![],
+                        receiver: Box::new(syn::Expr::Path(syn::ExprPath {
+                            attrs: vec![],
+                            qself: None,
+                            path: syn::Path {
+                                leading_colon: None,
+                                segments: core::iter::once(syn::PathSegment {
+                                    ident: Ident::new("r", Span::call_site()),
+                                    arguments: syn::PathArguments::None,
+                                })
+                                .collect(),
+                            },
+                        })),
+                        dot_token: Token!(.)(Span::call_site()),
+                        method: Ident::new("gen_range", Span::call_site()),
+                        turbofish: None,
+                        paren_token: syn::token::Paren::default(),
+                        args: core::iter::once(syn::Expr::Range(syn::ExprRange {
+                            attrs: vec![],
+                            start: Some(Box::new(syn::Expr::Lit(syn::ExprLit {
+                                attrs: vec![],
+                                lit: syn::Lit::Int(syn::LitInt::new("0", Span::call_site())),
+                            }))),
+                            limits: syn::RangeLimits::HalfOpen(Token!(..)(Span::call_site())),
+                            end: Some(Box::new(syn::Expr::Lit(syn::ExprLit {
+                                attrs: vec![],
+                                lit: syn::Lit::Int(syn::LitInt::new(
+                                    &format!("{}", self.transitions.len()),
+                                    Span::call_site(),
+                                )),
+                            }))),
+                        }))
+                        .collect(),
+                    })),
+                    brace_token: syn::token::Brace::default(),
+                    arms: self
+                        .transitions
+                        .iter()
+                        .enumerate()
+                        .map(|(i, (token, &dst))| syn::Arm {
+                            attrs: vec![],
+                            pat: syn::Pat::Lit(syn::ExprLit {
+                                attrs: vec![],
+                                lit: syn::Lit::Int(syn::LitInt::new(
+                                    &format!("{i}"),
+                                    Span::call_site(),
+                                )),
+                            }),
+                            guard: None,
+                            fat_arrow_token: Token!(=>)(Span::call_site()),
+                            body: Box::new(syn::Expr::Block(syn::ExprBlock {
+                                attrs: vec![],
+                                label: None,
+                                block: syn::Block {
+                                    brace_token: syn::token::Brace::default(),
+                                    stmts: fuzz_stmts(token, dst),
+                                },
+                            })),
+                            comma: None,
+                        })
+                        .chain(core::iter::once(syn::Arm {
+                            attrs: vec![],
+                            pat: syn::Pat::Wild(syn::PatWild {
+                                attrs: vec![],
+                                underscore_token: Token!(_)(Span::call_site()),
+                            }),
+                            guard: None,
+                            fat_arrow_token: Token!(=>)(Span::call_site()),
+                            body: Box::new(syn::Expr::Unsafe(syn::ExprUnsafe {
+                                attrs: vec![],
+                                unsafe_token: Token!(unsafe)(Span::call_site()),
+                                block: syn::Block {
+                                    brace_token: syn::token::Brace::default(),
+                                    stmts: vec![syn::Stmt::Expr(
+                                        syn::Expr::Call(syn::ExprCall {
+                                            attrs: vec![],
+                                            func: Box::new(syn::Expr::Path(syn::ExprPath {
+                                                attrs: vec![],
+                                                qself: None,
+                                                path: syn::Path {
+                                                    leading_colon: None,
+                                                    segments: [
+                                                        syn::PathSegment {
+                                                            ident: Ident::new(
+                                                                "core",
+                                                                Span::call_site(),
+                                                            ),
+                                                            arguments: syn::PathArguments::None,
+                                                        },
+                                                        syn::PathSegment {
+                                                            ident: Ident::new(
+                                                                "hint",
+                                                                Span::call_site(),
+                                                            ),
+                                                            arguments: syn::PathArguments::None,
+                                                        },
+                                                        syn::PathSegment {
+                                                            ident: Ident::new(
+                                                                "unreachable_unchecked",
+                                                                Span::call_site(),
+                                                            ),
+                                                            arguments: syn::PathArguments::None,
+                                                        },
+                                                    ]
+                                                    .into_iter()
+                                                    .collect(),
+                                                },
+                                            })),
+                                            paren_token: syn::token::Paren::default(),
+                                            args: syn::punctuated::Punctuated::new(),
+                                        }),
+                                        None,
+                                    )],
+                                },
+                            })),
+                            comma: None,
+                        }))
+                        .collect(),
+                }),
+                None,
+            )),
+        }
         syn::Item::Fn(syn::ItemFn {
             attrs: vec![
                 syn::Attribute {
@@ -1638,40 +1875,86 @@ impl<I: Clone + Ord> State<I> {
             },
             block: Box::new(syn::Block {
                 brace_token: syn::token::Brace::default(),
-                stmts: vec![syn::Stmt::Expr(
-                    // syn::Expr::Path(syn::ExprPath {
-                    //     attrs: vec![],
-                    //     qself: None,
-                    //     path: syn::Path {
-                    //         leading_colon: None,
-                    //         segments: core::iter::once(syn::PathSegment {
-                    //             ident: Ident::new("acc", Span::call_site()),
-                    //             arguments: syn::PathArguments::None,
-                    //         })
-                    //         .collect(),
-                    //     },
-                    // }),
-                    syn::Expr::Macro(syn::ExprMacro {
-                        attrs: vec![],
-                        mac: syn::Macro {
-                            path: syn::Path {
-                                leading_colon: None,
-                                segments: core::iter::once(syn::PathSegment {
-                                    ident: Ident::new("todo", Span::call_site()),
-                                    arguments: syn::PathArguments::None,
-                                })
-                                .collect(),
-                            },
-                            bang_token: Token!(!)(Span::call_site()),
-                            delimiter: syn::MacroDelimiter::Paren(syn::token::Paren::default()),
-                            tokens: proc_macro2::TokenStream::new(),
-                        },
-                    }),
-                    None,
-                )],
+                stmts,
             }),
         })
     }
+}
+
+/// When writing a fuzzer function, append this character then jump to this other state.
+fn fuzz_stmts<E: Expression>(token: &E, dst: usize) -> Vec<syn::Stmt> {
+    vec![
+        syn::Stmt::Expr(
+            syn::Expr::MethodCall(syn::ExprMethodCall {
+                attrs: vec![],
+                receiver: Box::new(syn::Expr::Path(syn::ExprPath {
+                    attrs: vec![],
+                    qself: None,
+                    path: syn::Path {
+                        leading_colon: None,
+                        segments: core::iter::once(syn::PathSegment {
+                            ident: Ident::new("acc", Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        })
+                        .collect(),
+                    },
+                })),
+                dot_token: Token!(.)(Span::call_site()),
+                method: Ident::new("push", Span::call_site()),
+                turbofish: None,
+                paren_token: syn::token::Paren::default(),
+                args: core::iter::once(token.to_expr()).collect(),
+            }),
+            Some(Token!(;)(Span::call_site())),
+        ),
+        syn::Stmt::Expr(
+            syn::Expr::Call(syn::ExprCall {
+                attrs: vec![],
+                func: Box::new(syn::Expr::Path(syn::ExprPath {
+                    attrs: vec![],
+                    qself: None,
+                    path: syn::Path {
+                        leading_colon: None,
+                        segments: core::iter::once(syn::PathSegment {
+                            ident: Ident::new(&format!("s{dst}"), Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        })
+                        .collect(),
+                    },
+                })),
+                paren_token: syn::token::Paren::default(),
+                args: [
+                    syn::Expr::Path(syn::ExprPath {
+                        attrs: vec![],
+                        qself: None,
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("r", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                    }),
+                    syn::Expr::Path(syn::ExprPath {
+                        attrs: vec![],
+                        qself: None,
+                        path: syn::Path {
+                            leading_colon: None,
+                            segments: core::iter::once(syn::PathSegment {
+                                ident: Ident::new("acc", Span::call_site()),
+                                arguments: syn::PathArguments::None,
+                            })
+                            .collect(),
+                        },
+                    }),
+                ]
+                .into_iter()
+                .collect(),
+            }),
+            None,
+        ),
+    ]
 }
 
 #[cfg(feature = "quickcheck")]

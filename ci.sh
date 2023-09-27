@@ -16,12 +16,10 @@ export RUST_BACKTRACE=1
 if [ -d example ]
 then
   cd example
-  rm -f src/autogen.rs
   cargo build
   cargo fmt
   ../ci.sh
   cargo +nightly miri run
-  rm src/autogen.rs
   cd ..
 fi
 
