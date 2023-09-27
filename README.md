@@ -1,4 +1,4 @@
-# `inator`: a revolutionary parsing library
+# `inator`: an evil parsing library
 ## You supply the evil plan; we supply the _**-inator!**_
 ### or, Provably Optimal Zero-Copy Parsers with Nondeterministic Finite Automata
 
@@ -42,6 +42,12 @@ Yes! Since we're really just riding on top of a decision-problem automaton, you 
 If you're writing a language, this means _automatically generating all possible valid source files_.
 
 And, you guessed it, this gets compiled down to Rust source as well, so your property-tests can be ridiculously effective.
+
+## Why not other parsing libraries?
+
+Please try other parsing libraries! This is _my_ favorite, mostly becuase it's pure Rust with zero macros, no new syntax, zero input copying, parsers as data, automatic input generation, and—well–I wrote it, but I'm not too familiar with other libraries, so I can't in good faith recommend this one too highly.
+
+My primary goal was a personal tool, but it turned out much better than I expected, so I'd love to see you use it and get your feedback!
 
 ## Acknowledgments
 
