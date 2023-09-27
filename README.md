@@ -5,9 +5,8 @@
 ![Portrait of the eminent Dr. Heinz Doofenshmirtz](http://images6.fanpop.com/image/polls/1198000/1198459_1364687083851_full.jpg)
 
 ## Why?
-Computability theory has known for ages that every decision problem (anything with a yes/no answer) has a unique and probably optimal representation.
-
-This is theoretically awesome and powers regular-expression searchers like `grep`, but—as far as I'm aware—anything more than a decision problem is theoretically not optimizable.
+Computability theory has known for ages that every decision problem (anything with a yes/no answer) has a unique and provably optimal representation as a finite automaton.
+This is the insight behind regular-expression searchers like `grep`, but—as far as I'm aware—anything more than a decision problem is theoretically not optimizable.
 
 ## How?
 This library uses the same high-level machinery as tools like `grep` but augmented with some extra goods:
