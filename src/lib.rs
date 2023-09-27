@@ -206,7 +206,7 @@ pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
 #[inline]
 #[must_use]
 pub fn space() -> Parser<char> {
-    any((0..u8::MAX).filter(u8::is_ascii_whitespace).map(char::from))
+    any((0..u8::MAX).filter(u8::is_ascii_whitespace).map(char::from)).star()
 }
 
 /// Surround this language in parentheses.
@@ -215,5 +215,5 @@ pub fn space() -> Parser<char> {
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
 pub fn parenthesized(p: Parser<char>) -> Parser<char> {
-    c('(') >> space() >> p >> space() >> c(')')
+    c('(') + p + c(')')
 }

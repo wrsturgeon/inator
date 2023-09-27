@@ -9,7 +9,7 @@
 use proc_macro2::Span;
 
 /// Convert to a variety of source-code-related formats.
-pub trait Expression: core::fmt::Display {
+pub trait Expression: core::fmt::Debug {
     /// Convert `&Self -> syn::Expr`.
     #[must_use]
     fn to_expr(&self) -> syn::Expr;
@@ -60,12 +60,13 @@ impl Expression for char {
         // If it ever does for you, let me know.
         match *self {
             'A'..='Z' | 'a'..='z' | '0'..='9' => return core::iter::once(self).collect(),
-            '\u{1}'..='\u{8}' | '\u{b}'..='\u{c}' | '\u{e}'..='\u{1f}' | '\u{80}'.. => {
+            '\u{1}'..='\u{8}' | '\u{b}' | '\u{e}'..='\u{1f}' | '\u{80}'.. => {
                 return format!("_x{:X}_", u32::from(*self))
             }
             '\0' => "_null_",
             '\t' => "_tab_",
             '\n' => "_newline_",
+            '\u{c}' => "_newpage_",
             '\r' => "_return_",
             ' ' => "_space_",
             '!' => "_bang_",

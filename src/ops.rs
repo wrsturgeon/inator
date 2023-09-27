@@ -27,7 +27,7 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
 }
 
 impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
-    type Output = Nfa<I>;
+    type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
     fn bitor(mut self, mut rhs: Self) -> Self::Output {
@@ -46,7 +46,7 @@ impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
 }
 
 impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
-    type Output = Nfa<I>;
+    type Output = Self;
     #[inline]
     #[allow(clippy::todo)] // FIXME
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -67,5 +67,14 @@ impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
         }
         self.states.extend(rhs.states);
         self
+    }
+}
+
+impl core::ops::Add for Nfa<char> {
+    type Output = Self;
+    #[inline]
+    #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
+    fn add(self, rhs: Self) -> Self::Output {
+        self >> crate::space() >> rhs
     }
 }

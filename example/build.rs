@@ -3,7 +3,7 @@
 //!
 //! /// Surround this language in parentheses.
 //! pub fn parenthesized(p: Parser<char>) -> Parser<char> {
-//!     c('(') >> p >> c(')')
+//!     c('(') + p + c(')')
 //! }
 //!
 //! /// Accept any of these tokens here.

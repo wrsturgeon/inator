@@ -771,6 +771,7 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
 
 impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
     #[inline]
+    #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
             f,
@@ -778,7 +779,7 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
             if self.accepting { "" } else { "NOT " }
         )?;
         for (input, transitions) in &self.transitions {
-            writeln!(f, "    {input} --> {transitions}")?;
+            writeln!(f, "    {input:?} --> {transitions}")?;
         }
         Ok(())
     }
@@ -901,8 +902,8 @@ impl<I: Clone + Ord> State<I> {
                                     match minimal_input.split_first() {
                                         None => "[this is the initial state]".to_owned(),
                                         Some((head, tail)) =>
-                                            tail.iter().fold(head.to_string(), |acc, token| {
-                                                acc + &format!(" -> {token}")
+                                            tail.iter().fold(format!("{head:?}"), |acc, token| {
+                                                acc + &format!(" -> {token:?}")
                                             }),
                                     },
                                 ),
@@ -1525,8 +1526,8 @@ impl<I: Clone + Ord> State<I> {
                                     match minimal_input.split_first() {
                                         None => "[this is the initial state]".to_owned(),
                                         Some((head, tail)) =>
-                                            tail.iter().fold(head.to_string(), |acc, token| {
-                                                acc + &format!(" -> {token}")
+                                            tail.iter().fold(format!("{head:?}"), |acc, token| {
+                                                acc + &format!(" -> {token:?}")
                                             }),
                                     },
                                 ),
