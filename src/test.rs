@@ -6,7 +6,7 @@
 
 #![allow(clippy::print_stdout, clippy::unwrap_used, clippy::use_debug)]
 
-use crate::{nfa::Graph as Nfa, Compiled as Dfa, *};
+use crate::{Compiled as Dfa, Parser as Nfa, *};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod unit {
@@ -143,7 +143,7 @@ mod prop {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let fused = (Lazy::Immediate(lhs.clone()) | Lazy::Immediate(rhs.clone())).evaluate();
+            let fused = lhs.clone() | rhs.clone();
             quickcheck::TestResult::from_bool(inputs.into_iter().all(|input| {
                 fused.accept(input.iter().copied())
                     == (lhs.accept(input.iter().copied()) || rhs.accept(input))
@@ -155,7 +155,7 @@ mod prop {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let fused = (Lazy::Immediate(lhs.clone()) >> Lazy::Immediate(rhs.clone())).evaluate();
+            let fused = lhs.clone() >> rhs.clone();
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -174,7 +174,7 @@ mod prop {
             let Ok(mut fuzzer) = nfa.fuzz() else {
                 return quickcheck::TestResult::discard();
             };
-            let repeated = Lazy::Immediate(nfa).repeat().evaluate();
+            let repeated = nfa.repeat();
             #[allow(clippy::default_numeric_fallback)]
             for _ in 0..100 {
                 let fst = fuzzer.next().unwrap();
@@ -187,8 +187,8 @@ mod prop {
         }
 
         fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
-            let lhs = Lazy::Immediate(nfa.clone()).repeat().optional().evaluate();
-            let rhs = Lazy::Immediate(nfa).optional().repeat().evaluate();
+            let lhs = nfa.clone().repeat().optional();
+            let rhs = nfa.optional().repeat();
             for (il, ir) in lhs.fuzz().unwrap().zip(rhs.fuzz().unwrap()).take(100) {
                 if !rhs.accept(il) { return false; }
                 if !lhs.accept(ir) { return false; }
@@ -201,7 +201,7 @@ mod prop {
             let Ok(bf) = b.fuzz() else { return quickcheck::TestResult::discard(); };
             let Ok(cf) = c.fuzz() else { return quickcheck::TestResult::discard(); };
             #[allow(clippy::arithmetic_side_effects)]
-            let abc = (Lazy::Immediate(a) >> Lazy::Immediate(b).optional() >> Lazy::Immediate(c)).evaluate();
+            let abc = a >> b.optional() >> c;
             #[allow(clippy::default_numeric_fallback)]
             for ((ai, bi), ci) in af.zip(bf).zip(cf).take(10) {
                 assert!(
@@ -270,7 +270,7 @@ mod reduced {
         println!("{lhs}");
         println!("RHS:");
         println!("{rhs}");
-        let fused = (Lazy::Immediate(lhs.clone()) | Lazy::Immediate(rhs.clone())).evaluate();
+        let fused = lhs.clone() | rhs.clone();
         println!("Fused:");
         println!("{fused}");
         let lhs_accepted = lhs.accept(input.iter().copied());
@@ -304,7 +304,7 @@ mod reduced {
         println!("{lhs}");
         println!("RHS:");
         println!("{rhs}");
-        let fused = (Lazy::Immediate(lhs.clone()) >> Lazy::Immediate(rhs.clone())).evaluate();
+        let fused = lhs.clone() >> rhs.clone();
         println!("Fused:");
         println!("{fused}");
         let chain_accepted = nfa::chain(lhs, rhs, input);

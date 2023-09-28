@@ -9,7 +9,7 @@
 
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-use crate::{nfa::Graph as Nfa, Compiled as Dfa};
+use crate::{Compiled as Dfa, Parser as Nfa};
 
 /// Type for transitions from _subsets_ of states to _subsets_ of states.
 type SubsetStates<I> = BTreeMap<

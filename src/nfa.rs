@@ -102,11 +102,8 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::arithmetic_side_effects)]
-    pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self
-    where
-        I: 'static,
-    {
-        (crate::empty() >> (singleton, fn_name, crate::empty())).evaluate()
+    pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self {
+        Self::empty() >> (singleton, fn_name, Self::empty())
     }
 
     /// Take every transition that doesn't require input.
@@ -174,6 +171,33 @@ impl<I: Clone + Ord> Graph<I> {
     #[must_use]
     pub fn would_ever_accept(&self) -> bool {
         self.states.iter().any(|state| state.accepting) && !self.initial.is_empty()
+    }
+
+    /// Match at least one time, then as many times as we want.
+    /// Note that if ANY number of times leads to an accepting state, we take it!
+    #[inline]
+    #[must_use]
+    pub fn repeat(mut self) -> Self {
+        for state in &mut self.states {
+            if state.accepting {
+                state.epsilon.extend(self.initial.iter());
+            }
+        }
+        self
+    }
+
+    /// Match at most one time (i.e. ignore if not present).
+    #[inline]
+    #[must_use]
+    pub fn optional(self) -> Self {
+        Self::empty() | self
+    }
+
+    /// Match zero or more times (a.k.a. Kleene star).
+    #[inline]
+    #[must_use]
+    pub fn star(self) -> Self {
+        self.repeat().optional()
     }
 }
 
