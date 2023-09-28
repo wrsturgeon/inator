@@ -1,8 +1,8 @@
 //! Literal transcription of <https://www.json.org/json-en.html>
 
-use inator::{any, empty, ignore, on, on_seq, opt, postpone, space, Compiled, Parser};
+use inator::{any, empty, ignore, on, on_seq, opt, postponed, space, Compiled, Parser};
 
-fn comma_separated(p: Parser<'_, char>) -> Parser<'_, char> {
+fn comma_separated(p: Parser<char>) -> Parser<char> {
     empty() // no elements
         | ( // or...
             p.clone() // first element
@@ -30,7 +30,7 @@ fn parser() -> Parser<char> {
         .chain('A'..'F')
         .chain('a'..'f')
         .map(|c| on(c, "hex_digit")));
-    let unicode_hex = hex >> hex >> hex >> hex; // four of 'em
+    let unicode_hex = hex.clone() >> hex.clone() >> hex.clone() >> hex; // four of 'em
     let escaped_character = ignore('\\')
         >> ((ignore('u') >> unicode_hex)
             | on('"', "esc_quote")
@@ -53,20 +53,19 @@ fn parser() -> Parser<char> {
     let string = on('"', "begin_string") >> character.star() >> ignore('"');
 
     // Declare (but not define) a value which can nest itself infinitely many times...
-    let postponed = None;
-    let value = postpone(&postponed);
+    let mut value = postponed();
 
-    let member = string + on(':', "key_value_sep") + value;
+    let member = string.clone() + on(':', "key_value_sep") + value.clone();
     let members = comma_separated(member);
     let object = on('{', "begin_object") + members + ignore('}');
 
-    let element = space() >> value >> space();
+    let element = space() >> value.clone() >> space();
     let elements = comma_separated(element.clone());
     let array = on('[', "begin_array") + elements + ignore(']');
 
     // Look how beautiful this definition is!
-    let final_value = string | number | object | array | lit_true | lit_false | lit_null;
-    postponed = Some(&final_value); // <-- Mark completed
+    let value_def = string | number | object | array | lit_true | lit_false | lit_null;
+    value.finally(value_def); // <-- Mark completed
 
     element
 }
