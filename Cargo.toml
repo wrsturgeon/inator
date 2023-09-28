@@ -1,9 +1,9 @@
 [package]
 name = "inator"
 authors = ["Will Sturgeon <willstrgn@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-description = "Fast declarative zero-copy parsers via nondeterministic finite automata."
+description = "Optimal zero-copy parsers with nondeterministic finite automata"
 license = "MPL-2.0"
 repository = "https://github.com/wrsturgeon/inator"
 build = "build.rs"

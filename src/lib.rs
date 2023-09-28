@@ -183,11 +183,27 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
     Parser::unit(token, Some(fn_name))
 }
 
+/// Accept this sequence of tokens if we see it here, then call this user-defined function on it.
+#[must_use]
+#[inline(always)]
+pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
+    tokens: II,
+    fn_name: &'static str,
+) -> Parser<I> {
+    let mut v: Vec<_> = tokens.into_iter().collect();
+    let Some(last) = v.pop() else {
+        panic!("Called `on_seq` on an empty sequence")
+    };
+    v.into_iter()
+        .fold(Parser::void(), |acc, token| acc >> ignore(token))
+        >> on(last, fn_name)
+}
+
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I, fn_name: Option<&'static str>) -> Parser<I> {
-    Parser::unit(token, fn_name).optional()
+pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
+    ignore(token).optional()
 }
 
 /// A single character of whitespace (or exactly one "\r\n").
