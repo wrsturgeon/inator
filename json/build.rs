@@ -11,7 +11,7 @@ fn comma_separated(p: Parser<char>) -> Parser<char> {
         )
 }
 
-fn parser() -> Parser<char> {
+fn parser() -> Compiled<char> {
     // Define a bunch of parsers, starting small, and keep combining until we have a full JSON parser.
 
     let nzero = any(('1'..='9').map(|c| on(c, "nzero")));
@@ -64,12 +64,12 @@ fn parser() -> Parser<char> {
     let array = on('[', "begin_array") + elements + ignore(']');
 
     // Look how beautiful this definition is!
-    let value_def = string | number | object | array | lit_true | lit_false | lit_null;
-    value.finally(value_def); // <-- Mark completed
+    value.finally(string | number | object | array | lit_true | lit_false | lit_null); // <-- Mark completed
 
-    element
+    // SAFETY: One postponed term still in scope.
+    unsafe { element.compile() }.unwrap()
 }
 
 fn main() -> std::io::Result<()> {
-    std::fs::write("src/parser.rs", parser().compile().into_source("json"))
+    std::fs::write("src/parser.rs", parser().into_source("json"))
 }

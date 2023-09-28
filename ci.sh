@@ -20,6 +20,12 @@ then
   cargo fmt
   ../ci.sh
   cargo +nightly miri run
+
+  cd ../json
+  cargo build
+  cargo fmt
+  ../ci.sh
+  cargo +nightly miri run
   cd ..
 fi
 

@@ -21,9 +21,7 @@ dependencies = [
 
 [[package]]
 name = "inator"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "055251a291736a8188b83ae2a15692661496d4138d16584e23e72dda2ca24929"
+version = "0.2.2"
 dependencies = [
  "prettyplease",
  "proc-macro2",

@@ -6,6 +6,8 @@
 
 //! Operations on NFAs.
 
+use std::collections::BTreeMap;
+
 use crate::nfa::{Graph as Nfa, State};
 
 /// Unevaluated binary operation.
@@ -15,9 +17,9 @@ use crate::nfa::{Graph as Nfa, State};
 pub enum Lazy<I: Clone + Ord> {
     /// NFA already made.
     Immediate(Nfa<I>),
-    /// NFA promised.
+    /// NFA promised and not yet defined.
     Postponed,
-    /// NFA promised.
+    /// NFA defined somewhere else (previously a postponed term).
     PostponedReference(*const Self),
     /// Either one NFA or another, in parallel.
     Or(Box<Self>, Box<Self>),
@@ -44,6 +46,11 @@ impl<I: Clone + Ord> Clone for Lazy<I> {
     }
 }
 
+/// Error indicating that we postponed a value and never defined it.
+#[allow(clippy::exhaustive_structs)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StillPostponed;
+
 impl<I: Clone + Ord> Lazy<I> {
     /// Define a postponed value.
     /// # Panics
@@ -52,20 +59,21 @@ impl<I: Clone + Ord> Lazy<I> {
     #[allow(clippy::manual_assert, clippy::panic)]
     pub fn finally(&mut self, value: Self) {
         if *self != Self::Postponed {
-            panic!("Called `finally` on a value that was already defined");
-        }
-        if value == Self::Postponed {
-            panic!("Called `finally` with a definition that is itself postponed");
+            panic!("Called `finally` on a value that had already been defined");
         }
         *self = value;
     }
 
+    /// NOTE: EVERY POSTPONED VALUE MUST STILL BE IN SCOPE WHEN YOU CALL THIS FUNCTION
     /// Brzozowski's algorithm for minimizing automata.
+    /// # Errors
+    /// If we postponed a value but never defined it.
+    /// # Safety
+    /// If any postponed parser has been cloned then dropped, this will segfault.
     #[inline]
-    #[must_use]
-    #[allow(clippy::missing_assert_message)]
-    pub fn compile(self) -> crate::dfa::Graph<I> {
-        self.evaluate().compile()
+    #[allow(clippy::missing_assert_message, unsafe_code, unsafe_op_in_unsafe_fn)]
+    pub unsafe fn compile(self) -> Result<crate::dfa::Graph<I>, StillPostponed> {
+        Ok(self.evaluate()?.compile())
     }
 
     /// Match at least one time, then as many times as we want.
@@ -90,27 +98,52 @@ impl<I: Clone + Ord> Lazy<I> {
         self.repeat().optional()
     }
 
+    /// NOTE: EVERY POSTPONED VALUE MUST STILL BE IN SCOPE WHEN YOU CALL THIS FUNCTION
     /// Turn an expression into a value.
-    /// Note that this requires all postponed terms to be present.
-    /// # Panics
+    /// Note that this requires all postponed terms to be defined and in scope.
+    /// # Errors
     /// If we postponed a value and never defined it.
+    /// # Panics
+    /// TODO
+    /// # Safety
+    /// If any postponed parser has been cloned then dropped, this will segfault.
+    #[allow(unsafe_code)]
+    pub unsafe fn evalute(self) -> Result<Nfa<I>, StillPostponed> {
+        self.evaluate_helper(&mut BTreeMap::new())
+    }
+
+    /// NOTE: EVERY POSTPONED VALUE MUST STILL BE IN SCOPE WHEN YOU CALL THIS FUNCTION
+    /// Turn an expression into a value.
+    /// Note that this requires all postponed terms to be defined and in scope.
+    /// # Errors
+    /// If we postponed a value and never defined it.
+    /// # Panics
+    /// TODO
+    /// # Safety
+    /// If any postponed parser has been cloned then dropped, this will segfault.
     #[inline]
     #[allow(
         clippy::arithmetic_side_effects,
         clippy::panic,
         clippy::shadow_reuse,
         clippy::suspicious_arithmetic_impl,
-        unsafe_code
+        unsafe_code,
+        unsafe_op_in_unsafe_fn
     )]
-    pub fn evaluate(self) -> Nfa<I> {
-        match self {
+    #[allow(clippy::panic_in_result_fn, clippy::todo)] // <-- FIXME
+    pub unsafe fn evaluate_helper(
+        self,
+        progress: &mut BTreeMap<(), ()>,
+    ) -> Result<Nfa<I>, StillPostponed> {
+        Ok(match self {
             Self::Immediate(nfa) => nfa,
-            Self::Postponed => panic!("Needed a postponed value that had not been initialized"),
-            // SAFETY: Up to you. Don't be stupid. <3
-            Self::PostponedReference(ptr) => unsafe { &*ptr }.clone().evaluate(),
+            Self::Reference(_) => panic!("INTERNAL ERROR: please report!"), // <-- We should be using references inline when simplifying binary expressions.
+            // Self::Postponed | Self::PostponedReference(_) => return Err(StillPostponed),
+            Self::Postponed => panic!("Still have a `Postponed`"),
+            Self::PostponedReference(_) => panic!("Still have a `PostponedReference`"),
             Self::Or(lhs, rhs) => {
-                let mut lhs = lhs.evaluate();
-                let mut rhs = rhs.evaluate();
+                let mut lhs = lhs.evaluate()?;
+                let mut rhs = rhs.evaluate()?;
                 let index = lhs.states.len();
                 for state in &mut rhs.states {
                     *state += index;
@@ -124,8 +157,8 @@ impl<I: Clone + Ord> Lazy<I> {
                 lhs
             }
             Self::ShrEps(lhs, rhs) => {
-                let mut lhs = lhs.evaluate();
-                let mut rhs = rhs.evaluate();
+                let mut lhs = lhs.evaluate()?;
+                let mut rhs = rhs.evaluate()?;
                 let index = lhs.states.len();
                 for state in &mut rhs.states {
                     *state += index;
@@ -144,8 +177,8 @@ impl<I: Clone + Ord> Lazy<I> {
                 lhs
             }
             Self::ShrNonEps(lhs, (token, fn_name, rhs)) => {
-                let mut lhs = lhs.evaluate();
-                let mut rhs = rhs.evaluate();
+                let mut lhs = lhs.evaluate()?;
+                let mut rhs = rhs.evaluate()?;
                 let index = lhs.states.len();
                 for state in &mut rhs.states {
                     *state += index;
@@ -169,7 +202,7 @@ impl<I: Clone + Ord> Lazy<I> {
                 lhs
             }
             Self::Repeat(lhs) => {
-                let mut eval = lhs.evaluate();
+                let mut eval = lhs.evaluate()?;
                 for state in &mut eval.states {
                     if state.accepting {
                         state.epsilon.extend(eval.initial.iter());
@@ -177,7 +210,7 @@ impl<I: Clone + Ord> Lazy<I> {
                 }
                 eval
             }
-        }
+        })
     }
 }
 
@@ -199,7 +232,7 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for State<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::BitOr for Lazy<I> {
+impl<I: Clone + Ord> core::ops::BitOr for Lazy<'_, I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -208,7 +241,9 @@ impl<I: Clone + Ord> core::ops::BitOr for Lazy<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Lazy<I>)> for Lazy<I> {
+impl<'post, I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Lazy<'post, I>)>
+    for Lazy<'post, I>
+{
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -217,7 +252,7 @@ impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Lazy<I>)> for Lazy
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr for Lazy<I> {
+impl<I: Clone + Ord> core::ops::Shr for Lazy<'_, I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -226,7 +261,7 @@ impl<I: Clone + Ord> core::ops::Shr for Lazy<I> {
     }
 }
 
-impl core::ops::Add for Lazy<char> {
+impl core::ops::Add for Lazy<'_, char> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]

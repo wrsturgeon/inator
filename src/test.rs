@@ -4,7 +4,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-#![allow(clippy::print_stdout, clippy::unwrap_used, clippy::use_debug)]
+#![allow(
+    clippy::print_stdout,
+    clippy::undocumented_unsafe_blocks,
+    clippy::unwrap_used,
+    clippy::use_debug
+)]
 
 use crate::{nfa::Graph as Nfa, Compiled as Dfa, *};
 use std::collections::{BTreeMap, BTreeSet};
@@ -139,23 +144,24 @@ mod prop {
             quickcheck::TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
         }
 
+        #[allow(unsafe_code)]
         fn bitor(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let fused = (Lazy::Immediate(lhs.clone()) | Lazy::Immediate(rhs.clone())).evaluate();
+            let fused = unsafe { (Lazy::Immediate(lhs.clone()) | Lazy::Immediate(rhs.clone())).evaluate().unwrap_unchecked() };
             quickcheck::TestResult::from_bool(inputs.into_iter().all(|input| {
                 fused.accept(input.iter().copied())
                     == (lhs.accept(input.iter().copied()) || rhs.accept(input))
             }))
         }
 
-        #[allow(clippy::arithmetic_side_effects)]
+        #[allow(clippy::arithmetic_side_effects, unsafe_code)]
         fn shr(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
-            let fused = (Lazy::Immediate(lhs.clone()) >> Lazy::Immediate(rhs.clone())).evaluate();
+            let fused = unsafe { (Lazy::Immediate(lhs.clone()) >> Lazy::Immediate(rhs.clone())).evaluate().unwrap_unchecked() };
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -170,11 +176,12 @@ mod prop {
                 })
         }
 
+        #[allow(unsafe_code)]
         fn repeat_fuzz_chain(nfa: Nfa<u8>) -> quickcheck::TestResult {
             let Ok(mut fuzzer) = nfa.fuzz() else {
                 return quickcheck::TestResult::discard();
             };
-            let repeated = Lazy::Immediate(nfa).repeat().evaluate();
+            let repeated = unsafe { Lazy::Immediate(nfa).repeat().evaluate().unwrap_unchecked() };
             #[allow(clippy::default_numeric_fallback)]
             for _ in 0..100 {
                 let fst = fuzzer.next().unwrap();
@@ -186,9 +193,10 @@ mod prop {
             quickcheck::TestResult::passed()
         }
 
+        #[allow(unsafe_code)]
         fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
-            let lhs = Lazy::Immediate(nfa.clone()).repeat().optional().evaluate();
-            let rhs = Lazy::Immediate(nfa).optional().repeat().evaluate();
+            let lhs = unsafe { Lazy::Immediate(nfa.clone()).repeat().optional().evaluate().unwrap_unchecked() };
+            let rhs = unsafe { Lazy::Immediate(nfa).optional().repeat().evaluate().unwrap_unchecked() };
             for (il, ir) in lhs.fuzz().unwrap().zip(rhs.fuzz().unwrap()).take(100) {
                 if !rhs.accept(il) { return false; }
                 if !lhs.accept(ir) { return false; }
@@ -196,12 +204,13 @@ mod prop {
             true
         }
 
+        #[allow(unsafe_code)]
         fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) -> quickcheck::TestResult {
             let Ok(af) = a.fuzz() else { return quickcheck::TestResult::discard(); };
             let Ok(bf) = b.fuzz() else { return quickcheck::TestResult::discard(); };
             let Ok(cf) = c.fuzz() else { return quickcheck::TestResult::discard(); };
             #[allow(clippy::arithmetic_side_effects)]
-            let abc = (Lazy::Immediate(a) >> Lazy::Immediate(b).optional() >> Lazy::Immediate(c)).evaluate();
+            let abc = unsafe { (Lazy::Immediate(a) >> Lazy::Immediate(b).optional() >> Lazy::Immediate(c)).evaluate().unwrap_unchecked() };
             #[allow(clippy::default_numeric_fallback)]
             for ((ai, bi), ci) in af.zip(bf).zip(cf).take(10) {
                 assert!(
@@ -244,6 +253,7 @@ mod reduced {
         );
     }
 
+    #[allow(unsafe_code)]
     fn brzozowski(nfa: &Nfa<u8>, input: &[u8]) {
         println!("NFA:");
         println!("{nfa}");
@@ -265,12 +275,17 @@ mod reduced {
         );
     }
 
+    #[allow(unsafe_code)]
     fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
         println!("LHS:");
         println!("{lhs}");
         println!("RHS:");
         println!("{rhs}");
-        let fused = (Lazy::Immediate(lhs.clone()) | Lazy::Immediate(rhs.clone())).evaluate();
+        let fused = unsafe {
+            (Lazy::Immediate(lhs.clone()) | Lazy::Immediate(rhs.clone()))
+                .evaluate()
+                .unwrap_unchecked()
+        };
         println!("Fused:");
         println!("{fused}");
         let lhs_accepted = lhs.accept(input.iter().copied());
@@ -298,13 +313,17 @@ mod reduced {
         );
     }
 
-    #[allow(clippy::arithmetic_side_effects)]
+    #[allow(clippy::arithmetic_side_effects, unsafe_code)]
     fn shr(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
         println!("LHS:");
         println!("{lhs}");
         println!("RHS:");
         println!("{rhs}");
-        let fused = (Lazy::Immediate(lhs.clone()) >> Lazy::Immediate(rhs.clone())).evaluate();
+        let fused = unsafe {
+            (Lazy::Immediate(lhs.clone()) >> Lazy::Immediate(rhs.clone()))
+                .evaluate()
+                .unwrap_unchecked()
+        };
         println!("Fused:");
         println!("{fused}");
         let chain_accepted = nfa::chain(lhs, rhs, input);

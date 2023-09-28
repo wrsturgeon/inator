@@ -30,7 +30,8 @@ fn main() -> std::io::Result<()> {
     let spec = tuple(append('A') | append('B') | append('C'));
 
     // Compile it to a provably optimal implementation
-    let parser = spec.compile();
+    // SAFETY: No postponed terms.
+    let parser = unsafe { spec.compile() }.unwrap();
 
     // Pretty-print the compiled version as a graph
     println!("{parser}");

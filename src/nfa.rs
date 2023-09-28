@@ -101,9 +101,14 @@ impl<I: Clone + Ord> Graph<I> {
     /// NFA accepting this exact token and only this exact token, only once.
     #[inline]
     #[must_use]
-    #[allow(clippy::arithmetic_side_effects)]
+    #[allow(clippy::arithmetic_side_effects, unsafe_code)]
     pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self {
-        (crate::empty() >> (singleton, fn_name, crate::empty())).evaluate()
+        // SAFETY: No postponed terms.
+        unsafe {
+            (crate::empty() >> (singleton, fn_name, crate::empty()))
+                .evaluate()
+                .unwrap_unchecked()
+        }
     }
 
     /// Take every transition that doesn't require input.

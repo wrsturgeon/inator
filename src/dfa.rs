@@ -149,7 +149,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// Print as a set of Rust source-code functions.
     #[inline]
     #[must_use]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, unsafe_code)]
     pub fn into_source(self, name: &str) -> String
     where
         I: Expression,

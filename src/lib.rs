@@ -159,7 +159,7 @@ pub use {
     dfa::Graph as Compiled,
     expr::Expression,
     fuzz::{Fuzzer, NeverAccepts},
-    ops::Lazy as Parser,
+    ops::{Lazy as Parser, StillPostponed},
 };
 
 use ops::Lazy;
@@ -235,7 +235,7 @@ pub fn space() -> Lazy<char> {
 /// Note that whitespace around the language--e.g. "( A )"--is fine.
 #[inline]
 #[must_use]
-#[allow(clippy::arithmetic_side_effects)]
+#[allow(clippy::arithmetic_side_effects, clippy::needless_lifetimes)]
 pub fn parenthesized(p: Lazy<char>) -> Lazy<char> {
     ignore('(') + p + ignore(')')
 }
