@@ -11,14 +11,12 @@ use crate::nfa::{Graph as Nfa, State};
 /// Unevaluated binary operation.
 #[non_exhaustive]
 #[allow(clippy::ref_option_ref)]
-#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Lazy<I: Clone + Ord> {
     /// NFA already made.
     Immediate(Nfa<I>),
     /// NFA promised.
     Postponed,
-    /// NFA promised.
-    PostponedReference(*const Self),
     /// Either one NFA or another, in parallel.
     Or(Box<Self>, Box<Self>),
     /// One then an epsilon transition to another.
@@ -27,21 +25,6 @@ pub enum Lazy<I: Clone + Ord> {
     ShrNonEps(Box<Self>, (I, Option<&'static str>, Box<Self>)),
     /// Repeat an NFA.
     Repeat(Box<Self>),
-}
-
-impl<I: Clone + Ord> Clone for Lazy<I> {
-    #[inline]
-    fn clone(&self) -> Self {
-        match *self {
-            Self::Immediate(ref lhs) => Self::Immediate(lhs.clone()),
-            Self::Postponed => Self::PostponedReference(self), // <-- This is the crucial bit
-            Self::PostponedReference(ptr) => Self::PostponedReference(ptr),
-            Self::Or(ref lhs, ref rhs) => Self::Or(lhs.clone(), rhs.clone()),
-            Self::ShrEps(ref lhs, ref rhs) => Self::ShrEps(lhs.clone(), rhs.clone()),
-            Self::ShrNonEps(ref lhs, ref rhs) => Self::ShrNonEps(lhs.clone(), rhs.clone()),
-            Self::Repeat(ref lhs) => Self::Repeat(lhs.clone()),
-        }
-    }
 }
 
 impl<I: Clone + Ord> Lazy<I> {
@@ -99,15 +82,12 @@ impl<I: Clone + Ord> Lazy<I> {
         clippy::arithmetic_side_effects,
         clippy::panic,
         clippy::shadow_reuse,
-        clippy::suspicious_arithmetic_impl,
-        unsafe_code
+        clippy::suspicious_arithmetic_impl
     )]
     pub fn evaluate(self) -> Nfa<I> {
         match self {
             Self::Immediate(nfa) => nfa,
             Self::Postponed => panic!("Needed a postponed value that had not been initialized"),
-            // SAFETY: Up to you. Don't be stupid. <3
-            Self::PostponedReference(ptr) => unsafe { &*ptr }.clone().evaluate(),
             Self::Or(lhs, rhs) => {
                 let mut lhs = lhs.evaluate();
                 let mut rhs = rhs.evaluate();
