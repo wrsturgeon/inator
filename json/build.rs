@@ -1,8 +1,8 @@
 //! Literal transcription of <https://www.json.org/json-en.html>
 
-use inator::{any, empty, ignore, on, on_seq, opt, postpone, space, Compiled, Parser};
+use inator::{any, empty, ignore, on, on_seq, opt, space, Parser};
 
-fn comma_separated(p: Parser<'_, char>) -> Parser<'_, char> {
+fn comma_separated(p: Parser<char>) -> Parser<char> {
     empty() // no elements
         | ( // or...
             p.clone() // first element
@@ -18,8 +18,8 @@ fn parser() -> Parser<char> {
     let digit = any(('0'..='9').map(|c| on(c, "digit")));
     let exp = (on('e', "exponential") | on('E', "exponential"))
         + (ignore('+') | on('-', "negative")).optional()
-        + digit.clone().repeat();
-    let fractional = on('.', "fraction_dot") >> digit.clone().repeat();
+        + digit.repeat();
+    let fractional = on('.', "fraction_dot") >> digit.repeat();
     let number = on('-', "negative").optional()
         >> nzero
         >> digit.star()
@@ -52,21 +52,16 @@ fn parser() -> Parser<char> {
 
     let string = on('"', "begin_string") >> character.star() >> ignore('"');
 
-    // Declare (but not define) a value which can nest itself infinitely many times...
-    let postponed = None;
-    let value = postpone(&postponed);
-
     let member = string + on(':', "key_value_sep") + value;
     let members = comma_separated(member);
     let object = on('{', "begin_object") + members + ignore('}');
 
     let element = space() >> value >> space();
-    let elements = comma_separated(element.clone());
+    let elements = comma_separated(element);
     let array = on('[', "begin_array") + elements + ignore(']');
 
     // Look how beautiful this definition is!
-    let final_value = string | number | object | array | lit_true | lit_false | lit_null;
-    postponed = Some(&final_value); // <-- Mark completed
+    let value = string | number | object | array | lit_true | lit_false | lit_null;
 
     element
 }

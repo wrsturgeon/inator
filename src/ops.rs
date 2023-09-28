@@ -12,11 +12,11 @@ use crate::nfa::{Graph as Nfa, State};
 #[non_exhaustive]
 #[allow(clippy::ref_option_ref)]
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Lazy<I: Clone + Ord> {
+pub enum Lazy<'post, I: Clone + Ord> {
     /// NFA already made.
     Immediate(Nfa<I>),
     /// NFA promised.
-    Postponed,
+    Postpone(&'post Option<&'post Self>),
     /// Either one NFA or another, in parallel.
     Or(Box<Self>, Box<Self>),
     /// One then an epsilon transition to another.
@@ -27,22 +27,7 @@ pub enum Lazy<I: Clone + Ord> {
     Repeat(Box<Self>),
 }
 
-impl<I: Clone + Ord> Lazy<I> {
-    /// Define a postponed value.
-    /// # Panics
-    /// If this value was already defined or if the definition is still postponed.
-    #[inline]
-    #[allow(clippy::manual_assert, clippy::panic)]
-    pub fn finally(&mut self, value: Self) {
-        if *self != Self::Postponed {
-            panic!("Called `finally` on a value that was already defined");
-        }
-        if value == Self::Postponed {
-            panic!("Called `finally` with a definition that is itself postponed");
-        }
-        *self = value;
-    }
-
+impl<I: Clone + Ord> Lazy<'_, I> {
     /// Brzozowski's algorithm for minimizing automata.
     #[inline]
     #[must_use]
@@ -62,32 +47,39 @@ impl<I: Clone + Ord> Lazy<I> {
     /// Match at most one time (i.e. ignore if not present).
     #[inline]
     #[must_use]
-    pub fn optional(self) -> Self {
+    pub fn optional(self) -> Self
+    where
+        I: 'static,
+    {
         crate::empty() | self
     }
 
     /// Match zero or more times (a.k.a. Kleene star).
     #[inline]
     #[must_use]
-    pub fn star(self) -> Self {
+    pub fn star(self) -> Self
+    where
+        I: 'static,
+    {
         self.repeat().optional()
     }
 
     /// Turn an expression into a value.
     /// Note that this requires all postponed terms to be present.
-    /// # Panics
-    /// If we postponed a value and never defined it.
     #[inline]
     #[allow(
         clippy::arithmetic_side_effects,
-        clippy::panic,
+        clippy::missing_panics_doc,
         clippy::shadow_reuse,
         clippy::suspicious_arithmetic_impl
     )]
     pub fn evaluate(self) -> Nfa<I> {
         match self {
             Self::Immediate(nfa) => nfa,
-            Self::Postponed => panic!("Needed a postponed value that had not been initialized"),
+            Self::Postpone(post) => post
+                .expect("Needed a postponed value that had not been initialized")
+                .clone()
+                .evaluate(),
             Self::Or(lhs, rhs) => {
                 let mut lhs = lhs.evaluate();
                 let mut rhs = rhs.evaluate();
@@ -179,7 +171,7 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for State<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::BitOr for Lazy<I> {
+impl<I: Clone + Ord> core::ops::BitOr for Lazy<'_, I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -188,7 +180,9 @@ impl<I: Clone + Ord> core::ops::BitOr for Lazy<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Lazy<I>)> for Lazy<I> {
+impl<'post, I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Lazy<'post, I>)>
+    for Lazy<'post, I>
+{
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -197,7 +191,7 @@ impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Lazy<I>)> for Lazy
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr for Lazy<I> {
+impl<I: Clone + Ord> core::ops::Shr for Lazy<'_, I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -206,7 +200,7 @@ impl<I: Clone + Ord> core::ops::Shr for Lazy<I> {
     }
 }
 
-impl core::ops::Add for Lazy<char> {
+impl core::ops::Add for Lazy<'_, char> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]

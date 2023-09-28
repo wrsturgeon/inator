@@ -168,28 +168,30 @@ use ops::Lazy;
 #[must_use]
 #[inline(always)]
 #[allow(clippy::ref_option_ref)]
-pub const fn postponed<I: Clone + Ord>() -> Lazy<I> {
-    Lazy::Postponed
+pub const fn postpone<'post, I: Clone + Ord>(
+    later: &'post Option<&'post Lazy<'post, I>>,
+) -> Lazy<'post, I> {
+    Lazy::Postpone(later)
 }
 
 /// Accept only the empty string.
 #[must_use]
 #[inline(always)]
-pub fn empty<I: Clone + Ord>() -> Lazy<I> {
+pub fn empty<I: Clone + Ord>() -> Lazy<'static, I> {
     Lazy::Immediate(nfa::Graph::empty())
 }
 
 /// Accept this token if we see it here, but throw it away.
 #[must_use]
 #[inline(always)]
-pub fn ignore<I: Clone + Ord>(token: I) -> Lazy<I> {
+pub fn ignore<I: Clone + Ord>(token: I) -> Lazy<'static, I> {
     Lazy::Immediate(nfa::Graph::unit(token, None))
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
-pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Lazy<I> {
+pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Lazy<'static, I> {
     Lazy::Immediate(nfa::Graph::unit(token, Some(fn_name)))
 }
 
@@ -200,7 +202,7 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Lazy<I> {
 pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
     tokens: II,
     fn_name: &'static str,
-) -> Lazy<I> {
+) -> Lazy<'static, I> {
     let mut v: Vec<_> = tokens.into_iter().collect();
     let Some(last) = v.pop() else {
         return empty();
@@ -211,7 +213,7 @@ pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I) -> Lazy<I> {
+pub fn opt<I: Clone + Ord>(token: I) -> Lazy<'static, I> {
     ignore(token).optional()
 }
 
@@ -219,7 +221,7 @@ pub fn opt<I: Clone + Ord>(token: I) -> Lazy<I> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn single_space() -> Lazy<char> {
+pub fn single_space() -> Lazy<'static, char> {
     ignore(' ') | ignore('\n') | (ignore('\r') >> ignore('\n'))
 }
 
@@ -227,7 +229,7 @@ pub fn single_space() -> Lazy<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn space() -> Lazy<char> {
+pub fn space() -> Lazy<'static, char> {
     single_space().star()
 }
 
@@ -236,14 +238,16 @@ pub fn space() -> Lazy<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn parenthesized(p: Lazy<char>) -> Lazy<char> {
+pub fn parenthesized(p: Lazy<'_, char>) -> Lazy<'_, char> {
     ignore('(') + p + ignore(')')
 }
 
 /// Accept anything accepted by any of these parsers.
 #[inline]
 #[must_use]
-pub fn any<I: Clone + Ord, II: IntoIterator<Item = Lazy<I>>>(alternatives: II) -> Lazy<I> {
+pub fn any<'post, I: Clone + Ord, II: IntoIterator<Item = Lazy<'post, I>>>(
+    alternatives: II,
+) -> Lazy<'post, I> {
     alternatives
         .into_iter()
         .fold(Lazy::Immediate(nfa::Graph::void()), |acc, p| acc | p)
@@ -253,7 +257,9 @@ pub fn any<I: Clone + Ord, II: IntoIterator<Item = Lazy<I>>>(alternatives: II) -
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn seq<I: Clone + Ord, II: IntoIterator<Item = Lazy<I>>>(alternatives: II) -> Lazy<I> {
+pub fn seq<'post, I: Clone + Ord, II: IntoIterator<Item = Lazy<'post, I>>>(
+    alternatives: II,
+) -> Lazy<'post, I> {
     alternatives
         .into_iter()
         .fold(Lazy::Immediate(nfa::Graph::void()), |acc, p| acc >> p)
