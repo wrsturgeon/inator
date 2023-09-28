@@ -60,8 +60,8 @@ impl<I: Clone + Ord> Graph<I> {
     /// Generalize to an identical NFA.
     #[inline]
     #[must_use]
-    pub fn generalize(&self) -> crate::Parser<I> {
-        crate::Parser {
+    pub fn generalize(&self) -> crate::nfa::Graph<I> {
+        crate::nfa::Graph {
             states: self
                 .states
                 .iter()

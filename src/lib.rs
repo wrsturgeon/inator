@@ -159,28 +159,40 @@ pub use {
     dfa::Graph as Compiled,
     expr::Expression,
     fuzz::{Fuzzer, NeverAccepts},
-    nfa::Graph as Parser,
+    ops::Lazy as Parser,
 };
+
+use ops::Lazy;
+
+/// Promise a parser that can't be computed yet (usually because it nests itself).
+#[must_use]
+#[inline(always)]
+#[allow(clippy::ref_option_ref)]
+pub const fn postpone<'post, I: Clone + Ord>(
+    later: &'post Option<&'post Lazy<'post, I>>,
+) -> Lazy<'post, I> {
+    Lazy::Postpone(later)
+}
 
 /// Accept only the empty string.
 #[must_use]
 #[inline(always)]
-pub fn empty<I: Clone + Ord>() -> Parser<I> {
-    Parser::empty()
+pub fn empty<I: Clone + Ord>() -> Lazy<'static, I> {
+    Lazy::Immediate(nfa::Graph::empty())
 }
 
 /// Accept this token if we see it here, but throw it away.
 #[must_use]
 #[inline(always)]
-pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
-    Parser::unit(token, None)
+pub fn ignore<I: Clone + Ord>(token: I) -> Lazy<'static, I> {
+    Lazy::Immediate(nfa::Graph::unit(token, None))
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
-pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
-    Parser::unit(token, Some(fn_name))
+pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Lazy<'static, I> {
+    Lazy::Immediate(nfa::Graph::unit(token, Some(fn_name)))
 }
 
 /// Accept this sequence of tokens if we see it here, then call this user-defined function on it.
@@ -190,20 +202,18 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
 pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
     tokens: II,
     fn_name: &'static str,
-) -> Parser<I> {
+) -> Lazy<'static, I> {
     let mut v: Vec<_> = tokens.into_iter().collect();
     let Some(last) = v.pop() else {
         return empty();
     };
-    v.into_iter()
-        .fold(Parser::void(), |acc, token| acc >> ignore(token))
-        >> on(last, fn_name)
+    seq(v.into_iter().map(|token| ignore(token))) >> on(last, fn_name)
 }
 
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn opt<I: Clone + Ord>(token: I) -> Lazy<'static, I> {
     ignore(token).optional()
 }
 
@@ -211,7 +221,7 @@ pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn single_space() -> Parser<char> {
+pub fn single_space() -> Lazy<'static, char> {
     ignore(' ') | ignore('\n') | (ignore('\r') >> ignore('\n'))
 }
 
@@ -219,7 +229,7 @@ pub fn single_space() -> Parser<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn space() -> Parser<char> {
+pub fn space() -> Lazy<'static, char> {
     single_space().star()
 }
 
@@ -228,15 +238,29 @@ pub fn space() -> Parser<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn parenthesized(p: Parser<char>) -> Parser<char> {
+pub fn parenthesized(p: Lazy<'_, char>) -> Lazy<'_, char> {
     ignore('(') + p + ignore(')')
 }
 
 /// Accept anything accepted by any of these parsers.
 #[inline]
 #[must_use]
-pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II) -> Parser<I> {
+pub fn any<'post, I: Clone + Ord, II: IntoIterator<Item = Lazy<'post, I>>>(
+    alternatives: II,
+) -> Lazy<'post, I> {
     alternatives
         .into_iter()
-        .fold(Parser::void(), |acc, p| acc | p)
+        .fold(Lazy::Immediate(nfa::Graph::void()), |acc, p| acc | p)
+}
+
+/// Accept if and only if each parser accepts in order.
+#[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
+pub fn seq<'post, I: Clone + Ord, II: IntoIterator<Item = Lazy<'post, I>>>(
+    alternatives: II,
+) -> Lazy<'post, I> {
+    alternatives
+        .into_iter()
+        .fold(Lazy::Immediate(nfa::Graph::void()), |acc, p| acc >> p)
 }
