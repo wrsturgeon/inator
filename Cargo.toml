@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Fast declarative zero-copy parsers via nondeterministic finite automata."
 license = "MPL-2.0"
-repository = "github.com/wrsturgeon/inator"
+repository = "https://github.com/wrsturgeon/inator"
 build = "build.rs"
 
 [dependencies]
