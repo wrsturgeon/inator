@@ -186,13 +186,14 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
 /// Accept this sequence of tokens if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
+#[allow(clippy::arithmetic_side_effects)]
 pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
     tokens: II,
     fn_name: &'static str,
 ) -> Parser<I> {
     let mut v: Vec<_> = tokens.into_iter().collect();
     let Some(last) = v.pop() else {
-        panic!("Called `on_seq` on an empty sequence")
+        return empty();
     };
     v.into_iter()
         .fold(Parser::void(), |acc, token| acc >> ignore(token))
@@ -229,4 +230,13 @@ pub fn space() -> Parser<char> {
 #[allow(clippy::arithmetic_side_effects)]
 pub fn parenthesized(p: Parser<char>) -> Parser<char> {
     ignore('(') + p + ignore(')')
+}
+
+/// Accept anything accepted by any of these parsers.
+#[inline]
+#[must_use]
+pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II) -> Parser<I> {
+    alternatives
+        .into_iter()
+        .fold(Parser::void(), |acc, p| acc | p)
 }

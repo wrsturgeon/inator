@@ -12,10 +12,10 @@ build = "build.rs"
 proc-macro2 = "1.0.67"
 syn = { version = "2.0.34", features = ["full"] }
 rand = "0.8.5"
+prettyplease = "0.2.15"
 
 # Optional dependencies:
 quickcheck = { version = "1.0.3", optional = true }
-prettyplease = "0.2.15"
 
 [features]
 quickcheck = ["dep:quickcheck"]
