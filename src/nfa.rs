@@ -102,10 +102,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::arithmetic_side_effects)]
-    pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self
-    where
-        I: 'static,
-    {
+    pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self {
         (crate::empty() >> (singleton, fn_name, crate::empty())).evaluate()
     }
 
