@@ -1,27 +1,27 @@
 use inator::{ignore, on, Parser};
 
-fn append(c: char) -> Parser<char> {
+fn append(c: char) -> Parser<'static, char> {
     on(c, "append") // We define `append` in `src/inator_config.rs`!
 }
 
-fn parenthesized(p: Parser<char>) -> Parser<char> {
+fn parenthesized(p: Parser<'_, char>) -> Parser<'_, char> {
     ignore('(') + p + ignore(')')
 }
 
-fn empty_tuple() -> Parser<char> {
+fn empty_tuple() -> Parser<'static, char> {
     parenthesized(Parser::empty())
 }
 
-fn singleton(p: Parser<char>) -> Parser<char> {
+fn singleton(p: Parser<'_, char>) -> Parser<'_, char> {
     parenthesized(p + ignore(','))
 }
 
-fn pair_or_more(p: Parser<char>) -> Parser<char> {
+fn pair_or_more(p: Parser<'_, char>) -> Parser<'_, char> {
     parenthesized(p.clone() + ignore(',') + p.clone() + (ignore(',') + p).star())
 }
 
 #[inline]
-fn tuple(p: Parser<char>) -> Parser<char> {
+fn tuple(p: Parser<'_, char>) -> Parser<'_, char> {
     empty_tuple() | singleton(p.clone()) | pair_or_more(p)
 }
 

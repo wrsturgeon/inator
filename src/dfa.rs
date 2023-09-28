@@ -6,7 +6,7 @@
 
 //! Deterministic finite automata.
 
-use crate::Expression;
+use crate::{nfa::Postpone, Expression};
 use proc_macro2::Span;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use syn::{Ident, Token, __private::ToTokens};
@@ -60,21 +60,23 @@ impl<I: Clone + Ord> Graph<I> {
     /// Generalize to an identical NFA.
     #[inline]
     #[must_use]
-    pub fn generalize(&self) -> crate::Parser<I> {
+    pub fn generalize(&self) -> crate::Parser<'_, I> {
         crate::Parser {
             states: self
                 .states
                 .iter()
-                .map(|state| crate::nfa::State {
-                    epsilon: std::collections::BTreeSet::new(),
-                    non_epsilon: state
-                        .transitions
-                        .iter()
-                        .map(|(token, &(dst, fn_name))| {
-                            (token.clone(), (core::iter::once(dst).collect(), fn_name))
-                        })
-                        .collect(),
-                    accepting: state.accepting,
+                .map(|state| {
+                    Postpone::Now(crate::nfa::State {
+                        epsilon: std::collections::BTreeSet::new(),
+                        non_epsilon: state
+                            .transitions
+                            .iter()
+                            .map(|(token, &(dst, fn_name))| {
+                                (token.clone(), (core::iter::once(dst).collect(), fn_name))
+                            })
+                            .collect(),
+                        accepting: state.accepting,
+                    })
                 })
                 .collect(),
             initial: core::iter::once(self.initial).collect(),

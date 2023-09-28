@@ -6,7 +6,10 @@
 
 //! Operations on NFAs.
 
-use crate::{nfa, Parser as Nfa};
+use crate::{
+    nfa::{self, Postpone},
+    Parser as Nfa,
+};
 
 impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
     #[inline]
@@ -26,14 +29,16 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
+impl<I: Clone + Ord> core::ops::BitOr for Nfa<'_, I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
     fn bitor(mut self, mut rhs: Self) -> Self::Output {
         let index = self.states.len();
         for state in &mut rhs.states {
-            *state += index;
+            if let &mut Postpone::Now(ref mut now) = state {
+                *now += index;
+            }
         }
         self.states.extend(rhs.states);
         self.initial.extend(
@@ -45,28 +50,37 @@ impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I> {
+impl<'post, I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<'post, I>)>
+    for Nfa<'post, I>
+{
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
-    fn shr(mut self, (token, fn_name, mut rhs): (I, Option<&'static str>, Nfa<I>)) -> Self::Output {
+    fn shr(
+        mut self,
+        (token, fn_name, mut rhs): (I, Option<&'static str>, Nfa<'post, I>),
+    ) -> Self::Output {
         let index = self.states.len();
         for state in &mut rhs.states {
-            *state += index;
+            if let &mut Postpone::Now(ref mut now) = state {
+                *now += index;
+            }
         }
         let incr_initial = rhs
             .initial
             .iter()
             .map(|x| x.checked_add(index).expect("Huge number of states"));
         for state in &mut self.states {
-            if state.accepting {
-                state.accepting = false;
-                state.non_epsilon.extend(
-                    incr_initial
-                        .clone()
-                        .map(|i| (token.clone(), (core::iter::once(i).collect(), fn_name)))
-                        .clone(),
-                );
+            if let &mut Postpone::Now(ref mut now) = state {
+                if now.accepting {
+                    now.accepting = false;
+                    now.non_epsilon.extend(
+                        incr_initial
+                            .clone()
+                            .map(|i| (token.clone(), (core::iter::once(i).collect(), fn_name)))
+                            .clone(),
+                    );
+                }
             }
         }
         self.states.extend(rhs.states);
@@ -74,23 +88,27 @@ impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
+impl<I: Clone + Ord> core::ops::Shr for Nfa<'_, I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
     fn shr(mut self, mut rhs: Self) -> Self::Output {
         let index = self.states.len();
         for state in &mut rhs.states {
-            *state += index;
+            if let &mut Postpone::Now(ref mut now) = state {
+                *now += index;
+            }
         }
         let incr_initial = rhs
             .initial
             .iter()
             .map(|x| x.checked_add(index).expect("Huge number of states"));
         for state in &mut self.states {
-            if state.accepting {
-                state.accepting = false;
-                state.epsilon.extend(incr_initial.clone());
+            if let &mut Postpone::Now(ref mut now) = state {
+                if now.accepting {
+                    now.accepting = false;
+                    now.epsilon.extend(incr_initial.clone());
+                }
             }
         }
         self.states.extend(rhs.states);
@@ -98,7 +116,7 @@ impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
     }
 }
 
-impl core::ops::Add for Nfa<char> {
+impl core::ops::Add for Nfa<'_, char> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]

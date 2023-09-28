@@ -11,9 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Nondeterministic finite automata with epsilon transitions.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Graph<I: Clone + Ord> {
+pub struct Graph<'post, I: Clone + Ord> {
     /// Every state in this graph.
-    pub(crate) states: Vec<State<I>>,
+    pub(crate) states: Vec<Postpone<'post, I>>,
     /// Initial set of states.
     pub(crate) initial: BTreeSet<usize>,
 }
@@ -29,11 +29,24 @@ pub struct State<I: Clone + Ord> {
     pub(crate) accepting: bool,
 }
 
+/// Guard against infinite recursion.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Postpone<'post, I: Clone + Ord> {
+    /// Immediate value.
+    Now(State<I>),
+    /// Construct a value later and tell us by reference.
+    Later(Option<&'post State<I>>),
+}
+
 /// Test if there is a way to split the input such that
 /// automaton #1 accepts the left part and #2 accepts the right.
 #[inline]
 #[cfg(test)]
-pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -> bool {
+pub(crate) fn chain<'post, I: Clone + Ord>(
+    a1: &Graph<'post, I>,
+    a2: &Graph<'post, I>,
+    input: &[I],
+) -> bool {
     let mut s1 = a1.step();
     let mut i = input.iter();
     if s1.currently_accepting() && a2.accept(i.clone()) {
@@ -48,32 +61,32 @@ pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -
     false
 }
 
-impl<I: Clone + Ord> IntoIterator for Graph<I> {
-    type Item = State<I>;
-    type IntoIter = std::vec::IntoIter<State<I>>;
+impl<'post, I: Clone + Ord> IntoIterator for Graph<'post, I> {
+    type Item = Postpone<'post, I>;
+    type IntoIter = std::vec::IntoIter<Postpone<'post, I>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.into_iter()
     }
 }
 
-impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
-    type Item = &'a State<I>;
-    type IntoIter = core::slice::Iter<'a, State<I>>;
+impl<'a, 'post, I: Clone + Ord> IntoIterator for &'a Graph<'post, I> {
+    type Item = &'a Postpone<'post, I>;
+    type IntoIter = core::slice::Iter<'a, Postpone<'post, I>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.iter()
     }
 }
 
-impl<I: Clone + Ord> Default for Graph<I> {
+impl<I: Clone + Ord> Default for Graph<'_, I> {
     #[inline(always)]
     fn default() -> Self {
         Self::void()
     }
 }
 
-impl<I: Clone + Ord> Graph<I> {
+impl<I: Clone + Ord> Graph<'_, I> {
     /// NFA with zero states.
     #[inline]
     #[must_use]
@@ -89,11 +102,11 @@ impl<I: Clone + Ord> Graph<I> {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            states: vec![State {
+            states: vec![Postpone::Now(State {
                 epsilon: BTreeSet::new(),
                 non_epsilon: BTreeMap::new(),
                 accepting: true,
-            }],
+            })],
             initial: core::iter::once(0).collect(),
         }
     }
@@ -114,12 +127,14 @@ impl<I: Clone + Ord> Graph<I> {
         // Take all epsilon transitions immediately
         let mut superposition = BTreeSet::<usize>::new();
         while let Some(state) = queue.pop() {
-            for next in &get!(self.states, state).epsilon {
-                if !superposition.contains(next) {
-                    queue.push(*next);
+            get!(self.states, state).map_ref(|now| {
+                for next in &now.epsilon {
+                    if !superposition.contains(next) {
+                        queue.push(*next);
+                    }
                 }
-            }
-            let _ = superposition.insert(state);
+                let _ = superposition.insert(state);
+            });
         }
         superposition
     }
@@ -127,7 +142,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// Step through each input token one at a time.
     #[inline]
     #[must_use]
-    pub fn step(&self) -> Stepper<'_, I> {
+    pub fn step(&self) -> Stepper<'_, '_, I> {
         Stepper::new(self)
     }
 
@@ -170,7 +185,10 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     pub fn would_ever_accept(&self) -> bool {
-        self.states.iter().any(|state| state.accepting) && !self.initial.is_empty()
+        self.states.iter().any(|state| match *state {
+            Postpone::Now(ref now) => now.accepting,
+            Postpone::Later(_) => false,
+        }) && !self.initial.is_empty()
     }
 
     /// Match at least one time, then as many times as we want.
@@ -179,9 +197,11 @@ impl<I: Clone + Ord> Graph<I> {
     #[must_use]
     pub fn repeat(mut self) -> Self {
         for state in &mut self.states {
-            if state.accepting {
-                state.epsilon.extend(self.initial.iter());
-            }
+            state.map_mut(|now| {
+                if now.accepting {
+                    now.epsilon.extend(self.initial.iter());
+                }
+            });
         }
         self
     }
@@ -201,7 +221,7 @@ impl<I: Clone + Ord> Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<'_, I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -232,6 +252,15 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
     }
 }
 
+impl<I: Clone + Ord + Expression> core::fmt::Display for Postpone<'_, I> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match *self {
+            Self::Now(ref now) => core::fmt::Display::fmt(&now, f),
+            Self::Later(_) => write!(f, "[POSTPONED]"),
+        }
+    }
+}
+
 impl<I: Clone + Ord> State<I> {
     /// Set of states to which this state can transition on a given input.
     #[inline]
@@ -240,8 +269,63 @@ impl<I: Clone + Ord> State<I> {
     }
 }
 
+impl<I: Clone + Ord> Postpone<'_, I> {
+    /// Apply this function iff this variant is `Self::Now`.
+    #[inline]
+    pub fn map<F: FnOnce(State<I>)>(self, f: F) {
+        if let Self::Now(now) = self {
+            f(now);
+        }
+    }
+
+    /// Apply this function iff this variant is `Self::Now`.
+    #[inline]
+    pub fn map_ref<F: FnOnce(&State<I>)>(&self, f: F) {
+        if let &Self::Now(ref now) = self {
+            f(now);
+        }
+    }
+
+    /// Apply this function iff this variant is `Self::Now`.
+    #[inline]
+    pub fn map_mut<F: FnOnce(&mut State<I>)>(&mut self, f: F) {
+        if let &mut Self::Now(ref mut now) = self {
+            f(now);
+        }
+    }
+
+    /// Unwrap iff this variant is `Self::Now` or `Self::Later(Some(..))`.
+    /// # Panics
+    /// Otherwise.
+    #[inline]
+    #[allow(clippy::panic)]
+    pub fn unwrap(&self) -> &State<I> {
+        match *self {
+            Self::Now(ref now) => now,
+            Self::Later(Some(ptr)) => ptr,
+            Self::Later(None) => {
+                panic!("Called `unwrap` on a `Postpone` value that had not been initialized.")
+            }
+        }
+    }
+
+    /// Unwrap iff this variant is `Self::Now` or `Self::Later(Some(..))`.
+    /// # Panics
+    /// Otherwise.
+    #[inline]
+    #[allow(clippy::panic)]
+    pub fn unwrap_mut(&mut self) -> &mut State<I> {
+        match *self {
+            Self::Now(ref mut now) => now,
+            Self::Later(_) => {
+                panic!("Called `unwrap_mut` on a `Postpone` value that was not `Now`.")
+            }
+        }
+    }
+}
+
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
+impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<'static, I> {
     #[inline]
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let mut states = quickcheck::Arbitrary::arbitrary(g);
@@ -301,13 +385,33 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
     }
 }
 
+#[cfg(feature = "quickcheck")]
+impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Postpone<'static, I> {
+    #[inline]
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self::Now(State::arbitrary(g))
+    }
+
+    #[inline]
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        let &Self::Now(ref state) = self else {
+            #[allow(unsafe_code)]
+            // SAFETY: Constructed above.
+            unsafe {
+                core::hint::unreachable_unchecked()
+            }
+        };
+        Box::new(state.shrink().map(Self::Now))
+    }
+}
+
 /// Remove impossible transitions from automatically generated automata.
 #[cfg(feature = "quickcheck")]
-fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
+fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<Postpone<'static, I>>) {
     let size = v.len();
     for state in v {
-        state.epsilon.retain(|i| i < &size);
-        for &mut (ref mut destination, _) in state.non_epsilon.values_mut() {
+        state.unwrap_mut().epsilon.retain(|i| i < &size);
+        for &mut (ref mut destination, _) in state.unwrap_mut().non_epsilon.values_mut() {
             destination.retain(|index| index < &size);
         }
     }
@@ -315,18 +419,18 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
 
 /// Step through an automaton one token at a time.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Stepper<'graph, I: Clone + Ord> {
+pub struct Stepper<'graph, 'post, I: Clone + Ord> {
     /// The graph we're riding.
-    graph: &'graph Graph<I>,
+    graph: &'graph Graph<'post, I>,
     /// Current state after the input we've received so far.
     state: BTreeSet<usize>,
 }
 
-impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
+impl<'graph, 'post, I: Clone + Ord> Stepper<'graph, 'post, I> {
     /// Start from the empty string on a certain automaton.
     #[inline]
     #[must_use]
-    fn new(graph: &'graph Graph<I>) -> Self {
+    fn new(graph: &'graph Graph<'post, I>) -> Self {
         Self {
             graph,
             state: graph.take_all_epsilon_transitions(graph.initial.iter().copied().collect()),
@@ -339,7 +443,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
         self.state = self.graph.take_all_epsilon_transitions(
             self.state
                 .iter()
-                .filter_map(|&index| get!(self.graph.states, index).transition(token))
+                .filter_map(|&index| get!(self.graph.states, index).unwrap().transition(token))
                 .flat_map(|&(ref map, _)| map.iter().copied())
                 .collect(),
         );
@@ -349,7 +453,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     #[inline]
     fn currently_accepting(&self) -> bool {
         for &index in &self.state {
-            if get!(self.graph.states, index).accepting {
+            if get!(self.graph.states, index).unwrap().accepting {
                 return true;
             }
         }
@@ -357,7 +461,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     }
 }
 
-impl<I: Clone + Ord, B: core::borrow::Borrow<I>> Extend<B> for Stepper<'_, I> {
+impl<I: Clone + Ord, B: core::borrow::Borrow<I>> Extend<B> for Stepper<'_, '_, I> {
     #[inline]
     fn extend<T: IntoIterator<Item = B>>(&mut self, iter: T) {
         for input in iter {

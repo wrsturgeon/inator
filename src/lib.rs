@@ -165,21 +165,21 @@ pub use {
 /// Accept only the empty string.
 #[must_use]
 #[inline(always)]
-pub fn empty<I: Clone + Ord>() -> Parser<I> {
+pub fn empty<I: Clone + Ord>() -> Parser<'static, I> {
     Parser::empty()
 }
 
 /// Accept this token if we see it here, but throw it away.
 #[must_use]
 #[inline(always)]
-pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn ignore<I: Clone + Ord>(token: I) -> Parser<'static, I> {
     Parser::unit(token, None)
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
-pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
+pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<'static, I> {
     Parser::unit(token, Some(fn_name))
 }
 
@@ -190,7 +190,7 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
 pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
     tokens: II,
     fn_name: &'static str,
-) -> Parser<I> {
+) -> Parser<'static, I> {
     let mut v: Vec<_> = tokens.into_iter().collect();
     let Some(last) = v.pop() else {
         return empty();
@@ -203,7 +203,7 @@ pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn opt<I: Clone + Ord>(token: I) -> Parser<'static, I> {
     ignore(token).optional()
 }
 
@@ -211,7 +211,7 @@ pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn single_space() -> Parser<char> {
+pub fn single_space() -> Parser<'static, char> {
     ignore(' ') | ignore('\n') | (ignore('\r') >> ignore('\n'))
 }
 
@@ -219,7 +219,7 @@ pub fn single_space() -> Parser<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn space() -> Parser<char> {
+pub fn space() -> Parser<'static, char> {
     single_space().star()
 }
 
@@ -228,14 +228,16 @@ pub fn space() -> Parser<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn parenthesized(p: Parser<char>) -> Parser<char> {
+pub fn parenthesized(p: Parser<'_, char>) -> Parser<'_, char> {
     ignore('(') + p + ignore(')')
 }
 
 /// Accept anything accepted by any of these parsers.
 #[inline]
 #[must_use]
-pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II) -> Parser<I> {
+pub fn any<'post, I: Clone + Ord, II: IntoIterator<Item = Parser<'post, I>>>(
+    alternatives: II,
+) -> Parser<'post, I> {
     alternatives
         .into_iter()
         .fold(Parser::void(), |acc, p| acc | p)

@@ -6,31 +6,38 @@
 
 //! Brzozowski's algorithm for minimizing automata.
 
-use crate::{nfa, Compiled as Dfa, Parser as Nfa};
+use crate::{
+    nfa::{self, Postpone},
+    Compiled as Dfa, Parser as Nfa,
+};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-impl<I: Clone + Ord> Nfa<I> {
+impl<I: Clone + Ord> Nfa<'_, I> {
     /// Reverse all transitions and swap initial with accepting states.
     /// # Panics
     /// TODO
     #[inline]
     #[must_use]
     pub fn reverse(&self) -> Self {
-        let mut states = core::iter::repeat(nfa::State {
+        let mut states = core::iter::repeat(Postpone::Now(nfa::State {
             epsilon: BTreeSet::new(),
             non_epsilon: BTreeMap::new(),
             accepting: false,
-        })
+        }))
         .take(self.states.len())
         .collect::<Vec<_>>();
         let mut initial = BTreeSet::new();
         for (src, state) in self.states.iter().enumerate() {
-            for &dst in &state.epsilon {
-                let _ = get_mut!(states, dst).epsilon.insert(src);
+            for &dst in &state.unwrap().epsilon {
+                let _ = get_mut!(states, dst).unwrap_mut().epsilon.insert(src);
             }
-            for (token, &(ref set, fn_name)) in &state.non_epsilon {
+            for (token, &(ref set, fn_name)) in &state.unwrap().non_epsilon {
                 for &dst in set {
-                    match get_mut!(states, dst).non_epsilon.entry(token.clone()) {
+                    match get_mut!(states, dst)
+                        .unwrap_mut()
+                        .non_epsilon
+                        .entry(token.clone())
+                    {
                         Entry::Vacant(entry) => {
                             let _ = entry.insert((core::iter::once(src).collect(), fn_name));
                         }
@@ -42,12 +49,12 @@ impl<I: Clone + Ord> Nfa<I> {
                     }
                 }
             }
-            if state.accepting {
+            if state.unwrap().accepting {
                 let _ = initial.insert(src);
             }
         }
         for &index in &self.initial {
-            get_mut!(states, index).accepting = true;
+            get_mut!(states, index).unwrap_mut().accepting = true;
         }
         Self { states, initial }
     }

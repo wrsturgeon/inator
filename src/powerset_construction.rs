@@ -20,7 +20,7 @@ type SubsetStates<I> = BTreeMap<
     ),
 >;
 
-impl<I: Clone + Ord> Nfa<I> {
+impl<I: Clone + Ord> Nfa<'_, I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
     pub(crate) fn subsets(self) -> Dfa<I> {
@@ -76,7 +76,7 @@ impl<I: Clone + Ord> Nfa<I> {
 /// Return the expansion of the original `queue` argument after taking all epsilon transitions.
 #[inline]
 fn traverse<I: Clone + Ord>(
-    nfa: &Nfa<I>,
+    nfa: &Nfa<'_, I>,
     queue: Vec<usize>,
     subset_states: &mut SubsetStates<I>,
 ) -> BTreeSet<usize> // <-- Return the set of states after taking epsilon transitions
@@ -94,12 +94,15 @@ fn traverse<I: Clone + Ord>(
     let subset = post_epsilon.iter().map(|&i| get!(nfa.states, i));
 
     // For now, so we can't get stuck in a cycle, cache an empty map
-    let _ = tmp.insert((BTreeMap::new(), subset.clone().any(|state| state.accepting)));
+    let _ = tmp.insert((
+        BTreeMap::new(),
+        subset.clone().any(|state| state.unwrap().accepting),
+    ));
 
     // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
     let mut transitions = BTreeMap::<I, (BTreeSet<usize>, Option<&'static str>)>::new();
     for state in subset {
-        for (token, &(ref map, fn_name)) in &state.non_epsilon {
+        for (token, &(ref map, fn_name)) in &state.unwrap().non_epsilon {
             match transitions.entry(token.clone()) {
                 Entry::Vacant(entry) => {
                     let _ = entry.insert((map.clone(), fn_name));
