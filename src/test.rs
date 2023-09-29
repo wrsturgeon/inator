@@ -67,6 +67,14 @@ mod unit {
         .fuzz()
         .unwrap_err();
     }
+
+    #[test]
+    #[should_panic]
+    fn ambiguity() {
+        let parser =
+            (ignore('a') >> on('a', "aa")) | (ignore('a') >> ignore('a') >> on('b', "aab"));
+        drop(parser.compile());
+    }
 }
 
 mod prop {
@@ -187,7 +195,7 @@ mod prop {
         }
 
         fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
-            let lhs = nfa.clone().repeat().optional();
+            let lhs = nfa.repeat().optional();
             let rhs = nfa.optional().repeat();
             for (il, ir) in lhs.fuzz().unwrap().zip(rhs.fuzz().unwrap()).take(100) {
                 if !rhs.accept(il) { return false; }

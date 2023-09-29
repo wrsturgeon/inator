@@ -56,11 +56,19 @@ impl<I: Clone + Ord> Nfa<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::missing_assert_message)]
-    pub fn compile(&self) -> Dfa<I> {
+    pub fn compile(&self) -> Dfa<I>
+    where
+        I: core::fmt::Debug,
+    {
+        // println!("Reversing (1st time)...");
         let rev = self.reverse();
+        // println!("Subset construction (1st time)...");
         let halfway = rev.subsets();
+        // println!("Generalizing...");
         let nfa = halfway.generalize();
+        // println!("Reversing (2nd time)...");
         let revrev = nfa.reverse();
+        // println!("Subset construction (2nd time)...");
         revrev.subsets()
     }
 }

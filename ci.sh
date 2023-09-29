@@ -13,14 +13,9 @@ cargo clippy --all-targets --all-features
 export MIRIFLAGS=-Zmiri-backtrace=1
 export RUST_BACKTRACE=1
 
-if [ -d example ]
+if [ -d examples ]
 then
-  cd example
-  cargo build
-  cargo fmt
-  ../ci.sh
-  cargo +nightly miri run
-  cd ..
+  ls examples | xargs -n 1 ./ci-example.sh
 fi
 
 cargo +nightly miri test --no-default-features

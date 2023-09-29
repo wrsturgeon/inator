@@ -162,7 +162,10 @@ impl<I: Clone + Ord> Graph<I> {
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts> {
+    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
+    where
+        I: core::fmt::Debug,
+    {
         crate::Fuzzer::try_from_reversed(self.reverse().compile())
     }
 
@@ -173,30 +176,86 @@ impl<I: Clone + Ord> Graph<I> {
         self.states.iter().any(|state| state.accepting) && !self.initial.is_empty()
     }
 
+    // /// Find the minimal input that reaches this state.
+    // /// Like Dijkstra's but optimized to leverage that each edge is 1 unit long
+    // #[inline]
+    // #[must_use]
+    // #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
+    // pub(crate) fn dijkstra(&self, initial: BTreeSet<usize>, endpoint: BTreeSet<usize>) -> Vec<I> {
+    //     use crate::dfa::CmpFirst;
+    //     use core::cmp::Reverse;
+    //     use std::collections::{btree_map::Entry, BinaryHeap};
+
+    //     let mut cache = BTreeMap::new();
+    //     let mut queue = BinaryHeap::new();
+
+    //     drop(cache.insert(initial.clone(), vec![]));
+    //     queue.push(Reverse(CmpFirst(0_usize, initial)));
+
+    //     while let Some(Reverse(CmpFirst(distance, indices))) = queue.pop() {
+    //         let cached = unwrap!(cache.get(&indices)).clone(); // TODO: look into `Cow`
+    //         if indices == endpoint {
+    //             return cached;
+    //         }
+    //         let subset = self.take_all_epsilon_transitions(indices.into_iter().collect());
+    //         if subset == endpoint {
+    //             return cached;
+    //         }
+    //         let states = subset.into_iter().map(|i| get!(self.states, i));
+    //         for (token, &(ref pre_eps, _fn_name)) in states.flat_map(|state| &state.non_epsilon) {
+    //             let next = self.take_all_epsilon_transitions(pre_eps.iter().copied().collect());
+    //             if let Entry::Vacant(entry) = cache.entry(next.clone()) {
+    //                 entry.insert(cached.clone()).push(token.clone());
+    //                 queue.push(Reverse(CmpFirst(distance.saturating_add(1), next.clone())));
+    //             }
+    //         }
+    //     }
+
+    //     #[allow(clippy::unreachable)]
+    //     #[cfg(any(test, debug_assertions))]
+    //     {
+    //         unreachable!()
+    //     }
+
+    //     #[allow(unsafe_code)]
+    //     #[cfg(not(any(test, debug_assertions)))]
+    //     unsafe {
+    //         core::hint::unreachable_unchecked()
+    //     }
+    // }
+
+    // /// Find the minimal input that reaches this state.
+    // #[inline]
+    // #[must_use]
+    // pub(crate) fn backtrack(&self, endpoint: BTreeSet<usize>) -> Vec<I> {
+    //     self.dijkstra(self.initial.clone(), endpoint)
+    // }
+
     /// Match at least one time, then as many times as we want.
     /// Note that if ANY number of times leads to an accepting state, we take it!
     #[inline]
     #[must_use]
-    pub fn repeat(mut self) -> Self {
-        for state in &mut self.states {
+    pub fn repeat(&self) -> Self {
+        let mut s = self.clone();
+        for state in &mut s.states {
             if state.accepting {
-                state.epsilon.extend(self.initial.iter());
+                state.epsilon.extend(s.initial.iter());
             }
         }
-        self
+        s
     }
 
     /// Match at most one time (i.e. ignore if not present).
     #[inline]
     #[must_use]
-    pub fn optional(self) -> Self {
-        Self::empty() | self
+    pub fn optional(&self) -> Self {
+        Self::empty() | self.clone()
     }
 
     /// Match zero or more times (a.k.a. Kleene star).
     #[inline]
     #[must_use]
-    pub fn star(self) -> Self {
+    pub fn star(&self) -> Self {
         self.repeat().optional()
     }
 }

@@ -4,6 +4,8 @@
 
 ![Portrait of the eminent Dr. Heinz Doofenshmirtz](http://images6.fanpop.com/image/polls/1198000/1198459_1364687083851_full.jpg)
 
+🚧 Development still ongoing! 🚧
+
 ## Why?
 Computability theory has known for ages that a certain class of languages have a unique and provably optimal representation as a graph.
 This is the insight behind regular-expression searchers like `grep`, but anything more than accepting or rejecting a string is difficult to reason about and impossible to optimize.
@@ -33,8 +35,10 @@ So, if `p` is a parser that accepts `ABC`, then `parenthesized(p)` will accept `
 
 The key idea here is that ***parsers are data***, and you can pass them around, modify them, and combine them just like anything else.
 
-See the `example` folder for a working self-contained crate using `inator` that reads characters from a tuple representation (`()`, `(A,)`, or `(A, B, C, ...)`), ignoring whitespace.
+See `examples/tuple` for a well-annotated crate that reads characters from a tuple representation (`()`, `(A,)`, or `(A, B, C, ...)`), ignoring whitespace.
 In that example, the entire parser could be defined in a single line, but I split it up to illustrate, first, _that you can do that_—you don't have to have a once-and-for-all megaparser—and, two, to explain as much about using the library as I can in detail.
+
+Other crates in `examples` extend the same technique to more complex parsers (e.g. phone numbers and email addresses).
 
 ## Anything else cool you can do?
 

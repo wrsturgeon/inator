@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [build-dependencies]
-inator = "0.1.1"
+inator = { path = ".." }

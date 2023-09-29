@@ -86,7 +86,10 @@ impl<I: Clone + Ord> Graph<I> {
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts> {
+    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
+    where
+        I: core::fmt::Debug,
+    {
         self.generalize().fuzz()
     }
 
@@ -770,7 +773,7 @@ impl<I: Clone + Ord> Graph<I> {
 
 /// Only the first element matters for equality and comparison.
 #[derive(Clone, Copy, Debug, Default)]
-struct CmpFirst<A: Ord, B>(pub(crate) A, pub(crate) B);
+pub(crate) struct CmpFirst<A: Ord, B>(pub(crate) A, pub(crate) B);
 
 impl<A: Ord, B> PartialEq for CmpFirst<A, B> {
     #[inline(always)]

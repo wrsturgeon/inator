@@ -15,12 +15,12 @@ use crate::{Compiled as Dfa, Parser as Nfa};
 type SubsetStates<I> = BTreeMap<
     BTreeSet<usize>, // <-- Subset of NFA states (will become one DFA state)
     (
-        BTreeMap<I, (BTreeSet<usize>, Option<&'static str>)>, // <-- Transitions
-        bool,                                                 // <-- Accepting or not
+        BTreeMap<I, (BTreeSet<usize>, Option<&'static str>, Vec<I>)>, // <-- Transitions
+        bool,                                                         // <-- Accepting or not
     ),
 >;
 
-impl<I: Clone + Ord> Nfa<I> {
+impl<I: Clone + Ord + core::fmt::Debug> Nfa<I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
     pub(crate) fn subsets(self) -> Dfa<I> {
@@ -30,6 +30,7 @@ impl<I: Clone + Ord> Nfa<I> {
             &self,
             self.initial.iter().copied().collect(),
             &mut subset_states,
+            vec![],
         );
 
         // Fix an ordering on subsets so each can be a DFA state
@@ -52,7 +53,7 @@ impl<I: Clone + Ord> Nfa<I> {
                 crate::dfa::State {
                     transitions: states
                         .iter()
-                        .map(|(token, &(ref set, fn_name))| {
+                        .map(|(token, &(ref set, fn_name, _))| {
                             (
                                 token.clone(),
                                 (unwrap!(ordered.binary_search(&set)), fn_name),
@@ -75,10 +76,11 @@ impl<I: Clone + Ord> Nfa<I> {
 /// Map which _subsets_ of states transition to which _subsets_ of states.
 /// Return the expansion of the original `queue` argument after taking all epsilon transitions.
 #[inline]
-fn traverse<I: Clone + Ord>(
+fn traverse<I: Clone + Ord + core::fmt::Debug>(
     nfa: &Nfa<I>,
     queue: Vec<usize>,
     subset_states: &mut SubsetStates<I>,
+    mut so_far: Vec<I>,
 ) -> BTreeSet<usize> // <-- Return the set of states after taking epsilon transitions
 {
     // Take all epsilon transitions immediately
@@ -97,16 +99,52 @@ fn traverse<I: Clone + Ord>(
     let _ = tmp.insert((BTreeMap::new(), subset.clone().any(|state| state.accepting)));
 
     // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
-    let mut transitions = BTreeMap::<I, (BTreeSet<usize>, Option<&'static str>)>::new();
+    let mut transitions = BTreeMap::<I, (BTreeSet<usize>, Option<&'static str>, Vec<I>)>::new();
     for state in subset {
         for (token, &(ref map, fn_name)) in &state.non_epsilon {
             match transitions.entry(token.clone()) {
                 Entry::Vacant(entry) => {
-                    let _ = entry.insert((map.clone(), fn_name));
+                    let _ = entry.insert((map.clone(), fn_name, {
+                        let mut app = so_far.clone();
+                        app.push(token.clone());
+                        app
+                    }));
                 }
                 Entry::Occupied(entry) => {
-                    let &mut (ref mut set, ref mut existing_fn_name) = entry.into_mut();
-                    assert_eq!(fn_name, *existing_fn_name, "MESSAGE TODO");
+                    let &mut (ref mut set, ref mut existing_fn_name, ref mut other_input) =
+                        entry.into_mut();
+                    assert_eq!(
+                        fn_name,
+                        *existing_fn_name,
+                        "Parsing ambiguity after [{}] / [{}]: {token:?} can't decide between {} and {}",
+                        {
+                            // let mut v = nfa.backtrack(queue.iter().copied().collect());
+                            other_input.pop().map_or_else(
+                                String::new,
+                                |last| {
+                                    other_input
+                                        .iter()
+                                        .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
+                                        + &format!("{last:?}")
+                                }
+                            )
+                        },
+                        {
+                            // let mut v = nfa.backtrack(queue.iter().copied().collect());
+                            so_far.pop().map_or_else(
+                                String::new,
+                                |last| {
+                                    so_far
+                                        .into_iter()
+                                        .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
+                                        + &format!("{last:?}")
+                                }
+                            )
+                        },
+                        fn_name.map_or_else(|| "ignoring".to_owned(), |f| format!("calling {f}")),
+                        existing_fn_name
+                            .map_or_else(|| "ignoring".to_owned(), |f| format!("calling {f}")),
+                    );
                     set.extend(map.iter().copied());
                 }
             }
@@ -114,8 +152,13 @@ fn traverse<I: Clone + Ord>(
     }
 
     // Now, follow epsilon transitions AND recurse
-    for &mut (ref mut dst, _) in transitions.values_mut() {
-        *dst = traverse(nfa, dst.iter().copied().collect(), subset_states);
+    for &mut (ref mut dst, _, ref mut app) in transitions.values_mut() {
+        *dst = traverse(
+            nfa,
+            dst.iter().copied().collect(),
+            subset_states,
+            app.clone(),
+        );
     }
 
     // Rewrite the empty map we wrote earlier with the actual transitions

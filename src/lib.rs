@@ -195,9 +195,7 @@ pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
     let Some(last) = v.pop() else {
         return empty();
     };
-    v.into_iter()
-        .fold(Parser::void(), |acc, token| acc >> ignore(token))
-        >> on(last, fn_name)
+    seq(v.into_iter().map(|token| ignore(token))) >> on(last, fn_name)
 }
 
 /// Accept either this token or nothing.
@@ -239,4 +237,14 @@ pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II)
     alternatives
         .into_iter()
         .fold(Parser::void(), |acc, p| acc | p)
+}
+
+/// Accept anything accepted by each of these parsers in sequence.
+#[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
+pub fn seq<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(in_order: II) -> Parser<I> {
+    in_order
+        .into_iter()
+        .fold(Parser::empty(), |acc, p| acc >> p)
 }
