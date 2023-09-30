@@ -19,47 +19,62 @@ pub struct Postponed<I: Clone + Ord>(pub(crate) Rc<OnceCell<Lazy<I>>>);
 #[derive(Debug, Clone)]
 pub struct PostponedRef<I: Clone + Ord>(pub(crate) Weak<OnceCell<Lazy<I>>>);
 
-impl<I: Clone + Ord> Hash for Postponed<I> {
+impl<I: Clone + Ord + Hash> Hash for Postponed<I> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        todo!()
+        self.0.get().unwrap().hash(state)
     }
 }
 
 impl<I: Clone + Ord> PartialOrd for Postponed<I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        todo!()
+        self.0.get().unwrap().partial_cmp(other.0.get().unwrap())
     }
 }
 
 impl<I: Clone + Ord> Ord for Postponed<I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        todo!()
+        self.0.get().unwrap().cmp(other.0.get().unwrap())
     }
 }
 
 impl<I: Clone + Ord> PartialEq for PostponedRef<I> {
     fn eq(&self, other: &Self) -> bool {
-        todo!()
+        self.0
+            .upgrade()
+            .unwrap()
+            .get()
+            .unwrap()
+            .eq(other.0.upgrade().unwrap().get().unwrap())
     }
 }
 
 impl<I: Clone + Ord> Eq for PostponedRef<I> {}
 
-impl<I: Clone + Ord> Hash for PostponedRef<I> {
+impl<I: Clone + Ord + Hash> Hash for PostponedRef<I> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        todo!()
+        self.0.upgrade().unwrap().get().unwrap().hash(state)
     }
 }
 
 impl<I: Clone + Ord> PartialOrd for PostponedRef<I> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        todo!()
+        self.0
+            .upgrade()
+            .unwrap()
+            .get()
+            .unwrap()
+            .partial_cmp(other.0.upgrade().unwrap().get().unwrap())
     }
 }
 
 impl<I: Clone + Ord> Ord for PostponedRef<I> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        todo!()
+        self.0
+            .upgrade()
+            .unwrap()
+            .get()
+            .unwrap()
+            .cmp(other.0.upgrade().unwrap().get().unwrap())
     }
 }
 
