@@ -6,19 +6,73 @@
 
 //! Operations on NFAs.
 
+use std::{
+    cell::OnceCell,
+    hash::Hash,
+    rc::{Rc, Weak},
+};
+
 use crate::nfa::{Graph as Nfa, State};
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Postponed<I: Clone + Ord>(pub(crate) Rc<OnceCell<Lazy<I>>>);
+#[derive(Debug, Clone)]
+pub struct PostponedRef<I: Clone + Ord>(pub(crate) Weak<OnceCell<Lazy<I>>>);
+
+impl<I: Clone + Ord> Hash for Postponed<I> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> PartialOrd for Postponed<I> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> Ord for Postponed<I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> PartialEq for PostponedRef<I> {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> Eq for PostponedRef<I> {}
+
+impl<I: Clone + Ord> Hash for PostponedRef<I> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> PartialOrd for PostponedRef<I> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        todo!()
+    }
+}
+
+impl<I: Clone + Ord> Ord for PostponedRef<I> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        todo!()
+    }
+}
 
 /// Unevaluated binary operation.
 #[non_exhaustive]
-#[allow(clippy::ref_option_ref)]
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Lazy<I: Clone + Ord> {
     /// NFA already made.
     Immediate(Nfa<I>),
     /// NFA promised.
-    Postponed,
+    Postponed(Postponed<I>),
     /// NFA promised.
-    PostponedReference(*const Self),
+    PostponedReference(PostponedRef<I>),
     /// Either one NFA or another, in parallel.
     Or(Box<Self>, Box<Self>),
     /// One then an epsilon transition to another.
@@ -32,10 +86,12 @@ pub enum Lazy<I: Clone + Ord> {
 impl<I: Clone + Ord> Clone for Lazy<I> {
     #[inline]
     fn clone(&self) -> Self {
-        match *self {
+        match self {
             Self::Immediate(ref lhs) => Self::Immediate(lhs.clone()),
-            Self::Postponed => Self::PostponedReference(self), // <-- This is the crucial bit
-            Self::PostponedReference(ptr) => Self::PostponedReference(ptr),
+            Self::Postponed(Postponed(cell)) => {
+                Self::PostponedReference(PostponedRef(Rc::downgrade(&cell)))
+            }
+            Self::PostponedReference(reference) => Self::PostponedReference(reference.clone()),
             Self::Or(ref lhs, ref rhs) => Self::Or(lhs.clone(), rhs.clone()),
             Self::ShrEps(ref lhs, ref rhs) => Self::ShrEps(lhs.clone(), rhs.clone()),
             Self::ShrNonEps(ref lhs, ref rhs) => Self::ShrNonEps(lhs.clone(), rhs.clone()),
@@ -47,17 +103,16 @@ impl<I: Clone + Ord> Clone for Lazy<I> {
 impl<I: Clone + Ord> Lazy<I> {
     /// Define a postponed value.
     /// # Panics
-    /// If this value was already defined or if the definition is still postponed.
+    /// If this value was already defined.
     #[inline]
     #[allow(clippy::manual_assert, clippy::panic)]
     pub fn finally(&mut self, value: Self) {
-        if *self != Self::Postponed {
-            panic!("Called `finally` on a value that was already defined");
+        if let Self::Postponed(Postponed(cell)) = self {
+            // map_err to discard the "error", since I doesn't implement Debug
+            cell.set(value)
+                .map_err(|_| "value already defined")
+                .unwrap();
         }
-        if value == Self::Postponed {
-            panic!("Called `finally` with a definition that is itself postponed");
-        }
-        *self = value;
     }
 
     /// Brzozowski's algorithm for minimizing automata.
@@ -105,9 +160,18 @@ impl<I: Clone + Ord> Lazy<I> {
     pub fn evaluate(self) -> Nfa<I> {
         match self {
             Self::Immediate(nfa) => nfa,
-            Self::Postponed => panic!("Needed a postponed value that had not been initialized"),
-            // SAFETY: Up to you. Don't be stupid. <3
-            Self::PostponedReference(ptr) => unsafe { &*ptr }.clone().evaluate(),
+            Self::Postponed(Postponed(cell)) => cell
+                .get()
+                .cloned()
+                .expect("value still postponed")
+                .evaluate(),
+            Self::PostponedReference(PostponedRef(cell)) => cell
+                .upgrade()
+                .unwrap()
+                .get()
+                .cloned()
+                .expect("value still postponed")
+                .evaluate(),
             Self::Or(lhs, rhs) => {
                 let mut lhs = lhs.evaluate();
                 let mut rhs = rhs.evaluate();

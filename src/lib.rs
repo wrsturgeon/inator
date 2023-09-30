@@ -162,14 +162,16 @@ pub use {
     ops::Lazy as Parser,
 };
 
+use std::{cell::OnceCell, rc::Rc};
+
 use ops::Lazy;
 
 /// Promise a parser that can't be computed yet (usually because it nests itself).
 #[must_use]
 #[inline(always)]
 #[allow(clippy::ref_option_ref)]
-pub const fn postponed<I: Clone + Ord>() -> Lazy<I> {
-    Lazy::Postponed
+pub fn postponed<I: Clone + Ord>() -> Lazy<I> {
+    Lazy::Postponed(ops::Postponed(Rc::new(OnceCell::new())))
 }
 
 /// Accept only the empty string.
