@@ -145,10 +145,10 @@ macro_rules! get_mut {
 // TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
 
 mod brzozowski;
-mod dfa;
+mod deterministic;
 mod expr;
 mod fuzz;
-mod nfa;
+mod nondeterministic;
 mod ops;
 mod powerset_construction;
 
@@ -156,30 +156,30 @@ mod powerset_construction;
 mod test;
 
 pub use {
-    dfa::Graph as Compiled,
+    deterministic::Graph as Compiled,
     expr::Expression,
     fuzz::{Fuzzer, NeverAccepts},
-    nfa::Graph as Parser,
+    nondeterministic::Graph as Parser,
 };
 
 /// Accept only the empty string.
 #[must_use]
 #[inline(always)]
-pub fn empty<I: Clone + Ord>() -> Parser<I> {
+pub fn empty<I: Clone + Ord, S: Clone + Ord>() -> Parser<I, S> {
     Parser::empty()
 }
 
 /// Accept this token if we see it here, but throw it away.
 #[must_use]
 #[inline(always)]
-pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn ignore<I: Clone + Ord, S: Clone + Ord>(token: I) -> Parser<I, S> {
     Parser::unit(token, None)
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
-pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
+pub fn on<I: Clone + Ord, S: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I, S> {
     Parser::unit(token, Some(fn_name))
 }
 
@@ -187,10 +187,10 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
 #[must_use]
 #[inline(always)]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
+pub fn on_seq<I: Clone + Ord, S: Clone + Ord, II: IntoIterator<Item = I>>(
     tokens: II,
     fn_name: &'static str,
-) -> Parser<I> {
+) -> Parser<I, S> {
     let mut v: Vec<_> = tokens.into_iter().collect();
     let Some(last) = v.pop() else {
         return empty();
@@ -201,7 +201,7 @@ pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn opt<I: Clone + Ord, S: Clone + Ord>(token: I) -> Parser<I, S> {
     ignore(token).optional()
 }
 
@@ -209,7 +209,7 @@ pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn single_space() -> Parser<char> {
+pub fn single_space<S: Clone + Ord>() -> Parser<char, S> {
     ignore(' ') | ignore('\n') | (ignore('\r') >> ignore('\n'))
 }
 
@@ -217,7 +217,7 @@ pub fn single_space() -> Parser<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn space() -> Parser<char> {
+pub fn space<S: Clone + Ord>() -> Parser<char, S> {
     single_space().star()
 }
 
@@ -226,14 +226,16 @@ pub fn space() -> Parser<char> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn parenthesized(p: Parser<char>) -> Parser<char> {
+pub fn parenthesized<S: Clone + Ord>(p: Parser<char, S>) -> Parser<char, S> {
     ignore('(') + p + ignore(')')
 }
 
 /// Accept anything accepted by any of these parsers.
 #[inline]
 #[must_use]
-pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II) -> Parser<I> {
+pub fn any<I: Clone + Ord, S: Clone + Ord, II: IntoIterator<Item = Parser<I, S>>>(
+    alternatives: II,
+) -> Parser<I, S> {
     alternatives
         .into_iter()
         .fold(Parser::void(), |acc, p| acc | p)
@@ -243,7 +245,9 @@ pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II)
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn seq<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(in_order: II) -> Parser<I> {
+pub fn seq<I: Clone + Ord, S: Clone + Ord, II: IntoIterator<Item = Parser<I, S>>>(
+    in_order: II,
+) -> Parser<I, S> {
     in_order
         .into_iter()
         .fold(Parser::empty(), |acc, p| acc >> p)

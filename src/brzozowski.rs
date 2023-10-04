@@ -6,17 +6,17 @@
 
 //! Brzozowski's algorithm for minimizing automata.
 
-use crate::{nfa, Compiled as Dfa, Parser as Nfa};
+use crate::{nondeterministic as n, Compiled as D, Parser as N};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-impl<I: Clone + Ord> Nfa<I> {
+impl<I: Clone + Ord, S: Clone + Ord> N<I, S> {
     /// Reverse all transitions and swap initial with accepting states.
     /// # Panics
     /// TODO
     #[inline]
     #[must_use]
     pub fn reverse(&self) -> Self {
-        let mut states = core::iter::repeat(nfa::State {
+        let mut states = core::iter::repeat(n::State {
             epsilon: BTreeSet::new(),
             non_epsilon: BTreeMap::new(),
             accepting: false,
@@ -56,7 +56,7 @@ impl<I: Clone + Ord> Nfa<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::missing_assert_message)]
-    pub fn compile(&self) -> Dfa<I>
+    pub fn compile(&self) -> D<I, S>
     where
         I: core::fmt::Debug,
     {
@@ -65,9 +65,9 @@ impl<I: Clone + Ord> Nfa<I> {
         // println!("Subset construction (1st time)...");
         let halfway = rev.subsets();
         // println!("Generalizing...");
-        let nfa = halfway.generalize();
+        let nondeterministic = halfway.generalize();
         // println!("Reversing (2nd time)...");
-        let revrev = nfa.reverse();
+        let revrev = nondeterministic.reverse();
         // println!("Subset construction (2nd time)...");
         revrev.subsets()
     }

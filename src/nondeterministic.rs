@@ -11,20 +11,20 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Nondeterministic finite automata with epsilon transitions.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Graph<I: Clone + Ord> {
+pub struct Graph<I: Clone + Ord, S: Clone + Ord = ()> {
     /// Every state in this graph.
-    pub(crate) states: Vec<State<I>>,
+    pub(crate) states: Vec<State<I, S>>,
     /// Initial set of states.
-    pub(crate) initial: BTreeSet<usize>,
+    pub(crate) initial: BTreeSet<(usize, S)>,
 }
 
 /// Transitions from one state to arbitrarily many others, possibly without even consuming input.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct State<I: Clone + Ord> {
+pub struct State<I: Clone + Ord, S: Clone + Ord> {
     /// Transitions that doesn't require consuming input.
     pub(crate) epsilon: BTreeSet<usize>,
     /// Transitions that require consuming and matching input.
-    pub(crate) non_epsilon: BTreeMap<I, (BTreeSet<usize>, Option<&'static str>)>,
+    pub(crate) non_epsilon: BTreeMap<I, (BTreeSet<usize>, S, Option<&'static str>)>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
@@ -33,7 +33,11 @@ pub struct State<I: Clone + Ord> {
 /// automaton #1 accepts the left part and #2 accepts the right.
 #[inline]
 #[cfg(test)]
-pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -> bool {
+pub(crate) fn chain<I: Clone + Ord, S: Clone + Ord>(
+    a1: &Graph<I, S>,
+    a2: &Graph<I, S>,
+    input: &[I],
+) -> bool {
     let mut s1 = a1.step();
     let mut i = input.iter();
     if s1.currently_accepting() && a2.accept(i.clone()) {
@@ -48,32 +52,32 @@ pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -
     false
 }
 
-impl<I: Clone + Ord> IntoIterator for Graph<I> {
-    type Item = State<I>;
-    type IntoIter = std::vec::IntoIter<State<I>>;
+impl<I: Clone + Ord, S: Clone + Ord> IntoIterator for Graph<I, S> {
+    type Item = State<I, S>;
+    type IntoIter = std::vec::IntoIter<State<I, S>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.into_iter()
     }
 }
 
-impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
-    type Item = &'a State<I>;
-    type IntoIter = core::slice::Iter<'a, State<I>>;
+impl<'a, I: Clone + Ord, S: Clone + Ord> IntoIterator for &'a Graph<I, S> {
+    type Item = &'a State<I, S>;
+    type IntoIter = core::slice::Iter<'a, State<I, S>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.iter()
     }
 }
 
-impl<I: Clone + Ord> Default for Graph<I> {
+impl<I: Clone + Ord, S: Clone + Ord> Default for Graph<I, S> {
     #[inline(always)]
     fn default() -> Self {
         Self::void()
     }
 }
 
-impl<I: Clone + Ord> Graph<I> {
+impl<I: Clone + Ord, S: Clone + Ord> Graph<I, S> {
     /// NFA with zero states.
     #[inline]
     #[must_use]
@@ -127,7 +131,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// Step through each input token one at a time.
     #[inline]
     #[must_use]
-    pub fn step(&self) -> Stepper<'_, I> {
+    pub fn step(&self) -> Stepper<'_, I, S> {
         Stepper::new(self)
     }
 
@@ -162,7 +166,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
+    pub fn fuzz(&self) -> Result<crate::Fuzzer<I, S>, crate::NeverAccepts>
     where
         I: core::fmt::Debug,
     {
@@ -182,7 +186,7 @@ impl<I: Clone + Ord> Graph<I> {
     // #[must_use]
     // #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
     // pub(crate) fn dijkstra(&self, initial: BTreeSet<usize>, endpoint: BTreeSet<usize>) -> Vec<I> {
-    //     use crate::dfa::CmpFirst;
+    //     use crate::deterministic::CmpFirst;
     //     use core::cmp::Reverse;
     //     use std::collections::{btree_map::Entry, BinaryHeap};
 
@@ -260,7 +264,7 @@ impl<I: Clone + Ord> Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + Expression, S: Clone + Ord> core::fmt::Display for Graph<I, S> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -272,7 +276,7 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
+impl<I: Clone + Ord + Expression, S: Clone + Ord> core::fmt::Display for State<I, S> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -291,7 +295,7 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
     }
 }
 
-impl<I: Clone + Ord> State<I> {
+impl<I: Clone + Ord, S: Clone + Ord> State<I, S> {
     /// Set of states to which this state can transition on a given input.
     #[inline]
     pub fn transition(&self, input: &I) -> Option<&(BTreeSet<usize>, Option<&'static str>)> {
@@ -374,18 +378,18 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
 
 /// Step through an automaton one token at a time.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Stepper<'graph, I: Clone + Ord> {
+pub struct Stepper<'graph, I: Clone + Ord, S: Clone + Ord> {
     /// The graph we're riding.
-    graph: &'graph Graph<I>,
+    graph: &'graph Graph<I, S>,
     /// Current state after the input we've received so far.
     state: BTreeSet<usize>,
 }
 
-impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
+impl<'graph, I: Clone + Ord, S: Clone + Ord> Stepper<'graph, I, S> {
     /// Start from the empty string on a certain automaton.
     #[inline]
     #[must_use]
-    fn new(graph: &'graph Graph<I>) -> Self {
+    fn new(graph: &'graph Graph<I, S>) -> Self {
         Self {
             graph,
             state: graph.take_all_epsilon_transitions(graph.initial.iter().copied().collect()),
@@ -416,7 +420,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     }
 }
 
-impl<I: Clone + Ord, B: core::borrow::Borrow<I>> Extend<B> for Stepper<'_, I> {
+impl<I: Clone + Ord, S: Clone + Ord, B: core::borrow::Borrow<I>> Extend<B> for Stepper<'_, I, S> {
     #[inline]
     fn extend<T: IntoIterator<Item = B>>(&mut self, iter: T) {
         for input in iter {

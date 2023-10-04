@@ -4,31 +4,31 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! The powerset construction algorithm for constructing an equivalent DFA from an arbitrary NFA.
+//! The powerset construction algorithm for constructing an equivalent deterministic automaton from an arbitrary nondeterministic automaton.
 //! Also known as the subset construction algorithm.
 
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-use crate::{Compiled as Dfa, Parser as Nfa};
+use crate::{Compiled as D, Parser as N};
 
 /// Type for transitions from _subsets_ of states to _subsets_ of states.
-type SubsetStates<I> = BTreeMap<
+type SubsetStates<I, S> = BTreeMap<
     BTreeSet<usize>, // <-- Subset of NFA states (will become one DFA state)
     (
-        BTreeMap<I, (BTreeSet<usize>, Option<&'static str>, Vec<I>)>, // <-- Transitions
-        bool,                                                         // <-- Accepting or not
+        BTreeMap<(I, S), (BTreeSet<usize>, S, Option<&'static str>, Vec<I>)>, // <-- Transitions
+        bool, // <-- Accepting or not
     ),
 >;
 
-impl<I: Clone + Ord + core::fmt::Debug> Nfa<I> {
+impl<I: Clone + Ord + core::fmt::Debug, S: Clone + Ord> N<I, S> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
-    pub(crate) fn subsets(self) -> Dfa<I> {
+    pub(crate) fn subsets(self) -> D<I, S> {
         // Map which _subsets_ of states transition to which _subsets_ of states
         let mut subset_states = SubsetStates::new();
         let initial_state = traverse(
             &self,
-            self.initial.iter().copied().collect(),
+            self.initial.iter().map(|&(i, _)| i).collect(),
             &mut subset_states,
             vec![],
         );
@@ -50,10 +50,10 @@ impl<I: Clone + Ord + core::fmt::Debug> Nfa<I> {
             .iter()
             .map(|&subset| {
                 let &(ref states, accepting) = unwrap!(subset_states.get(subset));
-                crate::dfa::State {
+                crate::deterministic::State {
                     transitions: states
                         .iter()
-                        .map(|(token, &(ref set, fn_name, _))| {
+                        .map(|(token, &(ref set, push, fn_name, _))| {
                             (
                                 token.clone(),
                                 (unwrap!(ordered.binary_search(&set)), fn_name),
@@ -66,7 +66,7 @@ impl<I: Clone + Ord + core::fmt::Debug> Nfa<I> {
             .collect();
 
         // Wrap it in a DFA
-        Dfa {
+        D {
             states,
             initial: unwrap!(ordered.binary_search(&&initial_state)),
         }
@@ -76,15 +76,15 @@ impl<I: Clone + Ord + core::fmt::Debug> Nfa<I> {
 /// Map which _subsets_ of states transition to which _subsets_ of states.
 /// Return the expansion of the original `queue` argument after taking all epsilon transitions.
 #[inline]
-fn traverse<I: Clone + Ord + core::fmt::Debug>(
-    nfa: &Nfa<I>,
+fn traverse<I: Clone + Ord + core::fmt::Debug, S: Clone + Ord>(
+    nondeterministic: &N<I, S>,
     queue: Vec<usize>,
-    subset_states: &mut SubsetStates<I>,
+    subset_states: &mut SubsetStates<I, S>,
     mut so_far: Vec<I>,
 ) -> BTreeSet<usize> // <-- Return the set of states after taking epsilon transitions
 {
     // Take all epsilon transitions immediately
-    let post_epsilon = nfa.take_all_epsilon_transitions(queue);
+    let post_epsilon = nondeterministic.take_all_epsilon_transitions(queue);
 
     // Check if we've already seen this subset
     let tmp = match subset_states.entry(post_epsilon.clone()) {
@@ -93,32 +93,40 @@ fn traverse<I: Clone + Ord + core::fmt::Debug>(
     };
 
     // Get all _states_ from indices
-    let subset = post_epsilon.iter().map(|&i| get!(nfa.states, i));
+    let subset = post_epsilon
+        .iter()
+        .map(|&i| get!(nondeterministic.states, i));
 
     // For now, so we can't get stuck in a cycle, cache an empty map
     let _ = tmp.insert((BTreeMap::new(), subset.clone().any(|state| state.accepting)));
 
     // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
-    let mut transitions = BTreeMap::<I, (BTreeSet<usize>, Option<&'static str>, Vec<I>)>::new();
+    let mut transitions =
+        BTreeMap::<(I, S), (BTreeSet<usize>, S, Option<&'static str>, Vec<I>)>::new();
     for state in subset {
         for (token, &(ref map, fn_name)) in &state.non_epsilon {
             match transitions.entry(token.clone()) {
                 Entry::Vacant(entry) => {
-                    let _ = entry.insert((map.clone(), fn_name, {
-                        let mut app = so_far.clone();
-                        app.push(token.clone());
-                        app
-                    }));
+                    let _ = entry.insert((
+                        map.clone(),
+                        todo!(),
+                        fn_name,
+                        {
+                            let mut app = so_far.clone();
+                            app.push(token.clone());
+                            app
+                        },
+                    ));
                 }
                 Entry::Occupied(entry) => {
-                    let &mut (ref mut set, ref mut existing_fn_name, ref mut other_input) =
+                    let &mut (ref mut set, _, ref mut existing_fn_name, ref mut other_input) =
                         entry.into_mut();
                     assert_eq!(
                         fn_name,
                         *existing_fn_name,
                         "Parsing ambiguity after [{}] / [{}]: {token:?} can't decide between {} and {}",
                         {
-                            // let mut v = nfa.backtrack(queue.iter().copied().collect());
+                            // let mut v = nondeterministic.backtrack(queue.iter().copied().collect());
                             other_input.pop().map_or_else(
                                 String::new,
                                 |last| {
@@ -130,7 +138,7 @@ fn traverse<I: Clone + Ord + core::fmt::Debug>(
                             )
                         },
                         {
-                            // let mut v = nfa.backtrack(queue.iter().copied().collect());
+                            // let mut v = nondeterministic.backtrack(queue.iter().copied().collect());
                             so_far.pop().map_or_else(
                                 String::new,
                                 |last| {
@@ -145,17 +153,17 @@ fn traverse<I: Clone + Ord + core::fmt::Debug>(
                         existing_fn_name
                             .map_or_else(|| "ignoring".to_owned(), |f| format!("calling {f}")),
                     );
-                    set.extend(map.iter().copied());
+                    set.extend(map.iter().cloned());
                 }
             }
         }
     }
 
     // Now, follow epsilon transitions AND recurse
-    for &mut (ref mut dst, _, ref mut app) in transitions.values_mut() {
+    for &mut (ref mut dst, _, _, ref mut app) in transitions.values_mut() {
         *dst = traverse(
-            nfa,
-            dst.iter().copied().collect(),
+            nondeterministic,
+            dst.iter().cloned().collect(),
             subset_states,
             app.clone(),
         );

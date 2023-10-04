@@ -6,9 +6,9 @@
 
 //! Operations on NFAs.
 
-use crate::{nfa, Parser as Nfa};
+use crate::{nondeterministic as n, Parser as N};
 
-impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
+impl<I: Clone + Ord, S: Clone + Ord> core::ops::AddAssign<usize> for n::State<I, S> {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
         // TODO: We can totally use unsafe here since the order doesn't change
@@ -26,7 +26,7 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
+impl<I: Clone + Ord, S: Clone + Ord> core::ops::BitOr for N<I, S> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -45,11 +45,16 @@ impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I> {
+impl<I: Clone + Ord, S: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, N<I, S>)>
+    for N<I, S>
+{
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
-    fn shr(mut self, (token, fn_name, mut rhs): (I, Option<&'static str>, Nfa<I>)) -> Self::Output {
+    fn shr(
+        mut self,
+        (token, fn_name, mut rhs): (I, Option<&'static str>, N<I, S>),
+    ) -> Self::Output {
         let index = self.states.len();
         for state in &mut rhs.states {
             *state += index;
@@ -74,7 +79,7 @@ impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
+impl<I: Clone + Ord, S: Clone + Ord> core::ops::Shr for N<I, S> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -98,7 +103,7 @@ impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
     }
 }
 
-impl core::ops::Add for Nfa<char> {
+impl<S: Clone + Ord> core::ops::Add for N<char, S> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]

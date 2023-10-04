@@ -6,7 +6,7 @@
 
 #![allow(clippy::print_stdout, clippy::unwrap_used, clippy::use_debug)]
 
-use crate::{Compiled as Dfa, Parser as Nfa, *};
+use crate::{deterministic as d, nondeterministic as n, Compiled as D, Parser as N, *};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod unit {
@@ -14,29 +14,29 @@ mod unit {
 
     #[test]
     fn zero_state_nfa_subsets() {
-        let nfa = Nfa::<()>::void();
+        let nfa = N::<(), ()>::void();
         let dfa = nfa.subsets();
         assert_eq!(
             dfa,
-            Dfa {
-                states: vec![dfa::State {
+            D {
+                states: vec![d::State {
                     transitions: BTreeMap::new(),
                     accepting: false
                 }],
-                initial: 0
+                initial: (0, ())
             }
         );
     }
 
     #[test]
     fn zero_state_nfa_fuzz() {
-        let _ = Nfa::<()>::void().fuzz().unwrap_err();
+        let _ = N::<(), ()>::void().fuzz().unwrap_err();
     }
 
     #[test]
     fn zero_initial_nfa_fuzz() {
-        let _ = Nfa::<()> {
-            states: vec![nfa::State {
+        let _ = N::<(), ()> {
+            states: vec![n::State {
                 epsilon: BTreeSet::new(),
                 non_epsilon: BTreeMap::new(),
                 accepting: true,
@@ -49,20 +49,20 @@ mod unit {
 
     #[test]
     fn isolated_state_nfa_fuzz() {
-        let _ = Nfa::<()> {
+        let _ = N::<(), ()> {
             states: vec![
-                nfa::State {
+                n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: false,
                 },
-                nfa::State {
+                n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 },
             ],
-            initial: core::iter::once(0).collect(),
+            initial: core::iter::once((0, ())).collect(),
         }
         .fuzz()
         .unwrap_err();
@@ -71,8 +71,8 @@ mod unit {
     #[test]
     #[should_panic]
     fn ambiguity() {
-        let parser =
-            (ignore('a') >> on('a', "aa")) | (ignore('a') >> ignore('a') >> on('b', "aab"));
+        let parser = (ignore::<_, ()>('a') >> on('a', "aa"))
+            | (ignore('a') >> ignore('a') >> on('b', "aab"));
         drop(parser.compile());
     }
 }
@@ -83,7 +83,7 @@ mod prop {
 
     #[cfg(feature = "quickcheck")]
     quickcheck::quickcheck! {
-        fn nfa_dfa_equal(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn nfa_dfa_equal(nfa: N<u8, ()>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
@@ -95,7 +95,7 @@ mod prop {
             )
         }
 
-        fn dfa_nfa_equal(dfa: Dfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn dfa_nfa_equal(dfa: D<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
@@ -107,17 +107,17 @@ mod prop {
             )
         }
 
-        fn nfa_dfa_one_and_a_half_roundtrip(nfa: Nfa<u8>) -> bool {
+        fn nfa_dfa_one_and_a_half_roundtrip(nfa: N<u8, ()>) -> bool {
             let dfa = nfa.subsets();
             dfa.generalize().subsets() == dfa
         }
 
-        fn dfa_nfa_double_roundtrip(dfa: Dfa<u8>) -> bool {
+        fn dfa_nfa_double_roundtrip(dfa: D<u8>) -> bool {
             let once = dfa.generalize().subsets();
             once.generalize().subsets() == once
         }
 
-        fn brzozowski(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn brzozowski(nfa: N<u8, ()>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
@@ -129,7 +129,7 @@ mod prop {
             )
         }
 
-        fn brzozowski_reduces_size(dfa: Dfa<u8>) -> quickcheck::TestResult {
+        fn brzozowski_reduces_size(dfa: D<u8>) -> quickcheck::TestResult {
             let orig_size = dfa.size();
             match dfa.generalize().compile().size().cmp(&orig_size) {
                 core::cmp::Ordering::Greater => quickcheck::TestResult::failed(),
@@ -143,11 +143,11 @@ mod prop {
             if reject == accept {
                 return quickcheck::TestResult::discard();
             }
-            let nfa = Nfa::unit(singleton, None);
+            let nfa = N::unit(singleton, None);
             quickcheck::TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
         }
 
-        fn bitor(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn bitor(lhs: N<u8, ()>, rhs: N<u8, ()>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
@@ -159,7 +159,7 @@ mod prop {
         }
 
         #[allow(clippy::arithmetic_side_effects)]
-        fn shr(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn shr(lhs: N<u8, ()>, rhs: N<u8, ()>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
             if inputs.is_empty() {
                 return quickcheck::TestResult::discard();
             }
@@ -167,18 +167,18 @@ mod prop {
             quickcheck::TestResult::from_bool(
                 inputs
                     .into_iter()
-                    .all(|input| fused.accept(&input) == nfa::chain(&lhs, &rhs, &input)),
+                    .all(|input| fused.accept(&input) == n::chain(&lhs, &rhs, &input)),
             )
         }
 
-        fn fuzz_roundtrip(nfa: Nfa<u8>) -> quickcheck::TestResult {
+        fn fuzz_roundtrip(nfa: N<u8, ()>) -> quickcheck::TestResult {
             nfa.fuzz()
                 .map_or(quickcheck::TestResult::discard(), |fuzz| {
                     quickcheck::TestResult::from_bool(fuzz.take(100).all(|input| nfa.accept(input)))
                 })
         }
 
-        fn repeat_fuzz_chain(nfa: Nfa<u8>) -> quickcheck::TestResult {
+        fn repeat_fuzz_chain(nfa: N<u8, ()>) -> quickcheck::TestResult {
             let Ok(mut fuzzer) = nfa.fuzz() else {
                 return quickcheck::TestResult::discard();
             };
@@ -194,7 +194,7 @@ mod prop {
             quickcheck::TestResult::passed()
         }
 
-        fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
+        fn star_def_swap_eq(nfa: N<u8, ()>) -> bool {
             let lhs = nfa.repeat().optional();
             let rhs = nfa.optional().repeat();
             for (il, ir) in lhs.fuzz().unwrap().zip(rhs.fuzz().unwrap()).take(100) {
@@ -204,7 +204,7 @@ mod prop {
             true
         }
 
-        fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) -> quickcheck::TestResult {
+        fn sandwich(a: N<u8, ()>, b: N<u8, ()>, c: N<u8, ()>) -> quickcheck::TestResult {
             let Ok(af) = a.fuzz() else { return quickcheck::TestResult::discard(); };
             let Ok(bf) = b.fuzz() else { return quickcheck::TestResult::discard(); };
             let Ok(cf) = c.fuzz() else { return quickcheck::TestResult::discard(); };
@@ -231,7 +231,7 @@ mod prop {
 mod reduced {
     use super::*;
 
-    fn nfa_dfa_equal(nfa: &Nfa<u8>, input: &[u8]) {
+    fn nfa_dfa_equal(nfa: &N<u8, ()>, input: &[u8]) {
         println!("NFA:");
         println!("{nfa}");
         let dfa = nfa.clone().subsets();
@@ -252,7 +252,7 @@ mod reduced {
         );
     }
 
-    fn brzozowski(nfa: &Nfa<u8>, input: &[u8]) {
+    fn brzozowski(nfa: &N<u8, ()>, input: &[u8]) {
         println!("NFA:");
         println!("{nfa}");
         let dfa = nfa.clone().compile();
@@ -273,7 +273,7 @@ mod reduced {
         );
     }
 
-    fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
+    fn bitor(lhs: &N<u8, ()>, rhs: &N<u8, ()>, input: &[u8]) {
         println!("LHS:");
         println!("{lhs}");
         println!("RHS:");
@@ -307,7 +307,7 @@ mod reduced {
     }
 
     #[allow(clippy::arithmetic_side_effects)]
-    fn shr(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
+    fn shr(lhs: &N<u8, ()>, rhs: &N<u8, ()>, input: &[u8]) {
         println!("LHS:");
         println!("{lhs}");
         println!("RHS:");
@@ -315,7 +315,7 @@ mod reduced {
         let fused = lhs.clone() >> rhs.clone();
         println!("Fused:");
         println!("{fused}");
-        let chain_accepted = nfa::chain(lhs, rhs, input);
+        let chain_accepted = n::chain(lhs, rhs, input);
         let fused_accepted = fused.accept(input);
         assert_eq!(
             fused_accepted,
@@ -338,13 +338,13 @@ mod reduced {
     #[test]
     fn nfa_dfa_equal_1() {
         nfa_dfa_equal(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((0, (BTreeSet::new(), None))).collect(),
+                    non_epsilon: core::iter::once((0, (BTreeSet::new(), (), None))).collect(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[],
         );
@@ -353,20 +353,20 @@ mod reduced {
     #[test]
     fn nfa_dfa_equal_2() {
         nfa_dfa_equal(
-            &Nfa {
+            &N {
                 states: vec![
-                    nfa::State {
+                    n::State {
                         epsilon: core::iter::once(1).collect(),
                         non_epsilon: BTreeMap::new(),
                         accepting: false,
                     },
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: true,
                     },
                 ],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[],
         );
@@ -375,13 +375,13 @@ mod reduced {
     #[test]
     fn nfa_dfa_equal_3() {
         nfa_dfa_equal(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((255, (BTreeSet::new(), None))).collect(),
+                    non_epsilon: core::iter::once((255, (BTreeSet::new(), (), None))).collect(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[255],
         );
@@ -390,21 +390,24 @@ mod reduced {
     #[test]
     fn nfa_dfa_equal_4() {
         nfa_dfa_equal(
-            &Nfa {
+            &N {
                 states: vec![
-                    nfa::State {
+                    n::State {
                         epsilon: core::iter::once(1).collect(),
                         non_epsilon: BTreeMap::new(),
                         accepting: false,
                     },
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
-                        non_epsilon: core::iter::once((255, (core::iter::once(0).collect(), None)))
-                            .collect(),
+                        non_epsilon: core::iter::once((
+                            255,
+                            (core::iter::once(0).collect(), (), None),
+                        ))
+                        .collect(),
                         accepting: true,
                     },
                 ],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[255],
         );
@@ -413,20 +416,20 @@ mod reduced {
     #[test]
     fn nfa_dfa_equal_5() {
         nfa_dfa_equal(
-            &Nfa {
+            &N {
                 states: vec![
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: false,
                     },
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: true,
                     },
                 ],
-                initial: core::iter::once(1).collect(),
+                initial: core::iter::once((1, ())).collect(),
             },
             &[],
         );
@@ -435,7 +438,7 @@ mod reduced {
     #[test]
     fn brzozowski_1() {
         brzozowski(
-            &Nfa {
+            &N {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
@@ -446,13 +449,13 @@ mod reduced {
     #[test]
     fn brzozowski_2() {
         brzozowski(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: false,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[],
         );
@@ -461,10 +464,10 @@ mod reduced {
     #[test]
     fn brzozowski_3() {
         brzozowski(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((0, (core::iter::once(0).collect(), None)))
+                    non_epsilon: core::iter::once((0, (core::iter::once(0).collect(), (), None)))
                         .collect(),
                     accepting: false,
                 }],
@@ -477,17 +480,17 @@ mod reduced {
     #[test]
     fn bitor_1() {
         bitor(
-            &Nfa {
+            &N {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[],
         );
@@ -496,15 +499,15 @@ mod reduced {
     #[test]
     fn bitor_2() {
         bitor(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: false,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
-            &Nfa {
+            &N {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
@@ -515,22 +518,22 @@ mod reduced {
     #[test]
     fn bitor_3() {
         bitor(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: core::iter::once((1, (core::iter::once(0).collect(), None)))
+                    non_epsilon: core::iter::once((1, (core::iter::once(0).collect(), (), None)))
                         .collect(),
                     accepting: false,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[1],
         );
@@ -539,15 +542,15 @@ mod reduced {
     #[test]
     fn shr_1() {
         shr(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
-            &Nfa {
+            &N {
                 states: vec![],
                 initial: BTreeSet::new(),
             },
@@ -558,37 +561,43 @@ mod reduced {
     #[test]
     fn shr_2() {
         shr(
-            &Nfa {
+            &N {
                 states: vec![
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: false,
                     },
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
-                        non_epsilon: core::iter::once((2, (core::iter::once(1).collect(), None)))
-                            .collect(),
+                        non_epsilon: core::iter::once((
+                            2,
+                            (core::iter::once(1).collect(), (), None),
+                        ))
+                        .collect(),
                         accepting: true,
                     },
                 ],
-                initial: core::iter::once(1).collect(),
+                initial: core::iter::once((1, ())).collect(),
             },
-            &Nfa {
+            &N {
                 states: vec![
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
-                        non_epsilon: core::iter::once((1, (core::iter::once(1).collect(), None)))
-                            .collect(),
+                        non_epsilon: core::iter::once((
+                            1,
+                            (core::iter::once(1).collect(), (), None),
+                        ))
+                        .collect(),
                         accepting: false,
                     },
-                    nfa::State {
+                    n::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
                         accepting: true,
                     },
                 ],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[2, 1],
         );
@@ -597,21 +606,21 @@ mod reduced {
     #[test]
     fn shr_3() {
         shr(
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
-            &Nfa {
-                states: vec![nfa::State {
+            &N {
+                states: vec![n::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
                     accepting: true,
                 }],
-                initial: core::iter::once(0).collect(),
+                initial: core::iter::once((0, ())).collect(),
             },
             &[],
         );

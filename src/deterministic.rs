@@ -4,37 +4,38 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! Deterministic finite automata.
+//! Deterministic pushdown automata.
 
 use crate::Expression;
 use proc_macro2::Span;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use syn::{Ident, Token, __private::ToTokens};
 
-/// Deterministic finite automata.
+/// Deterministic pushdown automata.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Graph<I: Clone + Ord> {
+pub struct Graph<I: Clone + Ord, S: Clone + Ord> {
     /// Every state in this graph (should never be empty!).
-    pub(crate) states: Vec<State<I>>,
-    /// Initial set of states.
-    pub(crate) initial: usize,
+    pub(crate) states: Vec<State<I, S>>,
+    /// Initial state and stack symbol.
+    pub(crate) initial: (usize, S),
 }
 
 /// State transitions from one state to no more than one other.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct State<I: Clone + Ord> {
+pub struct State<I: Clone + Ord, S: Clone + Ord> {
     /// Transitions that require consuming and matching input.
-    pub(crate) transitions: BTreeMap<I, (usize, Option<&'static str>)>,
+    pub(crate) transitions: BTreeMap<(I, S), (usize, S, Option<&'static str>)>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
 
-impl<I: Clone + Ord> Graph<I> {
+impl<I: Clone + Ord, S: Clone + Ord> Graph<I, S> {
     /// Decide whether an input belongs to the regular langage this NFA accepts.
     #[inline]
     #[allow(clippy::missing_panics_doc)]
     pub fn accept<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
-        let mut state = self.initial;
+        let mut state = self.initial_state;
+        let mut stack = vec![self.initial_stack];
         for input in iter {
             match get!(self.states, state).transition(&input) {
                 Some(&(next_state, _)) => state = next_state,
@@ -57,15 +58,15 @@ impl<I: Clone + Ord> Graph<I> {
         self.states.len()
     }
 
-    /// Generalize to an identical NFA.
+    /// Generalize to an identical nondeterministic automaton.
     #[inline]
     #[must_use]
-    pub fn generalize(&self) -> crate::Parser<I> {
+    pub fn generalize(&self) -> crate::Parser<I, S> {
         crate::Parser {
             states: self
                 .states
                 .iter()
-                .map(|state| crate::nfa::State {
+                .map(|state| crate::nondeterministic::State {
                     epsilon: std::collections::BTreeSet::new(),
                     non_epsilon: state
                         .transitions
@@ -86,7 +87,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
+    pub fn fuzz(&self) -> Result<crate::Fuzzer<I, S>, crate::NeverAccepts>
     where
         I: core::fmt::Debug,
     {
@@ -797,25 +798,25 @@ impl<A: Ord, B> Ord for CmpFirst<A, B> {
     }
 }
 
-impl<I: Clone + Ord> IntoIterator for Graph<I> {
-    type Item = State<I>;
-    type IntoIter = std::vec::IntoIter<State<I>>;
+impl<I: Clone + Ord, S: Clone + Ord> IntoIterator for Graph<I, S> {
+    type Item = State<I, S>;
+    type IntoIter = std::vec::IntoIter<State<I, S>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.into_iter()
     }
 }
 
-impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
-    type Item = &'a State<I>;
-    type IntoIter = core::slice::Iter<'a, State<I>>;
+impl<'a, I: Clone + Ord, S: Clone + Ord> IntoIterator for &'a Graph<I, S> {
+    type Item = &'a State<I, S>;
+    type IntoIter = core::slice::Iter<'a, State<I, S>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.iter()
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + Expression, S: Clone + Ord> core::fmt::Display for Graph<I, S> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Initial state: {}", self.initial)?;
@@ -826,7 +827,7 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
+impl<I: Clone + Ord + Expression, S: Clone + Ord> core::fmt::Display for State<I, S> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -889,7 +890,7 @@ fn invert<K: Ord, V: Ord>(map: &BTreeMap<K, V>) -> BTreeMap<&V, BTreeSet<&K>> {
     acc
 }
 
-impl<I: Clone + Ord> State<I> {
+impl<I: Clone + Ord, S: Clone + Ord> State<I, S> {
     /// State to which this state can transition on a given input.
     #[inline]
     pub fn transition(&self, input: &I) -> Option<&(usize, Option<&'static str>)> {

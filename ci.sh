@@ -15,7 +15,7 @@ export RUST_BACKTRACE=1
 
 if [ -d examples ]
 then
-  ls examples | xargs -n 1 ./ci-example.sh
+  ls examples | xargs -n 1 ./ci-example.sh || exit 1
 fi
 
 cargo +nightly miri test --no-default-features

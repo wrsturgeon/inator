@@ -6,14 +6,14 @@
 
 //! Infinite iterators over inputs guaranteed to be accepted by a given automaton.
 
-use crate::Compiled as Dfa;
+use crate::Compiled as D;
 use rand::Rng;
 
 /// Infinite iterator over inputs guaranteed to be accepted by a given automaton.
 #[derive(Clone, Debug)]
-pub struct Fuzzer<I: Clone + Ord> {
+pub struct Fuzzer<I: Clone + Ord, S: Clone + Ord> {
     /// Reversed automaton.
-    dfa: Dfa<I>,
+    graph: D<I, S>,
     /// Random number generator.
     rng: rand::rngs::ThreadRng,
 }
@@ -23,16 +23,16 @@ pub struct Fuzzer<I: Clone + Ord> {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NeverAccepts;
 
-impl<I: Clone + Ord> Iterator for Fuzzer<I> {
+impl<I: Clone + Ord, S: Clone + Ord> Iterator for Fuzzer<I, S> {
     type Item = Vec<I>;
     #[inline]
     #[allow(clippy::unwrap_in_result)]
     fn next(&mut self) -> Option<Self::Item> {
         'start_over: loop {
-            let mut index = self.dfa.initial;
+            let mut index = self.graph.initial;
             let mut v = vec![];
             loop {
-                let state = get!(self.dfa.states, index);
+                let state = get!(self.graph.states, index);
                 if state.accepting && self.rng.gen() {
                     v.reverse();
                     return Some(v);
@@ -52,15 +52,15 @@ impl<I: Clone + Ord> Iterator for Fuzzer<I> {
     }
 }
 
-impl<I: Clone + Ord> Fuzzer<I> {
+impl<I: Clone + Ord, S: Clone + Ord> Fuzzer<I, S> {
     /// Wrap this (ALREADY REVERSED) automaton in fuzzing capabilities.
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn try_from_reversed(reversed: Dfa<I>) -> Result<Self, NeverAccepts> {
+    pub fn try_from_reversed(reversed: D<I, S>) -> Result<Self, NeverAccepts> {
         if reversed.would_ever_accept() {
             Ok(Self {
-                dfa: reversed,
+                graph: reversed,
                 rng: rand::thread_rng(),
             })
         } else {
