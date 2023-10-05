@@ -7,7 +7,37 @@
 //! Nondeterministic finite automata with epsilon transitions.
 
 use crate::Expression;
-use std::collections::{BTreeMap, BTreeSet};
+use core::{
+    borrow::Borrow,
+    fmt::{self, Debug, Display},
+    iter::once,
+    slice::Iter,
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    vec::IntoIter,
+};
+
+#[cfg(feature = "quickcheck")]
+use quickcheck::*;
+
+/// Subset of states (by their index).
+type Subset = BTreeSet<usize>;
+
+/// From a single state, all tokens and the transitions each would induce.
+type Transitions<I> = BTreeMap<I, Transition>;
+
+/// Function (or none) to call on an edge.
+type Call = Option<&'static str>;
+
+/// A single edge triggered by a token.
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Transition {
+    /// Set of destination states.
+    pub(crate) dsts: Subset,
+    /// Function (or none) to call on this edge.
+    pub(crate) call: Call,
+}
 
 /// Nondeterministic finite automata with epsilon transitions.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -15,16 +45,16 @@ pub struct Graph<I: Clone + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
     /// Initial set of states.
-    pub(crate) initial: BTreeSet<usize>,
+    pub(crate) initial: Subset,
 }
 
 /// Transitions from one state to arbitrarily many others, possibly without even consuming input.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<I: Clone + Ord> {
     /// Transitions that doesn't require consuming input.
-    pub(crate) epsilon: BTreeSet<usize>,
+    pub(crate) epsilon: Subset,
     /// Transitions that require consuming and matching input.
-    pub(crate) non_epsilon: BTreeMap<I, (BTreeSet<usize>, Option<&'static str>)>,
+    pub(crate) non_epsilon: Transitions<I>,
     /// Whether an input that ends in this state ought to be accepted.
     pub(crate) accepting: bool,
 }
@@ -50,7 +80,7 @@ pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -
 
 impl<I: Clone + Ord> IntoIterator for Graph<I> {
     type Item = State<I>;
-    type IntoIter = std::vec::IntoIter<State<I>>;
+    type IntoIter = IntoIter<State<I>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.into_iter()
@@ -59,7 +89,7 @@ impl<I: Clone + Ord> IntoIterator for Graph<I> {
 
 impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
     type Item = &'a State<I>;
-    type IntoIter = core::slice::Iter<'a, State<I>>;
+    type IntoIter = Iter<'a, State<I>>;
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.states.iter()
@@ -80,7 +110,7 @@ impl<I: Clone + Ord> Graph<I> {
     pub fn void() -> Self {
         Self {
             states: vec![],
-            initial: BTreeSet::new(),
+            initial: Subset::new(),
         }
     }
 
@@ -90,11 +120,11 @@ impl<I: Clone + Ord> Graph<I> {
     pub fn empty() -> Self {
         Self {
             states: vec![State {
-                epsilon: BTreeSet::new(),
+                epsilon: Subset::new(),
                 non_epsilon: BTreeMap::new(),
                 accepting: true,
             }],
-            initial: core::iter::once(0).collect(),
+            initial: once(0).collect(),
         }
     }
 
@@ -110,9 +140,9 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
-    pub fn take_all_epsilon_transitions(&self, mut queue: Vec<usize>) -> BTreeSet<usize> {
+    pub fn take_all_epsilon_transitions(&self, mut queue: Vec<usize>) -> Subset {
         // Take all epsilon transitions immediately
-        let mut superposition = BTreeSet::<usize>::new();
+        let mut superposition = Subset::new();
         while let Some(state) = queue.pop() {
             for next in &get!(self.states, state).epsilon {
                 if !superposition.contains(next) {
@@ -137,7 +167,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[allow(clippy::missing_panics_doc)]
     pub fn accept<Iter: IntoIterator>(&self, iter: Iter) -> bool
     where
-        Iter::Item: core::borrow::Borrow<I>,
+        Iter::Item: Borrow<I>,
     {
         let mut stepper = self.step();
         stepper.extend(iter);
@@ -164,7 +194,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
     where
-        I: core::fmt::Debug,
+        I: Debug,
     {
         crate::Fuzzer::try_from_reversed(self.reverse().compile())
     }
@@ -181,7 +211,7 @@ impl<I: Clone + Ord> Graph<I> {
     // #[inline]
     // #[must_use]
     // #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
-    // pub(crate) fn dijkstra(&self, initial: BTreeSet<usize>, endpoint: BTreeSet<usize>) -> Vec<I> {
+    // pub(crate) fn dijkstra(&self, initial: Subset, endpoint: Subset) -> Vec<I> {
     //     use crate::dfa::CmpFirst;
     //     use core::cmp::Reverse;
     //     use std::collections::{btree_map::Entry, BinaryHeap};
@@ -227,7 +257,7 @@ impl<I: Clone + Ord> Graph<I> {
     // /// Find the minimal input that reaches this state.
     // #[inline]
     // #[must_use]
-    // pub(crate) fn backtrack(&self, endpoint: BTreeSet<usize>) -> Vec<I> {
+    // pub(crate) fn backtrack(&self, endpoint: Subset) -> Vec<I> {
     //     self.dijkstra(self.initial.clone(), endpoint)
     // }
 
@@ -260,10 +290,10 @@ impl<I: Clone + Ord> Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
+impl<I: Clone + Ord + Expression> Display for Graph<I> {
     #[inline]
     #[allow(clippy::use_debug)]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Initial states: {:?}", self.initial)?;
         for (i, state) in self.states.iter().enumerate() {
             write!(f, "State {i} {state}")?;
@@ -272,10 +302,10 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
+impl<I: Clone + Ord + Expression> Display for State<I> {
     #[inline]
     #[allow(clippy::use_debug)]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
             "({}accepting):",
@@ -284,8 +314,8 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
         if !self.epsilon.is_empty() {
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         }
-        for (input, &(ref transitions, fn_name)) in &self.non_epsilon {
-            writeln!(f, "    {input:?} --> {transitions:?} >>= {fn_name:?}")?;
+        for (input, &Transition { ref dsts, call }) in &self.non_epsilon {
+            writeln!(f, "    {input:?} --> {dsts:?} >>= {call:?}")?;
         }
         Ok(())
     }
@@ -294,18 +324,18 @@ impl<I: Clone + Ord + Expression> core::fmt::Display for State<I> {
 impl<I: Clone + Ord> State<I> {
     /// Set of states to which this state can transition on a given input.
     #[inline]
-    pub fn transition(&self, input: &I) -> Option<&(BTreeSet<usize>, Option<&'static str>)> {
+    pub fn transition(&self, input: &I) -> Option<&Transition> {
         self.non_epsilon.get(input)
     }
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
+impl<I: Ord + Arbitrary> Arbitrary for Graph<I> {
     #[inline]
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        let mut states = quickcheck::Arbitrary::arbitrary(g);
+    fn arbitrary(g: &mut Gen) -> Self {
+        let mut states = Arbitrary::arbitrary(g);
         cut_nonsense(&mut states);
-        let mut initial = BTreeSet::arbitrary(g);
+        let mut initial = Subset::arbitrary(g);
         initial.retain(|i| i < &states.len());
         Self { states, initial }
     }
@@ -323,16 +353,24 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for Graph<I> {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
+impl<I: Ord + Arbitrary> Arbitrary for State<I> {
     #[inline]
-    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         Self {
-            epsilon: quickcheck::Arbitrary::arbitrary(g),
-            non_epsilon: BTreeMap::<I, BTreeSet<usize>>::arbitrary(g)
+            epsilon: Arbitrary::arbitrary(g),
+            non_epsilon: BTreeMap::<I, Subset>::arbitrary(g)
                 .into_iter()
-                .map(|(k, v)| (k, (v, None)))
+                .map(|(k, v)| {
+                    (
+                        k,
+                        Transition {
+                            dsts: v,
+                            call: None,
+                        },
+                    )
+                })
                 .collect(),
-            accepting: quickcheck::Arbitrary::arbitrary(g),
+            accepting: Arbitrary::arbitrary(g),
         }
     }
 
@@ -343,7 +381,7 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
                 self.epsilon.clone(),
                 self.non_epsilon
                     .iter()
-                    .map(|(token, &(ref map, _))| (token.clone(), map.clone()))
+                    .map(|(token, &Transition { ref dsts, .. })| (token.clone(), dsts.clone()))
                     .collect::<BTreeMap<_, _>>(),
                 self.accepting,
             )
@@ -352,7 +390,7 @@ impl<I: Ord + quickcheck::Arbitrary> quickcheck::Arbitrary for State<I> {
                     epsilon,
                     non_epsilon: non_epsilon
                         .into_iter()
-                        .map(|(dst, set)| (dst, (set, None)))
+                        .map(|(dst, dsts)| (dst, Transition { dsts, call: None }))
                         .collect(),
                     accepting,
                 }),
@@ -366,8 +404,8 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
         state.epsilon.retain(|i| i < &size);
-        for &mut (ref mut destination, _) in state.non_epsilon.values_mut() {
-            destination.retain(|index| index < &size);
+        for &mut Transition { ref mut dsts, .. } in state.non_epsilon.values_mut() {
+            dsts.retain(|index| index < &size);
         }
     }
 }
@@ -378,7 +416,7 @@ pub struct Stepper<'graph, I: Clone + Ord> {
     /// The graph we're riding.
     graph: &'graph Graph<I>,
     /// Current state after the input we've received so far.
-    state: BTreeSet<usize>,
+    state: Subset,
 }
 
 impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
@@ -399,7 +437,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
             self.state
                 .iter()
                 .filter_map(|&index| get!(self.graph.states, index).transition(token))
-                .flat_map(|&(ref map, _)| map.iter().copied())
+                .flat_map(|&Transition { ref dsts, .. }| dsts.iter().copied())
                 .collect(),
         );
     }
@@ -416,7 +454,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     }
 }
 
-impl<I: Clone + Ord, B: core::borrow::Borrow<I>> Extend<B> for Stepper<'_, I> {
+impl<I: Clone + Ord, B: Borrow<I>> Extend<B> for Stepper<'_, I> {
     #[inline]
     fn extend<T: IntoIterator<Item = B>>(&mut self, iter: T) {
         for input in iter {

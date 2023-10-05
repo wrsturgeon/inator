@@ -6,45 +6,49 @@
 
 //! Allowed expressions.
 
+use core::{fmt::Debug, iter::once};
 use proc_macro2::Span;
+use syn::{
+    Expr, ExprLit, Lit, LitByte, LitChar, Pat, Path, PathArguments, PathSegment, Type, TypePath,
+};
 
 /// Convert to a variety of source-code-related formats.
-pub trait Expression: core::fmt::Debug {
+pub trait Expression: Debug {
     /// Convert `&Self -> syn::Expr`.
     #[must_use]
-    fn to_expr(&self) -> syn::Expr;
+    fn to_expr(&self) -> Expr;
     /// Convert `&Self -> syn::Pat`.
     #[must_use]
-    fn to_pattern(&self) -> syn::Pat;
+    fn to_pattern(&self) -> Pat;
     /// Write a `syn::Type` type representing this value's type.
     #[must_use]
-    fn to_type() -> syn::Type;
+    fn to_type() -> Type;
 }
 
 impl Expression for char {
     #[inline]
-    fn to_expr(&self) -> syn::Expr {
-        syn::Expr::Lit(syn::ExprLit {
+    fn to_expr(&self) -> Expr {
+        Expr::Lit(ExprLit {
             attrs: vec![],
-            lit: syn::Lit::Char(syn::LitChar::new(*self, Span::call_site())),
+            lit: Lit::Char(LitChar::new(*self, Span::call_site())),
         })
     }
     #[inline]
-    fn to_pattern(&self) -> syn::Pat {
-        syn::Pat::Lit(syn::ExprLit {
+    fn to_pattern(&self) -> Pat {
+        Pat::Lit(ExprLit {
             attrs: vec![],
-            lit: syn::Lit::Char(syn::LitChar::new(*self, Span::call_site())),
+            lit: Lit::Char(LitChar::new(*self, Span::call_site())),
         })
     }
     #[inline]
-    fn to_type() -> syn::Type {
-        syn::Type::Path(syn::TypePath {
+    fn to_type() -> Type {
+        Type::Path(TypePath {
             qself: None,
-            path: syn::Path {
+            path: Path {
                 leading_colon: None,
-                segments: core::iter::once(syn::PathSegment {
+                segments: once(PathSegment {
                     ident: syn::Ident::new("char", Span::call_site()),
-                    arguments: syn::PathArguments::None,
+                    arguments: PathArguments::None,
                 })
                 .collect(),
             },
@@ -54,28 +58,28 @@ impl Expression for char {
 
 impl Expression for u8 {
     #[inline]
-    fn to_expr(&self) -> syn::Expr {
-        syn::Expr::Lit(syn::ExprLit {
+    fn to_expr(&self) -> Expr {
+        Expr::Lit(ExprLit {
             attrs: vec![],
-            lit: syn::Lit::Byte(syn::LitByte::new(*self, Span::call_site())),
+            lit: Lit::Byte(LitByte::new(*self, Span::call_site())),
         })
     }
     #[inline]
-    fn to_pattern(&self) -> syn::Pat {
-        syn::Pat::Lit(syn::ExprLit {
+    fn to_pattern(&self) -> Pat {
+        Pat::Lit(ExprLit {
             attrs: vec![],
-            lit: syn::Lit::Byte(syn::LitByte::new(*self, Span::call_site())),
+            lit: Lit::Byte(LitByte::new(*self, Span::call_site())),
         })
     }
     #[inline]
-    fn to_type() -> syn::Type {
-        syn::Type::Path(syn::TypePath {
+    fn to_type() -> Type {
+        Type::Path(TypePath {
             qself: None,
-            path: syn::Path {
+            path: Path {
                 leading_colon: None,
-                segments: core::iter::once(syn::PathSegment {
+                segments: once(PathSegment {
                     ident: syn::Ident::new("u8", Span::call_site()),
-                    arguments: syn::PathArguments::None,
+                    arguments: PathArguments::None,
                 })
                 .collect(),
             },

@@ -7,8 +7,12 @@
 //! Operations on NFAs.
 
 use crate::{nfa, Parser as Nfa};
+use core::{
+    iter::once,
+    ops::{Add, AddAssign, BitOr, Shr},
+};
 
-impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
+impl<I: Clone + Ord> AddAssign<usize> for nfa::State<I> {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
         // TODO: We can totally use unsafe here since the order doesn't change
@@ -17,8 +21,8 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
             .iter()
             .map(|x| x.checked_add(rhs).expect("Huge number of states"))
             .collect();
-        for &mut (ref mut set, _fn_name) in &mut self.non_epsilon.values_mut() {
-            *set = set
+        for &mut nfa::Transition { ref mut dsts, .. } in &mut self.non_epsilon.values_mut() {
+            *dsts = dsts
                 .iter()
                 .map(|&x| x.checked_add(rhs).expect("Huge number of states"))
                 .collect();
@@ -26,7 +30,7 @@ impl<I: Clone + Ord> core::ops::AddAssign<usize> for nfa::State<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
+impl<I: Clone + Ord> BitOr for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -45,7 +49,7 @@ impl<I: Clone + Ord> core::ops::BitOr for Nfa<I> {
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I> {
+impl<I: Clone + Ord> Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -64,7 +68,15 @@ impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I
                 state.non_epsilon.extend(
                     incr_initial
                         .clone()
-                        .map(|i| (token.clone(), (core::iter::once(i).collect(), fn_name)))
+                        .map(|i| {
+                            (
+                                token.clone(),
+                                nfa::Transition {
+                                    dsts: once(i).collect(),
+                                    call: fn_name,
+                                },
+                            )
+                        })
                         .clone(),
                 );
             }
@@ -74,7 +86,7 @@ impl<I: Clone + Ord> core::ops::Shr<(I, Option<&'static str>, Nfa<I>)> for Nfa<I
     }
 }
 
-impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
+impl<I: Clone + Ord> Shr for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -98,7 +110,7 @@ impl<I: Clone + Ord> core::ops::Shr for Nfa<I> {
     }
 }
 
-impl core::ops::Add for Nfa<char> {
+impl Add for Nfa<char> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]

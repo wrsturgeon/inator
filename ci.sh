@@ -13,10 +13,10 @@ cargo clippy --all-targets --all-features
 export MIRIFLAGS=-Zmiri-backtrace=1
 export RUST_BACKTRACE=1
 
-if [ -d examples ]
-then
-  ls examples | xargs -n 1 ./ci-example.sh
-fi
+for dir in $(ls examples)
+do
+  ./ci-example.sh $dir
+done
 
 cargo +nightly miri test --no-default-features
 cargo +nightly miri test --no-default-features --examples

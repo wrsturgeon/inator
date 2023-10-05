@@ -7,7 +7,8 @@
 //! Infinite iterators over inputs guaranteed to be accepted by a given automaton.
 
 use crate::Compiled as Dfa;
-use rand::Rng;
+use core::fmt;
+use rand::{rngs::ThreadRng, Rng};
 
 /// Infinite iterator over inputs guaranteed to be accepted by a given automaton.
 #[derive(Clone, Debug)]
@@ -15,7 +16,7 @@ pub struct Fuzzer<I: Clone + Ord> {
     /// Reversed automaton.
     dfa: Dfa<I>,
     /// Random number generator.
-    rng: rand::rngs::ThreadRng,
+    rng: ThreadRng,
 }
 
 /// Tried to fuzz an automaton that never accepts any input.
@@ -46,7 +47,7 @@ impl<I: Clone + Ord> Iterator for Fuzzer<I> {
                     .keys()
                     .nth(self.rng.gen_range(0..state.transitions.len())));
                 v.push(key.clone());
-                index = unwrap!(state.transitions.get(key)).0;
+                index = unwrap!(state.transitions.get(key)).dst;
             }
         }
     }
@@ -69,9 +70,9 @@ impl<I: Clone + Ord> Fuzzer<I> {
     }
 }
 
-impl core::fmt::Display for NeverAccepts {
+impl fmt::Display for NeverAccepts {
     #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Tried to fuzz an automaton that never accepts any input."
