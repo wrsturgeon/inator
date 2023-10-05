@@ -15,7 +15,7 @@ export RUST_BACKTRACE=1
 
 for dir in $(ls examples)
 do
-  ./ci-example.sh $dir
+  ./local-ci.sh $dir
 done
 
 cargo +nightly miri test --no-default-features

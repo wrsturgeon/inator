@@ -105,6 +105,7 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
 /// Map which _subsets_ of states transition to which _subsets_ of states.
 /// Return the expansion of the original `queue` argument after taking all epsilon transitions.
 #[inline]
+#[allow(unused_mut)] // <-- FIXME
 fn traverse<I: Clone + Ord + Debug>(
     nfa: &Nfa<I>,
     queue: Vec<usize>,
@@ -132,9 +133,12 @@ fn traverse<I: Clone + Ord + Debug>(
             .any(|&nfa::State { accepting, .. }| accepting),
     });
 
-    // Calculate the next superposition of states WITHOUT EPSILON TRANSITIONS YET
+    // Calculate all non-epsilon transitions out of this *subset* of states,
+    // converted into transitions out of a *single* DFA state.
     let mut transitions = Transitions::<I>::new();
+    // For each state we're currently inhabiting,...
     for state in subset {
+        // ... for each non-epsilon transition out of that state...
         for (
             token,
             &nfa::Transition {
@@ -143,54 +147,43 @@ fn traverse<I: Clone + Ord + Debug>(
             },
         ) in &state.non_epsilon
         {
+            // ... check if we already have any other transitions on that token.
             match transitions.entry(token.clone()) {
+                // If we don't, ...
                 Entry::Vacant(entry) => {
+                    // ... construct the input string that would reach here, ...
                     let mut breadcrumbs = so_far.clone();
                     breadcrumbs.push(token.clone());
+                    // ... and insert a new transition.
                     let _ = entry.insert(Transition {
                         dsts: map.clone(),
                         call: fn_name,
                         breadcrumbs,
                     });
                 }
+                // If we already have a transition on this token, ...
                 Entry::Occupied(entry) => {
+                    // ... check what we have so far.
+                    #[allow(unused_variables)] // <-- FIXME
                     let &mut Transition {
                         ref mut dsts,
                         ref mut call,
                         ref mut breadcrumbs,
                     } = entry.into_mut();
-                    assert_eq!(
-                        fn_name,
-                        *call,
-                        "Parsing ambiguity after [{}] / [{}]: {token:?} can't decide between {} and {}",
-                        {
-                            // let mut v = nfa.backtrack(queue.iter().copied().collect());
-                            breadcrumbs.pop().map_or_else(
-                                String::new,
-                                |last| {
-                                    breadcrumbs
-                                        .iter()
-                                        .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
-                                        + &format!("{last:?}")
-                                }
-                            )
-                        },
-                        {
-                            // let mut v = nfa.backtrack(queue.iter().copied().collect());
-                            so_far.pop().map_or_else(
-                                String::new,
-                                |last| {
-                                    so_far
-                                        .into_iter()
-                                        .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
-                                        + &format!("{last:?}")
-                                }
-                            )
-                        },
-                        fn_name.map_or_else(|| "ignoring".to_owned(), |f| format!("calling {f}")),
-                        call.map_or_else(|| "ignoring".to_owned(), |f| format!("calling {f}")),
-                    );
-                    dsts.extend(map.iter().copied());
+                    // If the function we want to call happens to be the same, ...
+                    #[allow(clippy::todo)] // <- FIXME
+                    if fn_name == *call {
+                        // ... just take the set-union of this state's destinations and the existing ones.
+                        dsts.extend(map.iter().copied());
+                    }
+                    // If we're trying to call two different functions on the same input, ...
+                    else {
+                        // ... make sure the functions don't use this exact input token, ...
+                        todo!();
+                        // assert!(!fn_name.uses_token(), "MESSAGE TODO");
+                        // assert!(!call.uses_token(), "MESSAGE TODO");
+                        // postpone();
+                    }
                 }
             }
         }
