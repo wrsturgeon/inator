@@ -145,6 +145,7 @@ macro_rules! get_mut {
 // TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
 
 mod brzozowski;
+mod call;
 mod dfa;
 mod expr;
 mod fuzz;
@@ -180,7 +181,13 @@ pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
 #[must_use]
 #[inline(always)]
 pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
-    Parser::unit(token, Some(fn_name))
+    Parser::unit(
+        token,
+        Some(call::Call {
+            name: fn_name,
+            takes_arg: false,
+        }),
+    )
 }
 
 /// Accept this sequence of tokens if we see it here, then call this user-defined function on it.

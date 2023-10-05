@@ -58,11 +58,3 @@ pub fn roundtrip(g: &mut quickcheck::Gen) {
     println!("\"{input}\" -> {parsed:?}");
     assert_eq!(parsed, v.into_iter().map(char::from).collect::<Vec<_>>());
 }
-
-// quickcheck::quickcheck! {
-//     fn prop_roundtrip(v: Vec<Alphabet>) -> bool {
-//         let input = mk_input(&v);
-//         let parsed = crate::parse(input.chars()).unwrap();
-//         parsed.into_iter().eq(v.into_iter().map(char::from))
-//     }
-// }

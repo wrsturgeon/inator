@@ -6,7 +6,7 @@
 
 //! Deterministic finite automata.
 
-use crate::{nfa, Expression};
+use crate::{call::Call, nfa, Expression};
 use core::{
     cmp::{Ordering, Reverse},
     fmt::{self, Debug, Display},
@@ -40,16 +40,13 @@ type Subset = BTreeSet<usize>;
 /// From a single state, all tokens and the transitions each would induce.
 type Transitions<I> = BTreeMap<I, Transition>;
 
-/// Function (or none) to call on an edge.
-type Call = Option<&'static str>;
-
 /// A single edge triggered by a token.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Transition {
+pub(crate) struct Transition {
     /// Destination state.
     pub(crate) dst: usize,
     /// Function (or none) to call on this edge.
-    pub(crate) call: Call,
+    pub(crate) call: Option<Call>,
 }
 
 /// Deterministic finite automata.
@@ -930,7 +927,7 @@ fn invert<K: Ord, V: Ord>(map: &BTreeMap<K, V>) -> BTreeMap<&V, BTreeSet<&K>> {
 impl<I: Clone + Ord> State<I> {
     /// State to which this state can transition on a given input.
     #[inline]
-    pub fn transition(&self, input: &I) -> Option<&Transition> {
+    pub(crate) fn transition(&self, input: &I) -> Option<&Transition> {
         self.transitions.get(input)
     }
 
@@ -1190,11 +1187,11 @@ impl<I: Clone + Ord> State<I> {
                                                         func: Box::new(Expr::Path(ExprPath {
                                                             attrs: vec![],
                                                             qself: None,
-                                                            path: config_path(name, f),
+                                                            path: config_path(name, f.name),
                                                         })),
                                                         paren_token: Paren::default(),
-                                                        args: [
-                                                            Expr::Path(ExprPath {
+                                                        args: {
+                                                            let mut e = vec![Expr::Path(ExprPath {
                                                                 attrs: vec![],
                                                                 qself: None,
                                                                 path: Path {
@@ -1209,26 +1206,27 @@ impl<I: Clone + Ord> State<I> {
                                                                     })
                                                                     .collect(),
                                                                 },
-                                                            }),
-                                                            Expr::Path(ExprPath {
-                                                                attrs: vec![],
-                                                                qself: None,
-                                                                path: Path {
-                                                                    leading_colon: None,
-                                                                    segments: once(PathSegment {
-                                                                        ident: Ident::new(
-                                                                            "token",
-                                                                            Span::call_site(),
-                                                                        ),
-                                                                        arguments:
-                                                                            PathArguments::None,
-                                                                    })
-                                                                    .collect(),
-                                                                },
-                                                            }),
-                                                        ]
-                                                        .into_iter()
-                                                        .collect(),
+                                                            })];
+                                                            if f.takes_arg {
+                                                                e.push(Expr::Path(ExprPath {
+                                                                    attrs: vec![],
+                                                                    qself: None,
+                                                                    path: Path {
+                                                                        leading_colon: None,
+                                                                        segments: once(PathSegment {
+                                                                            ident: Ident::new(
+                                                                                "token",
+                                                                                Span::call_site(),
+                                                                            ),
+                                                                            arguments:
+                                                                                PathArguments::None,
+                                                                        })
+                                                                        .collect(),
+                                                                    },
+                                                                }));
+                                                            }
+                                                            e.into_iter().collect()
+                                                        },
                                                     })
                                                 },
                                             ),

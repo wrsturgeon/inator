@@ -6,9 +6,8 @@
 
 //! Nondeterministic finite automata with epsilon transitions.
 
-use crate::Expression;
+use crate::{call::Call, Expression};
 use core::{
-    borrow::Borrow,
     fmt::{self, Debug, Display},
     iter::once,
     slice::Iter,
@@ -17,6 +16,9 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     vec::IntoIter,
 };
+
+#[cfg(test)]
+use core::borrow::Borrow;
 
 #[cfg(feature = "quickcheck")]
 use quickcheck::*;
@@ -27,16 +29,13 @@ type Subset = BTreeSet<usize>;
 /// From a single state, all tokens and the transitions each would induce.
 type Transitions<I> = BTreeMap<I, Transition>;
 
-/// Function (or none) to call on an edge.
-type Call = Option<&'static str>;
-
 /// A single edge triggered by a token.
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Transition {
+pub(crate) struct Transition {
     /// Set of destination states.
     pub(crate) dsts: Subset,
     /// Function (or none) to call on this edge.
-    pub(crate) call: Call,
+    pub(crate) call: Option<Call>,
 }
 
 /// Nondeterministic finite automata with epsilon transitions.
@@ -107,7 +106,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// NFA with zero states.
     #[inline]
     #[must_use]
-    pub fn void() -> Self {
+    pub(crate) fn void() -> Self {
         Self {
             states: vec![],
             initial: Subset::new(),
@@ -117,7 +116,7 @@ impl<I: Clone + Ord> Graph<I> {
     /// NFA accepting only the empty string.
     #[inline]
     #[must_use]
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             states: vec![State {
                 epsilon: Subset::new(),
@@ -132,15 +131,15 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::arithmetic_side_effects)]
-    pub fn unit(singleton: I, fn_name: Option<&'static str>) -> Self {
-        Self::empty() >> (singleton, fn_name, Self::empty())
+    pub(crate) fn unit(singleton: I, call: Option<Call>) -> Self {
+        Self::empty() >> (singleton, call, Self::empty())
     }
 
     /// Take every transition that doesn't require input.
     #[inline]
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
-    pub fn take_all_epsilon_transitions(&self, mut queue: Vec<usize>) -> Subset {
+    pub(crate) fn take_all_epsilon_transitions(&self, mut queue: Vec<usize>) -> Subset {
         // Take all epsilon transitions immediately
         let mut superposition = Subset::new();
         while let Some(state) = queue.pop() {
@@ -157,27 +156,23 @@ impl<I: Clone + Ord> Graph<I> {
     /// Step through each input token one at a time.
     #[inline]
     #[must_use]
-    pub fn step(&self) -> Stepper<'_, I> {
+    #[cfg(test)]
+    pub(crate) fn step(&self) -> Stepper<'_, I> {
         Stepper::new(self)
     }
 
     /// Decide whether an input belongs to the regular langage this NFA accepts.
     #[inline]
     #[must_use]
+    #[cfg(test)]
     #[allow(clippy::missing_panics_doc)]
-    pub fn accept<Iter: IntoIterator>(&self, iter: Iter) -> bool
+    pub(crate) fn accept<Iter: IntoIterator>(&self, iter: Iter) -> bool
     where
         Iter::Item: Borrow<I>,
     {
         let mut stepper = self.step();
         stepper.extend(iter);
         stepper.currently_accepting()
-    }
-
-    /// Decide whether an input belongs to the regular langage this NFA accepts.
-    #[inline(always)]
-    pub fn reject<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
-        !self.accept(iter)
     }
 
     /// Number of states.
@@ -192,74 +187,12 @@ impl<I: Clone + Ord> Graph<I> {
     /// # Errors
     /// If this automaton never accepts any input.
     #[inline]
-    pub fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
+    pub(crate) fn fuzz(&self) -> Result<crate::Fuzzer<I>, crate::NeverAccepts>
     where
         I: Debug,
     {
         crate::Fuzzer::try_from_reversed(self.reverse().compile())
     }
-
-    /// Check if there exists a string this DFA will accept.
-    #[inline]
-    #[must_use]
-    pub fn would_ever_accept(&self) -> bool {
-        self.states.iter().any(|state| state.accepting) && !self.initial.is_empty()
-    }
-
-    // /// Find the minimal input that reaches this state.
-    // /// Like Dijkstra's but optimized to leverage that each edge is 1 unit long
-    // #[inline]
-    // #[must_use]
-    // #[allow(clippy::panic_in_result_fn, clippy::unwrap_in_result)]
-    // pub(crate) fn dijkstra(&self, initial: Subset, endpoint: Subset) -> Vec<I> {
-    //     use crate::dfa::CmpFirst;
-    //     use core::cmp::Reverse;
-    //     use std::collections::{btree_map::Entry, BinaryHeap};
-
-    //     let mut cache = BTreeMap::new();
-    //     let mut queue = BinaryHeap::new();
-
-    //     drop(cache.insert(initial.clone(), vec![]));
-    //     queue.push(Reverse(CmpFirst(0_usize, initial)));
-
-    //     while let Some(Reverse(CmpFirst(distance, indices))) = queue.pop() {
-    //         let cached = unwrap!(cache.get(&indices)).clone(); // TODO: look into `Cow`
-    //         if indices == endpoint {
-    //             return cached;
-    //         }
-    //         let subset = self.take_all_epsilon_transitions(indices.into_iter().collect());
-    //         if subset == endpoint {
-    //             return cached;
-    //         }
-    //         let states = subset.into_iter().map(|i| get!(self.states, i));
-    //         for (token, &(ref pre_eps, _fn_name)) in states.flat_map(|state| &state.non_epsilon) {
-    //             let next = self.take_all_epsilon_transitions(pre_eps.iter().copied().collect());
-    //             if let Entry::Vacant(entry) = cache.entry(next.clone()) {
-    //                 entry.insert(cached.clone()).push(token.clone());
-    //                 queue.push(Reverse(CmpFirst(distance.saturating_add(1), next.clone())));
-    //             }
-    //         }
-    //     }
-
-    //     #[allow(clippy::unreachable)]
-    //     #[cfg(any(test, debug_assertions))]
-    //     {
-    //         unreachable!()
-    //     }
-
-    //     #[allow(unsafe_code)]
-    //     #[cfg(not(any(test, debug_assertions)))]
-    //     unsafe {
-    //         core::hint::unreachable_unchecked()
-    //     }
-    // }
-
-    // /// Find the minimal input that reaches this state.
-    // #[inline]
-    // #[must_use]
-    // pub(crate) fn backtrack(&self, endpoint: Subset) -> Vec<I> {
-    //     self.dijkstra(self.initial.clone(), endpoint)
-    // }
 
     /// Match at least one time, then as many times as we want.
     /// Note that if ANY number of times leads to an accepting state, we take it!
@@ -287,6 +220,15 @@ impl<I: Clone + Ord> Graph<I> {
     #[must_use]
     pub fn star(&self) -> Self {
         self.repeat().optional()
+    }
+}
+
+impl<I: Clone + Ord> State<I> {
+    /// Set of states to which this state can transition on a given input.
+    #[inline]
+    #[cfg(test)]
+    pub(crate) fn transition(&self, input: &I) -> Option<&Transition> {
+        self.non_epsilon.get(input)
     }
 }
 
@@ -318,14 +260,6 @@ impl<I: Clone + Ord + Expression> Display for State<I> {
             writeln!(f, "    {input:?} --> {dsts:?} >>= {call:?}")?;
         }
         Ok(())
-    }
-}
-
-impl<I: Clone + Ord> State<I> {
-    /// Set of states to which this state can transition on a given input.
-    #[inline]
-    pub fn transition(&self, input: &I) -> Option<&Transition> {
-        self.non_epsilon.get(input)
     }
 }
 
@@ -411,14 +345,16 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
 }
 
 /// Step through an automaton one token at a time.
+#[cfg(test)]
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Stepper<'graph, I: Clone + Ord> {
+pub(crate) struct Stepper<'graph, I: Clone + Ord> {
     /// The graph we're riding.
     graph: &'graph Graph<I>,
     /// Current state after the input we've received so far.
     state: Subset,
 }
 
+#[cfg(test)]
 impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     /// Start from the empty string on a certain automaton.
     #[inline]
@@ -454,6 +390,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     }
 }
 
+#[cfg(test)]
 impl<I: Clone + Ord, B: Borrow<I>> Extend<B> for Stepper<'_, I> {
     #[inline]
     fn extend<T: IntoIterator<Item = B>>(&mut self, iter: T) {

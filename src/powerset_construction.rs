@@ -7,7 +7,7 @@
 //! The powerset construction algorithm for constructing an equivalent DFA from an arbitrary NFA.
 //! Also known as the subset construction algorithm.
 
-use crate::{dfa, nfa, Compiled as Dfa, Parser as Nfa};
+use crate::{call::Call, dfa, nfa, Compiled as Dfa, Parser as Nfa};
 use core::fmt::Debug;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
@@ -17,16 +17,13 @@ type Subset = BTreeSet<usize>;
 /// From a single state, all tokens and the transitions each would induce.
 type Transitions<I> = BTreeMap<I, Transition<I>>;
 
-/// Function (or none) to call on an edge.
-type Call = Option<&'static str>;
-
 /// A single edge triggered by a token.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Transition<I> {
     /// Set of destination states.
     dsts: Subset,
     /// Function (or none) to call on this edge.
-    call: Call,
+    call: Option<Call>,
     /// Minimal reproducible input string to reach this transition.
     breadcrumbs: Vec<I>,
 }
