@@ -6,6 +6,8 @@
 
 //! Nondeterministic finite automata with epsilon transitions.
 
+#![cfg_attr(test, allow(dead_code))] // <-- FIXME
+
 use crate::{call::Call, Expression};
 use core::{
     fmt::{self, Debug, Display},
@@ -221,6 +223,17 @@ impl<I: Clone + Ord> Graph<I> {
     pub fn star(&self) -> Self {
         self.repeat().optional()
     }
+
+    /// Remove all calls (set them to `None`).
+    #[inline]
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self {
+            states: self.states.into_iter().map(State::remove_calls).collect(),
+            ..self
+        }
+    }
 }
 
 impl<I: Clone + Ord> State<I> {
@@ -256,10 +269,37 @@ impl<I: Clone + Ord + Expression> Display for State<I> {
         if !self.epsilon.is_empty() {
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
         }
-        for (input, &Transition { ref dsts, call }) in &self.non_epsilon {
+        for (input, &Transition { ref dsts, ref call }) in &self.non_epsilon {
             writeln!(f, "    {input:?} --> {dsts:?} >>= {call:?}")?;
         }
         Ok(())
+    }
+}
+
+impl<I: Clone + Ord> State<I> {
+    /// Remove all calls (set them to `None`).
+    #[inline]
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self {
+            non_epsilon: self
+                .non_epsilon
+                .into_iter()
+                .map(|(token, transition)| (token, transition.remove_calls()))
+                .collect(),
+            ..self
+        }
+    }
+}
+
+impl Transition {
+    /// Remove all calls (set them to `None`).
+    #[inline]
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self { call: None, ..self }
     }
 }
 
@@ -299,7 +339,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
                         k,
                         Transition {
                             dsts: v,
-                            call: None,
+                            call: Arbitrary::arbitrary(g),
                         },
                     )
                 })
@@ -315,7 +355,9 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
                 self.epsilon.clone(),
                 self.non_epsilon
                     .iter()
-                    .map(|(token, &Transition { ref dsts, .. })| (token.clone(), dsts.clone()))
+                    .map(|(token, &Transition { ref dsts, ref call })| {
+                        (token.clone(), (dsts.clone(), call.clone()))
+                    })
                     .collect::<BTreeMap<_, _>>(),
                 self.accepting,
             )
@@ -324,7 +366,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
                     epsilon,
                     non_epsilon: non_epsilon
                         .into_iter()
-                        .map(|(dst, dsts)| (dst, Transition { dsts, call: None }))
+                        .map(|(dst, (dsts, call))| (dst, Transition { dsts, call }))
                         .collect(),
                     accepting,
                 }),

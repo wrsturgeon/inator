@@ -6,6 +6,8 @@
 
 //! Deterministic finite automata.
 
+#![cfg_attr(test, allow(dead_code))] // <-- FIXME
+
 use crate::{call::Call, nfa, Expression};
 use core::{
     cmp::{Ordering, Reverse},
@@ -41,7 +43,7 @@ type Subset = BTreeSet<usize>;
 type Transitions<I> = BTreeMap<I, Transition>;
 
 /// A single edge triggered by a token.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct Transition {
     /// Destination state.
     pub(crate) dst: usize,
@@ -95,6 +97,17 @@ impl<I: Clone + Ord> Graph<I> {
         self.states.len()
     }
 
+    /// Remove all calls (set them to `None`).
+    #[inline]
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self {
+            states: self.states.into_iter().map(State::remove_calls).collect(),
+            ..self
+        }
+    }
+
     /// Generalize to an identical NFA.
     #[inline]
     #[must_use]
@@ -108,12 +121,12 @@ impl<I: Clone + Ord> Graph<I> {
                     non_epsilon: state
                         .transitions
                         .iter()
-                        .map(|(token, &Transition { dst, call })| {
+                        .map(|(token, &Transition { dst, ref call })| {
                             (
                                 token.clone(),
                                 nfa::Transition {
                                     dsts: once(dst).collect(),
-                                    call,
+                                    call: call.clone(),
                                 },
                             )
                         })
@@ -870,7 +883,7 @@ impl<I: Clone + Ord + Expression> Display for State<I> {
             "({}accepting):",
             if self.accepting { "" } else { "NOT " }
         )?;
-        for (input, &Transition { dst, call }) in &self.transitions {
+        for (input, &Transition { dst, ref call }) in &self.transitions {
             writeln!(f, "    {input:?} --> {dst} >>= {call:?}")?;
         }
         Ok(())
@@ -929,6 +942,21 @@ impl<I: Clone + Ord> State<I> {
     #[inline]
     pub(crate) fn transition(&self, input: &I) -> Option<&Transition> {
         self.transitions.get(input)
+    }
+
+    /// Remove all calls (set them to `None`).
+    #[inline]
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self {
+            transitions: self
+                .transitions
+                .into_iter()
+                .map(|(token, transition)| (token, transition.remove_calls()))
+                .collect(),
+            ..self
+        }
     }
 
     /// Print as a Rust source-code function.
@@ -1094,7 +1122,14 @@ impl<I: Clone + Ord> State<I> {
                         brace_token: Brace::default(),
                         arms: {
                             let mut v = vec![];
-                            for (&&Transition { dst, call: fn_name }, inputs) in &inverted {
+                            for (
+                                &&Transition {
+                                    dst,
+                                    call: ref fn_name,
+                                },
+                                inputs,
+                            ) in &inverted
+                            {
                                 let sdst = format!("s{dst}");
                                 v.push(syn::Arm {
                                     attrs: vec![],
@@ -1163,7 +1198,7 @@ impl<I: Clone + Ord> State<I> {
                                                     .collect(),
                                                 },
                                             }),
-                                            fn_name.map_or_else(
+                                            fn_name.as_ref().map_or_else(
                                                 || {
                                                     Expr::Path(ExprPath {
                                                         attrs: vec![],
@@ -1187,11 +1222,11 @@ impl<I: Clone + Ord> State<I> {
                                                         func: Box::new(Expr::Path(ExprPath {
                                                             attrs: vec![],
                                                             qself: None,
-                                                            path: config_path(name, f.name),
+                                                            path: config_path(name, &f.name),
                                                         })),
                                                         paren_token: Paren::default(),
-                                                        args: {
-                                                            let mut e = vec![Expr::Path(ExprPath {
+                                                        args: [
+                                                            Expr::Path(ExprPath {
                                                                 attrs: vec![],
                                                                 qself: None,
                                                                 path: Path {
@@ -1206,27 +1241,26 @@ impl<I: Clone + Ord> State<I> {
                                                                     })
                                                                     .collect(),
                                                                 },
-                                                            })];
-                                                            if f.takes_arg {
-                                                                e.push(Expr::Path(ExprPath {
-                                                                    attrs: vec![],
-                                                                    qself: None,
-                                                                    path: Path {
-                                                                        leading_colon: None,
-                                                                        segments: once(PathSegment {
-                                                                            ident: Ident::new(
-                                                                                "token",
-                                                                                Span::call_site(),
-                                                                            ),
-                                                                            arguments:
-                                                                                PathArguments::None,
-                                                                        })
-                                                                        .collect(),
-                                                                    },
-                                                                }));
-                                                            }
-                                                            e.into_iter().collect()
-                                                        },
+                                                            }),
+                                                            Expr::Path(ExprPath {
+                                                                attrs: vec![],
+                                                                qself: None,
+                                                                path: Path {
+                                                                    leading_colon: None,
+                                                                    segments: once(PathSegment {
+                                                                        ident: Ident::new(
+                                                                            "token",
+                                                                            Span::call_site(),
+                                                                        ),
+                                                                        arguments:
+                                                                            PathArguments::None,
+                                                                    })
+                                                                    .collect(),
+                                                                },
+                                                            }),
+                                                        ]
+                                                        .into_iter()
+                                                        .collect(),
                                                     })
                                                 },
                                             ),
@@ -1802,6 +1836,16 @@ fn fuzz_stmts<E: Expression>(token: &E, dst: usize) -> Vec<Stmt> {
     ]
 }
 
+impl Transition {
+    /// Remove all calls (set them to `None`).
+    #[inline]
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self { call: None, ..self }
+    }
+}
+
 #[cfg(feature = "quickcheck")]
 impl<I: Ord + Arbitrary> Arbitrary for Graph<I> {
     #[inline]
@@ -1842,7 +1886,15 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
         Self {
             transitions: BTreeMap::arbitrary(g)
                 .into_iter()
-                .map(|(k, v)| (k, Transition { dst: v, call: None }))
+                .map(|(k, v)| {
+                    (
+                        k,
+                        Transition {
+                            dst: v,
+                            call: Arbitrary::arbitrary(g),
+                        },
+                    )
+                })
                 .collect(),
             accepting: Arbitrary::arbitrary(g),
         }
@@ -1854,7 +1906,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
             (
                 self.transitions
                     .iter()
-                    .map(|(k, &Transition { dst, .. })| (k.clone(), dst))
+                    .map(|(k, &Transition { dst, ref call })| (k.clone(), dst, call.clone()))
                     .collect::<Vec<_>>(),
                 self.accepting,
             )
@@ -1862,7 +1914,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
                 .map(|(transitions, accepting)| Self {
                     transitions: transitions
                         .into_iter()
-                        .map(|(k, v)| (k, Transition { dst: v, call: None }))
+                        .map(|(token, dst, call)| (token, Transition { dst, call }))
                         .collect(),
                     accepting,
                 }),

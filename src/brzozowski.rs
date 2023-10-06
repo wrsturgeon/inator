@@ -36,7 +36,7 @@ impl<I: Clone + Ord> Nfa<I> {
                 token,
                 &nfa::Transition {
                     dsts: ref set,
-                    call,
+                    ref call,
                 },
             ) in &state.non_epsilon
             {
@@ -45,15 +45,15 @@ impl<I: Clone + Ord> Nfa<I> {
                         Entry::Vacant(entry) => {
                             let _ = entry.insert(nfa::Transition {
                                 dsts: once(src).collect(),
-                                call,
+                                call: call.clone(),
                             });
                         }
                         Entry::Occupied(entry) => {
                             let &mut nfa::Transition {
                                 dsts: ref mut mut_set,
-                                call: existing_fn_name,
+                                call: ref existing_fn_name,
                             } = entry.into_mut();
-                            assert_eq!(call, existing_fn_name, "MESSAGE TODO");
+                            assert_eq!(*call, *existing_fn_name, "MESSAGE TODO");
                             let _ = mut_set.insert(src);
                         }
                     }
@@ -77,10 +77,27 @@ impl<I: Clone + Ord> Nfa<I> {
     where
         I: Debug,
     {
-        let rev = self.reverse();
+        /// Print if and only if we're debugging or testing.
+        #[cfg(any(test, debug_assertions))]
+        macro_rules! dbg_print {
+            ($($arg:tt)*) => {
+                println!($($arg)*)
+            };
+        }
+        /// Print if and only if we're debugging or testing.
+        #[cfg(not(any(test, debug_assertions)))]
+        macro_rules! dbg_print {
+            ($($arg:tt)*) => {};
+        }
+        dbg_print!("Brzozowski: powerset construction (1st time)...");
+        let dfa = self.subsets();
+        dbg_print!("Brzozowski: reversing (1st time)...");
+        let rev = dfa.generalize().reverse();
+        dbg_print!("Brzozowski: powerset construction (2nd time)...");
         let halfway = rev.subsets();
-        let nfa = halfway.generalize();
-        let revrev = nfa.reverse();
+        dbg_print!("Brzozowski: reversing (2nd time)...");
+        let revrev = halfway.generalize().reverse();
+        dbg_print!("Brzozowski: powerset construction (3rd time)...");
         revrev.subsets()
     }
 }

@@ -180,29 +180,30 @@ pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
-pub fn on<I: Clone + Ord>(token: I, fn_name: &'static str) -> Parser<I> {
+pub fn on<I: Clone + Ord>(token: I, fn_name: &str) -> Parser<I> {
     Parser::unit(
         token,
         Some(call::Call {
-            name: fn_name,
+            name: fn_name.to_owned(),
             takes_arg: false,
         }),
     )
 }
 
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// TODO: reinstate calls as taking arguments or not,
+// then postpone these only as far as necessary to resolve conflicts.
+// see how the below (`on_seq`) front-loads the function call:
+// it should be the minimal number of tokens deep to be unambiguous
+
 /// Accept this sequence of tokens if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(
-    tokens: II,
-    fn_name: &'static str,
-) -> Parser<I> {
-    let mut v: Vec<_> = tokens.into_iter().collect();
-    let Some(last) = v.pop() else {
-        return empty();
-    };
-    seq(v.into_iter().map(|token| ignore(token))) >> on(last, fn_name)
+pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II, fn_name: &str) -> Parser<I> {
+    let mut iter = tokens.into_iter();
+    iter.next()
+        .map_or_else(empty, |first| on(first, fn_name) >> seq(iter.map(ignore)))
 }
 
 /// Accept either this token or nothing.
@@ -251,7 +252,5 @@ pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II)
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
 pub fn seq<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(in_order: II) -> Parser<I> {
-    in_order
-        .into_iter()
-        .fold(Parser::empty(), |acc, p| acc >> p)
+    in_order.into_iter().fold(empty(), |acc, p| acc >> p)
 }

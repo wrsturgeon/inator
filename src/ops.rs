@@ -73,7 +73,7 @@ impl<I: Clone + Ord> Shr<(I, Option<Call>, Nfa<I>)> for Nfa<I> {
                                 token.clone(),
                                 nfa::Transition {
                                     dsts: once(i).collect(),
-                                    call: fn_name,
+                                    call: fn_name.clone(),
                                 },
                             )
                         })

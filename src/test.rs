@@ -7,11 +7,14 @@
 #![allow(clippy::print_stdout, clippy::unwrap_used, clippy::use_debug)]
 
 use crate::{Compiled as Dfa, Parser as Nfa, *};
-use core::iter::once;
-use std::collections::{BTreeMap, BTreeSet};
+use core::{fmt::Debug, iter::once, panic::RefUnwindSafe};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    panic,
+};
 
 #[cfg(feature = "quickcheck")]
-use core::cmp::Ordering;
+use {core::cmp::Ordering, quickcheck::*};
 
 mod unit {
     use super::*;
@@ -74,37 +77,51 @@ mod unit {
 
     #[test]
     #[should_panic]
-    fn ambiguity() {
+    fn ambiguity_simple() {
+        let parser = on('a', "a") | on('a', "b");
+        drop(parser.compile());
+    }
+
+    #[test]
+    #[should_panic]
+    fn ambiguity_one_call_before_another() {
         let parser =
             (ignore('a') >> on('a', "aa")) | (ignore('a') >> ignore('a') >> on('b', "aab"));
         drop(parser.compile());
     }
+
+    #[test]
+    fn ambiguity_but_not_really_just_postpone_it() {
+        let parser = (on('a', "aa") >> ignore('a')) | (on('a', "ab") >> ignore('b'));
+        drop(parser.compile());
+    }
 }
 
+#[cfg(feature = "quickcheck")]
 mod prop {
-    #[allow(unused_imports)]
     use super::*;
 
-    #[cfg(feature = "quickcheck")]
-    quickcheck::quickcheck! {
-        fn nfa_dfa_equal(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+    // Tests that have worked in the past:
+    quickcheck! {
+        fn nfa_dfa_equal(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> TestResult {
+            let nfa = nfa.remove_calls();
             if inputs.is_empty() {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             }
-            let dfa = nfa.clone().subsets();
-            quickcheck::TestResult::from_bool(
+            let dfa = nfa.subsets();
+            TestResult::from_bool(
                 inputs
                     .into_iter()
                     .all(|input| nfa.accept(input.iter().copied()) == dfa.accept(input)),
             )
         }
 
-        fn dfa_nfa_equal(dfa: Dfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn dfa_nfa_equal(dfa: Dfa<u8>, inputs: Vec<Vec<u8>>) -> TestResult {
             if inputs.is_empty() {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             }
             let nfa =dfa.generalize();
-            quickcheck::TestResult::from_bool(
+            TestResult::from_bool(
                 inputs
                     .into_iter()
                     .all(|input| dfa.accept(input.iter().copied()) == nfa.accept(input)),
@@ -112,7 +129,7 @@ mod prop {
         }
 
         fn nfa_dfa_one_and_a_half_roundtrip(nfa: Nfa<u8>) -> bool {
-            let dfa = nfa.subsets();
+            let dfa = nfa.remove_calls().subsets();
             dfa.generalize().subsets() == dfa
         }
 
@@ -121,70 +138,74 @@ mod prop {
             once.generalize().subsets() == once
         }
 
-        fn brzozowski(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn brzozowski(nfa: Nfa<u8>, inputs: Vec<Vec<u8>>) -> TestResult {
+            let nfa = nfa.remove_calls();
             if inputs.is_empty() {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             }
             let dfa = nfa.compile();
-            quickcheck::TestResult::from_bool(
+            TestResult::from_bool(
                 inputs
                     .into_iter()
                     .all(|input| nfa.accept(input.iter().copied()) == dfa.accept(input)),
             )
         }
 
-        fn brzozowski_reduces_size(dfa: Dfa<u8>) -> quickcheck::TestResult {
+        fn brzozowski_reduces_size(dfa: Dfa<u8>) -> TestResult {
+            let dfa = dfa.remove_calls();
             let orig_size = dfa.size();
             match dfa.generalize().compile().size().cmp(&orig_size) {
-                Ordering::Greater => quickcheck::TestResult::failed(),
-                Ordering::Equal => quickcheck::TestResult::discard(),
-                Ordering::Less => quickcheck::TestResult::passed(),
+                Ordering::Greater => TestResult::failed(),
+                Ordering::Equal => TestResult::discard(),
+                Ordering::Less => TestResult::passed(),
             }
         }
 
-        fn unit(singleton: u8, reject: Vec<u8>) -> quickcheck::TestResult {
+        fn unit(singleton: u8, reject: Vec<u8>) -> TestResult {
             let accept = vec![singleton];
             if reject == accept {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             }
             let nfa = Nfa::unit(singleton, None);
-            quickcheck::TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
+            TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
         }
 
-        fn bitor(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn bitor(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> TestResult {
             if inputs.is_empty() {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             }
             let fused = lhs.clone() | rhs.clone();
-            quickcheck::TestResult::from_bool(inputs.into_iter().all(|input| {
+            TestResult::from_bool(inputs.into_iter().all(|input| {
                 fused.accept(input.iter().copied())
                     == (lhs.accept(input.iter().copied()) || rhs.accept(input))
             }))
         }
 
         #[allow(clippy::arithmetic_side_effects)]
-        fn shr(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> quickcheck::TestResult {
+        fn shr(lhs: Nfa<u8>, rhs: Nfa<u8>, inputs: Vec<Vec<u8>>) -> TestResult {
             if inputs.is_empty() {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             }
             let fused = lhs.clone() >> rhs.clone();
-            quickcheck::TestResult::from_bool(
+            TestResult::from_bool(
                 inputs
                     .into_iter()
                     .all(|input| fused.accept(&input) == nfa::chain(&lhs, &rhs, &input)),
             )
         }
 
-        fn fuzz_roundtrip(nfa: Nfa<u8>) -> quickcheck::TestResult {
+        fn fuzz_roundtrip(nfa: Nfa<u8>) -> TestResult {
+            let nfa = nfa.remove_calls();
             nfa.fuzz()
-                .map_or(quickcheck::TestResult::discard(), |fuzz| {
-                    quickcheck::TestResult::from_bool(fuzz.take(100).all(|input| nfa.accept(input)))
+                .map_or(TestResult::discard(), |fuzz| {
+                    TestResult::from_bool(fuzz.take(100).all(|input| nfa.accept(input)))
                 })
         }
 
-        fn repeat_fuzz_chain(nfa: Nfa<u8>) -> quickcheck::TestResult {
+        fn repeat_fuzz_chain(nfa: Nfa<u8>) -> TestResult {
+            let nfa = nfa.remove_calls();
             let Ok(mut fuzzer) = nfa.fuzz() else {
-                return quickcheck::TestResult::discard();
+                return TestResult::discard();
             };
             let repeated = nfa.repeat();
             #[allow(clippy::default_numeric_fallback)]
@@ -192,13 +213,14 @@ mod prop {
                 let fst = fuzzer.next().unwrap();
                 let snd = fuzzer.next().unwrap();
                 if !repeated.accept(fst.into_iter().chain(snd)) {
-                    return quickcheck::TestResult::failed();
+                    return TestResult::failed();
                 }
             }
-            quickcheck::TestResult::passed()
+            TestResult::passed()
         }
 
         fn star_def_swap_eq(nfa: Nfa<u8>) -> bool {
+            let nfa = nfa.remove_calls();
             let lhs = nfa.repeat().optional();
             let rhs = nfa.optional().repeat();
             for (il, ir) in lhs.fuzz().unwrap().zip(rhs.fuzz().unwrap()).take(100) {
@@ -208,10 +230,13 @@ mod prop {
             true
         }
 
-        fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) -> quickcheck::TestResult {
-            let Ok(af) = a.fuzz() else { return quickcheck::TestResult::discard(); };
-            let Ok(bf) = b.fuzz() else { return quickcheck::TestResult::discard(); };
-            let Ok(cf) = c.fuzz() else { return quickcheck::TestResult::discard(); };
+        fn sandwich(a: Nfa<u8>, b: Nfa<u8>, c: Nfa<u8>) -> TestResult {
+            let a = a.remove_calls();
+            let b = b.remove_calls();
+            let c = c.remove_calls();
+            let Ok(af) = a.fuzz() else { return TestResult::discard(); };
+            let Ok(bf) = b.fuzz() else { return TestResult::discard(); };
+            let Ok(cf) = c.fuzz() else { return TestResult::discard(); };
             #[allow(clippy::arithmetic_side_effects)]
             let abc = a >> b.optional() >> c;
             #[allow(clippy::default_numeric_fallback)]
@@ -227,7 +252,16 @@ mod prop {
                     two valid inputs: {ai:?} & {ci:?}",
                 );
             }
-            quickcheck::TestResult::passed()
+            TestResult::passed()
+        }
+
+        fn unambiguous_forward_means_survive_reversal(nfa: Nfa<u8>) -> TestResult {
+            let Ok(dfa) = panic::catch_unwind(|| nfa.subsets()) else {
+                return TestResult::discard();
+            };
+            panic::catch_unwind(|| {
+                dfa.generalize().reverse().subsets()
+            }).map_or_else(|_| TestResult::failed(), |_| TestResult::passed())
         }
     }
 }
@@ -275,6 +309,20 @@ mod reduced {
             },
             if dfa_accepted { "accepted" } else { "did not" },
         );
+    }
+
+    /// For inputs like ("aa" | "ba"), where forward is fine but backward ("aa" | "ab") is temporarily ambiguous.
+    fn unambiguous_forward_means_survive_reversal<
+        I: Clone + Debug + Expression + Ord + RefUnwindSafe,
+    >(
+        nfa: &Nfa<I>,
+    ) {
+        let Ok(dfa) = panic::catch_unwind(|| nfa.subsets()) else {
+            return; // but be warned: this is just totally outside the realm of what we're testing
+        };
+        let reversed = dfa.generalize().reverse();
+        println!("{reversed}");
+        drop(reversed.subsets()); // can't panic
     }
 
     fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
@@ -648,6 +696,20 @@ mod reduced {
                 initial: once(0).collect(),
             },
             &[],
+        );
+    }
+
+    #[test]
+    fn unambiguous_forward_means_survive_reversal_actually_ambiguous_is_fine() {
+        unambiguous_forward_means_survive_reversal(
+            &(on_seq("a".chars(), "a") | on_seq("a".chars(), "b")),
+        );
+    }
+
+    #[test]
+    fn unambiguous_forward_means_survive_reversal_1() {
+        unambiguous_forward_means_survive_reversal(
+            &(on_seq("aa".chars(), "a") | on_seq("ba".chars(), "b")),
         );
     }
 }

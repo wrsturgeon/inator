@@ -43,11 +43,11 @@ type SubsetsAsStates<I> = BTreeMap<Subset, SubsetState<I>>;
 impl<I: Clone + Ord + Debug> Nfa<I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
-    pub(crate) fn subsets(self) -> Dfa<I> {
+    pub(crate) fn subsets(&self) -> Dfa<I> {
         // Map which _subsets_ of states transition to which _subsets_ of states
         let mut subsets_as_states = SubsetsAsStates::new();
         let initial_state = traverse(
-            &self,
+            self,
             self.initial.iter().copied().collect(),
             &mut subsets_as_states,
             vec![],
@@ -76,15 +76,22 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                 dfa::State {
                     transitions: transitions
                         .iter()
-                        .map(|(token, &Transition { ref dsts, call, .. })| {
-                            (
-                                token.clone(),
-                                dfa::Transition {
-                                    dst: unwrap!(ordered.binary_search(&dsts)),
-                                    call,
+                        .map(
+                            |(
+                                token,
+                                &Transition {
+                                    ref dsts, ref call, ..
                                 },
-                            )
-                        })
+                            )| {
+                                (
+                                    token.clone(),
+                                    dfa::Transition {
+                                        dst: unwrap!(ordered.binary_search(&dsts)),
+                                        call: call.clone(),
+                                    },
+                                )
+                            },
+                        )
                         .collect(),
                     accepting,
                 }
@@ -102,7 +109,8 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
 /// Map which _subsets_ of states transition to which _subsets_ of states.
 /// Return the expansion of the original `queue` argument after taking all epsilon transitions.
 #[inline]
-#[allow(unused_mut)] // <-- FIXME
+#[allow(clippy::todo)] // <-- FIXME
+#[allow(clippy::too_many_lines)]
 fn traverse<I: Clone + Ord + Debug>(
     nfa: &Nfa<I>,
     queue: Vec<usize>,
@@ -140,46 +148,98 @@ fn traverse<I: Clone + Ord + Debug>(
             token,
             &nfa::Transition {
                 dsts: ref map,
-                call: fn_name,
+                call: ref fn_name,
             },
         ) in &state.non_epsilon
         {
+            // ... compute the input string that reached this state ...
+            let mut input_string = so_far.clone();
+            input_string.push(token.clone());
             // ... check if we already have any other transitions on that token.
             match transitions.entry(token.clone()) {
                 // If we don't, ...
                 Entry::Vacant(entry) => {
-                    // ... construct the input string that would reach here, ...
-                    let mut breadcrumbs = so_far.clone();
-                    breadcrumbs.push(token.clone());
-                    // ... and insert a new transition.
+                    // ... insert a new transition.
                     let _ = entry.insert(Transition {
                         dsts: map.clone(),
-                        call: fn_name,
-                        breadcrumbs,
+                        call: fn_name.clone(),
+                        breadcrumbs: input_string,
                     });
                 }
                 // If we already have a transition on this token, ...
                 Entry::Occupied(entry) => {
-                    // ... check what we have so far.
-                    #[allow(unused_variables)] // <-- FIXME
+                    // ... check what we have so far, ...
                     let &mut Transition {
                         ref mut dsts,
                         ref mut call,
                         ref mut breadcrumbs,
                     } = entry.into_mut();
-                    // If the function we want to call happens to be the same, ...
-                    #[allow(clippy::todo)] // <- FIXME
-                    if fn_name == *call {
-                        // ... just take the set-union of this state's destinations and the existing ones.
-                        dsts.extend(map.iter().copied());
+                    // ... and if we have a shorter input string that reached here, replace it.
+                    if input_string.len() < breadcrumbs.len() {
+                        *breadcrumbs = input_string;
                     }
-                    // If we're trying to call two different functions on the same input, ...
-                    else {
-                        // ... make sure the functions don't use this exact input token, ...
-                        todo!();
-                        // assert!(!fn_name.uses_token(), "MESSAGE TODO");
-                        // assert!(!call.uses_token(), "MESSAGE TODO");
-                        // postpone();
+                    // Next, check for trying to call two different functions on the same input.
+                    // If it's the same function (or `None` & `None`), then we just add some states to the subset.
+                    // If not, try to postpone the decision until a differentiating token.
+                    match (fn_name.as_ref(), call.as_ref()) {
+                        // If they're equal (2 cases):
+                        (None, None) => dsts.extend(map.iter().copied()),
+                        (Some(a), Some(b)) if a == b => dsts.extend(map.iter().copied()),
+                        // If not (2 cases):
+                        (Some(a), Some(b)) => {
+                            assert!(
+                                !(a.takes_arg || b.takes_arg),
+                                "Parsing ambiguity after [{}] on token {token:?}: \
+                                    can't immediately decide between {} and {}, \
+                                    but a function reads this exact token at runtime. \
+                                    (Note: if you rewrite the functions you call \
+                                    without reading the exact tokens under them, \
+                                    we can automatically postpone the decision \
+                                    until some later token is different.)",
+                                so_far.pop().map_or_else(String::new, |last| {
+                                    so_far
+                                        .iter()
+                                        .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
+                                        + &format!("{last:?}")
+                                }),
+                                fn_name.as_ref().map_or_else(
+                                    || "doing nothing".to_owned(),
+                                    |f| format!("calling `{}`", &f.name)
+                                ),
+                                call.as_ref().map_or_else(
+                                    || "doing nothing".to_owned(),
+                                    |f| format!("calling `{}`", &f.name)
+                                ),
+                            );
+                            todo!()
+                        }
+                        (Some(one), None) | (None, Some(one)) => {
+                            assert!(
+                                !one.takes_arg,
+                                "Parsing ambiguity after [{}] on token {token:?}: \
+                                    can't immediately decide between {} and {}, \
+                                    but a function reads this exact token at runtime. \
+                                    (Note: if you rewrite the function you call \
+                                    without reading the exact token under it, \
+                                    we can automatically postpone the decision \
+                                    until some later token is different.)",
+                                so_far.pop().map_or_else(String::new, |last| {
+                                    so_far
+                                        .iter()
+                                        .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
+                                        + &format!("{last:?}")
+                                }),
+                                fn_name.as_ref().map_or_else(
+                                    || "doing nothing".to_owned(),
+                                    |f| format!("calling `{}`", &f.name)
+                                ),
+                                call.as_ref().map_or_else(
+                                    || "doing nothing".to_owned(),
+                                    |f| format!("calling `{}`", &f.name)
+                                ),
+                            );
+                            todo!()
+                        }
                     }
                 }
             }
