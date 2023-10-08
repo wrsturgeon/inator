@@ -49,11 +49,11 @@ impl<I: Clone + Ord> BitOr for Nfa<I> {
     }
 }
 
-impl<I: Clone + Ord> Shr<(I, Option<Call>, Nfa<I>)> for Nfa<I> {
+impl<I: Clone + Ord> Shr<(I, Call, Nfa<I>)> for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
-    fn shr(mut self, (token, fn_name, mut rhs): (I, Option<Call>, Nfa<I>)) -> Self::Output {
+    fn shr(mut self, (token, fn_name, mut rhs): (I, Call, Nfa<I>)) -> Self::Output {
         let index = self.states.len();
         for state in &mut rhs.states {
             *state += index;

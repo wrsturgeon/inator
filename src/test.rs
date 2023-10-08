@@ -7,15 +7,19 @@
 #![allow(clippy::print_stdout, clippy::unwrap_used, clippy::use_debug)]
 
 use crate::{Compiled as Dfa, Parser as Nfa, *};
-use core::{fmt::Debug, iter::once, panic::RefUnwindSafe};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    panic,
-};
+use std::panic;
 
 #[cfg(feature = "quickcheck")]
 use {core::cmp::Ordering, quickcheck::*};
 
+#[cfg(not(feature = "quickcheck"))]
+use {
+    crate::call::Call,
+    core::{fmt::Debug, iter::once, panic::RefUnwindSafe},
+    std::collections::{BTreeMap, BTreeSet},
+};
+
+#[cfg(not(feature = "quickcheck"))]
 mod unit {
     use super::*;
 
@@ -84,9 +88,16 @@ mod unit {
 
     #[test]
     #[should_panic]
-    fn ambiguity_one_call_before_another() {
+    fn ambiguity_prefix() {
         let parser =
             (ignore('a') >> on('a', "aa")) | (ignore('a') >> ignore('a') >> on('b', "aab"));
+        drop(parser.compile());
+    }
+
+    #[test]
+    fn ambiguity_prefix_then_diverge() {
+        let parser = (ignore('a') >> on('a', "aac") >> ignore('c'))
+            | (ignore('a') >> ignore('a') >> on('b', "aab"));
         drop(parser.compile());
     }
 
@@ -108,7 +119,7 @@ mod prop {
             if inputs.is_empty() {
                 return TestResult::discard();
             }
-            let dfa = nfa.subsets();
+            let dfa = nfa.clone().subsets();
             TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -143,7 +154,7 @@ mod prop {
             if inputs.is_empty() {
                 return TestResult::discard();
             }
-            let dfa = nfa.compile();
+            let dfa = nfa.clone().compile();
             TestResult::from_bool(
                 inputs
                     .into_iter()
@@ -166,7 +177,7 @@ mod prop {
             if reject == accept {
                 return TestResult::discard();
             }
-            let nfa = Nfa::unit(singleton, None);
+            let nfa = Nfa::unit(singleton, Call::Pass);
             TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
         }
 
@@ -263,9 +274,18 @@ mod prop {
                 dfa.generalize().reverse().subsets()
             }).map_or_else(|_| TestResult::failed(), |_| TestResult::passed())
         }
+
+        #[allow(clippy::arithmetic_side_effects)]
+        fn postpone_ambiguity(x0: u8, tl: Vec<u8>, tr: Vec<u8>) -> bool {
+            let parser =
+                (on(x0, "lf") >> seq(tl.iter().copied().map(ignore))) |
+                (on(x0, "rt") >> seq(tr.iter().copied().map(ignore)));
+            panic::catch_unwind(|| parser.subsets()).is_err() == (tl == tr)
+        }
     }
 }
 
+#[cfg(not(feature = "quickcheck"))]
 mod reduced {
     use super::*;
 
@@ -317,12 +337,20 @@ mod reduced {
     >(
         nfa: &Nfa<I>,
     ) {
-        let Ok(dfa) = panic::catch_unwind(|| nfa.subsets()) else {
+        let Ok(dfa) = panic::catch_unwind(|| nfa.clone().subsets()) else {
             return; // but be warned: this is just totally outside the realm of what we're testing
         };
         let reversed = dfa.generalize().reverse();
         println!("{reversed}");
-        drop(reversed.subsets()); // can't panic
+        drop(reversed.subsets()); // shouldn't panic
+    }
+
+    #[allow(clippy::arithmetic_side_effects)]
+    fn postpone_ambiguity(x0: u8, tl: &[u8], tr: &[u8]) {
+        let parser = (on(x0, "lf") >> seq(tl.iter().copied().map(ignore)))
+            | (on(x0, "rt") >> seq(tr.iter().copied().map(ignore)));
+        assert_ne!(tl, tr);
+        drop(parser.subsets()); // shouldn't panic
     }
 
     fn bitor(lhs: &Nfa<u8>, rhs: &Nfa<u8>, input: &[u8]) {
@@ -455,7 +483,7 @@ mod reduced {
                             255,
                             nfa::Transition {
                                 dsts: once(0).collect(),
-                                call: None,
+                                call: Call::Pass,
                             },
                         ))
                         .collect(),
@@ -526,7 +554,7 @@ mod reduced {
                         0,
                         nfa::Transition {
                             dsts: once(0).collect(),
-                            call: None,
+                            call: Call::Pass,
                         },
                     ))
                     .collect(),
@@ -586,7 +614,7 @@ mod reduced {
                         1,
                         nfa::Transition {
                             dsts: once(0).collect(),
-                            call: None,
+                            call: Call::Pass,
                         },
                     ))
                     .collect(),
@@ -641,7 +669,7 @@ mod reduced {
                             2,
                             nfa::Transition {
                                 dsts: once(1).collect(),
-                                call: None,
+                                call: Call::Pass,
                             },
                         ))
                         .collect(),
@@ -658,7 +686,7 @@ mod reduced {
                             1,
                             nfa::Transition {
                                 dsts: once(1).collect(),
-                                call: None,
+                                call: Call::Pass,
                             },
                         ))
                         .collect(),
@@ -711,5 +739,10 @@ mod reduced {
         unambiguous_forward_means_survive_reversal(
             &(on_seq("aa".chars(), "a") | on_seq("ba".chars(), "b")),
         );
+    }
+
+    #[test]
+    fn postpone_ambiguity_1() {
+        postpone_ambiguity(0, &[], &[0]);
     }
 }

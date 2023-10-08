@@ -37,7 +37,7 @@ pub(crate) struct Transition {
     /// Set of destination states.
     pub(crate) dsts: Subset,
     /// Function (or none) to call on this edge.
-    pub(crate) call: Option<Call>,
+    pub(crate) call: Call,
 }
 
 /// Nondeterministic finite automata with epsilon transitions.
@@ -133,7 +133,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::arithmetic_side_effects)]
-    pub(crate) fn unit(singleton: I, call: Option<Call>) -> Self {
+    pub(crate) fn unit(singleton: I, call: Call) -> Self {
         Self::empty() >> (singleton, call, Self::empty())
     }
 
@@ -299,7 +299,10 @@ impl Transition {
     #[must_use]
     #[cfg(test)]
     pub(crate) fn remove_calls(self) -> Self {
-        Self { call: None, ..self }
+        Self {
+            call: Call::Pass,
+            ..self
+        }
     }
 }
 

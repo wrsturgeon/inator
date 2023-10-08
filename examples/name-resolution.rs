@@ -1,8 +1,10 @@
+#[allow(dead_code)]
 fn shit() {
     println!("shit");
 }
 
 mod module {
+    #[allow(dead_code)]
     fn shit() {
         panic!("Wrong function");
     }

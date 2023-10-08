@@ -73,7 +73,7 @@ impl<I: Clone + Ord> Nfa<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::missing_assert_message)]
-    pub fn compile(&self) -> Dfa<I>
+    pub fn compile(self) -> Dfa<I>
     where
         I: Debug,
     {

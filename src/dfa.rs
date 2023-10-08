@@ -48,7 +48,7 @@ pub(crate) struct Transition {
     /// Destination state.
     pub(crate) dst: usize,
     /// Function (or none) to call on this edge.
-    pub(crate) call: Option<Call>,
+    pub(crate) call: Call,
 }
 
 /// Deterministic finite automata.
@@ -892,7 +892,7 @@ impl<I: Clone + Ord + Expression> Display for State<I> {
 
 /// User-defined config module after build time.
 #[inline]
-fn config_path(name: &str, destination: &str) -> Path {
+pub(crate) fn config_path(name: &str, destination: &str) -> Path {
     Path {
         leading_colon: None,
         segments: [
@@ -1198,72 +1198,7 @@ impl<I: Clone + Ord> State<I> {
                                                     .collect(),
                                                 },
                                             }),
-                                            fn_name.as_ref().map_or_else(
-                                                || {
-                                                    Expr::Path(ExprPath {
-                                                        attrs: vec![],
-                                                        qself: None,
-                                                        path: Path {
-                                                            leading_colon: None,
-                                                            segments: once(PathSegment {
-                                                                ident: Ident::new(
-                                                                    "acc",
-                                                                    Span::call_site(),
-                                                                ),
-                                                                arguments: PathArguments::None,
-                                                            })
-                                                            .collect(),
-                                                        },
-                                                    })
-                                                },
-                                                |f| {
-                                                    Expr::Call(ExprCall {
-                                                        attrs: vec![],
-                                                        func: Box::new(Expr::Path(ExprPath {
-                                                            attrs: vec![],
-                                                            qself: None,
-                                                            path: config_path(name, &f.name),
-                                                        })),
-                                                        paren_token: Paren::default(),
-                                                        args: [
-                                                            Expr::Path(ExprPath {
-                                                                attrs: vec![],
-                                                                qself: None,
-                                                                path: Path {
-                                                                    leading_colon: None,
-                                                                    segments: once(PathSegment {
-                                                                        ident: Ident::new(
-                                                                            "acc",
-                                                                            Span::call_site(),
-                                                                        ),
-                                                                        arguments:
-                                                                            PathArguments::None,
-                                                                    })
-                                                                    .collect(),
-                                                                },
-                                                            }),
-                                                            Expr::Path(ExprPath {
-                                                                attrs: vec![],
-                                                                qself: None,
-                                                                path: Path {
-                                                                    leading_colon: None,
-                                                                    segments: once(PathSegment {
-                                                                        ident: Ident::new(
-                                                                            "token",
-                                                                            Span::call_site(),
-                                                                        ),
-                                                                        arguments:
-                                                                            PathArguments::None,
-                                                                    })
-                                                                    .collect(),
-                                                                },
-                                                            }),
-                                                        ]
-                                                        .into_iter()
-                                                        .collect(),
-                                                    })
-                                                },
-                                            ),
+                                            fn_name.to_expr(),
                                         ]
                                         .into_iter()
                                         .collect(),
@@ -1842,7 +1777,10 @@ impl Transition {
     #[must_use]
     #[cfg(test)]
     pub(crate) fn remove_calls(self) -> Self {
-        Self { call: None, ..self }
+        Self {
+            call: Call::Pass,
+            ..self
+        }
     }
 }
 

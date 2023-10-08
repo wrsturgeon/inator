@@ -163,6 +163,8 @@ pub use {
     nfa::Graph as Parser,
 };
 
+use call::Call;
+
 /// Accept only the empty string.
 #[must_use]
 #[inline(always)]
@@ -174,20 +176,14 @@ pub fn empty<I: Clone + Ord>() -> Parser<I> {
 #[must_use]
 #[inline(always)]
 pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
-    Parser::unit(token, None)
+    Parser::unit(token, Call::Pass)
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
 pub fn on<I: Clone + Ord>(token: I, fn_name: &str) -> Parser<I> {
-    Parser::unit(
-        token,
-        Some(call::Call {
-            name: fn_name.to_owned(),
-            takes_arg: false,
-        }),
-    )
+    Parser::unit(token, Call::WithoutToken(fn_name.to_owned()))
 }
 
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
