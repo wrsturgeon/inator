@@ -32,4 +32,12 @@ cargo +nightly miri test --no-default-features --examples
 cargo +nightly miri test -r --no-default-features
 cargo +nightly miri test -r --no-default-features --examples
 
+# Run examples
 ./run-examples.sh
+
+# Check for remaining `FIXME`s
+grep -Rnw . -e FIXME # next line checks result
+if [ $? -eq 0 ]
+then
+  exit 1
+fi
