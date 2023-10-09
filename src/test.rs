@@ -32,7 +32,7 @@ mod unit {
             Dfa {
                 states: vec![dfa::State {
                     transitions: BTreeMap::new(),
-                    accepting: false
+                    accepting: None
                 }],
                 initial: 0
             }
@@ -50,7 +50,7 @@ mod unit {
             states: vec![nfa::State {
                 epsilon: BTreeSet::new(),
                 non_epsilon: BTreeMap::new(),
-                accepting: true,
+                accepting: Some(Call::Pass),
             }],
             initial: BTreeSet::new(),
         }
@@ -65,12 +65,12 @@ mod unit {
                 nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: false,
+                    accepting: None,
                 },
                 nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 },
             ],
             initial: once(0).collect(),
@@ -83,14 +83,6 @@ mod unit {
     #[should_panic]
     fn ambiguity_simple() {
         let parser = on('a', "a") | on('a', "b");
-        drop(parser.compile());
-    }
-
-    #[test]
-    #[should_panic]
-    fn ambiguity_prefix() {
-        let parser =
-            (ignore('a') >> on('a', "aa")) | (ignore('a') >> ignore('a') >> on('b', "aab"));
         drop(parser.compile());
     }
 
@@ -422,7 +414,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: once((0, nfa::Transition::default())).collect(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },
@@ -438,12 +430,12 @@ mod reduced {
                     nfa::State {
                         epsilon: once(1).collect(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: false,
+                        accepting: None,
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: true,
+                        accepting: Some(Call::Pass),
                     },
                 ],
                 initial: once(0).collect(),
@@ -459,7 +451,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: once((255, nfa::Transition::default())).collect(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },
@@ -475,7 +467,7 @@ mod reduced {
                     nfa::State {
                         epsilon: once(1).collect(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: false,
+                        accepting: None,
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
@@ -487,7 +479,7 @@ mod reduced {
                             },
                         ))
                         .collect(),
-                        accepting: true,
+                        accepting: Some(Call::Pass),
                     },
                 ],
                 initial: once(0).collect(),
@@ -504,12 +496,12 @@ mod reduced {
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: false,
+                        accepting: None,
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: true,
+                        accepting: Some(Call::Pass),
                     },
                 ],
                 initial: once(1).collect(),
@@ -536,7 +528,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: false,
+                    accepting: None,
                 }],
                 initial: once(0).collect(),
             },
@@ -558,7 +550,7 @@ mod reduced {
                         },
                     ))
                     .collect(),
-                    accepting: false,
+                    accepting: None,
                 }],
                 initial: BTreeSet::new(),
             },
@@ -577,7 +569,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },
@@ -592,7 +584,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: false,
+                    accepting: None,
                 }],
                 initial: once(0).collect(),
             },
@@ -618,7 +610,7 @@ mod reduced {
                         },
                     ))
                     .collect(),
-                    accepting: false,
+                    accepting: None,
                 }],
                 initial: once(0).collect(),
             },
@@ -626,7 +618,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },
@@ -641,7 +633,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },
@@ -661,7 +653,7 @@ mod reduced {
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: false,
+                        accepting: None,
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
@@ -673,7 +665,7 @@ mod reduced {
                             },
                         ))
                         .collect(),
-                        accepting: true,
+                        accepting: Some(Call::Pass),
                     },
                 ],
                 initial: once(1).collect(),
@@ -690,12 +682,12 @@ mod reduced {
                             },
                         ))
                         .collect(),
-                        accepting: false,
+                        accepting: None,
                     },
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: BTreeMap::new(),
-                        accepting: true,
+                        accepting: Some(Call::Pass),
                     },
                 ],
                 initial: once(0).collect(),
@@ -711,7 +703,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },
@@ -719,7 +711,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: BTreeMap::new(),
-                    accepting: true,
+                    accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
             },

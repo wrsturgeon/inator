@@ -7,7 +7,7 @@
 //! The powerset construction algorithm for constructing an equivalent DFA from an arbitrary NFA.
 //! Also known as the subset construction algorithm.
 
-use crate::{call::Call, dfa, nfa, Compiled as Dfa, Parser as Nfa};
+use crate::{call::Call, dfa, nfa, Compiled as Dfa, Expression, Parser as Nfa};
 use core::fmt::Debug;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
@@ -24,6 +24,10 @@ struct Transition<I> {
     dsts: Subset,
     /// Function (or none) to call on this edge.
     call: Call,
+    /// Index of the state this transition *leaves*.
+    from_state: usize,
+    /// Token that triggers this transition.
+    on_token: I,
     /// Minimal reproducible input string to reach this transition.
     breadcrumbs: Vec<I>,
 }
@@ -34,7 +38,7 @@ struct SubsetState<I> {
     /// Transitions from this subset of states to other subsets on certain tokens.
     transitions: Transitions<I>,
     /// Whether we should accept a string that ends in this state.
-    accepting: bool,
+    accepting: Option<Call>,
 }
 
 /// Map each _subset_ of NFA states to a future DFA state.
@@ -42,7 +46,21 @@ type SubsetsAsStates<I> = BTreeMap<Subset, SubsetState<I>>;
 
 /// Postpone a call from an original call site to some set of later states.
 #[allow(dead_code)] // <-- FIXME
-struct Postpone {
+struct Postpone<I: Clone + Expression + Ord> {
+    /// Origin of the transition on the original graph.
+    l_state: usize,
+    /// Token that generates an ambiguous transition.
+    l_token: I,
+    /// Sequence of tokens that could lead to `l_state`.
+    l_so_far: Vec<I>,
+    /// Origin of the transition on the original graph.
+    r_state: usize,
+    /// Token that generates an ambiguous transition.
+    r_token: I,
+    /// Sequence of tokens that could lead to `r_state`.
+    r_so_far: Vec<I>,
+    /// Whether to save the value of this token for later.
+    stash: bool,
     /// Left call (not really "left" in any meaningful sense, but the first one).
     pl: Call,
     /// Right call (not really "right" in any meaningful sense, but the second one).
@@ -51,7 +69,7 @@ struct Postpone {
     to: Subset,
 }
 
-impl<I: Clone + Ord + Debug> Nfa<I> {
+impl<I: Clone + Expression + Ord + Debug> Nfa<I> {
     /// Powerset construction algorithm mapping subsets of states to DFA nodes.
     #[inline]
     pub(crate) fn subsets(mut self) -> Dfa<I> {
@@ -74,10 +92,10 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
         let states = ordered
             .iter()
             .map(|&subset| {
-                let &SubsetState {
+                let SubsetState {
                     ref transitions,
-                    accepting,
-                } = unwrap!(subsets_as_states.get(subset));
+                    ref accepting,
+                } = *unwrap!(subsets_as_states.get(subset));
                 dfa::State {
                     transitions: transitions
                         .iter()
@@ -98,7 +116,7 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                             },
                         )
                         .collect(),
-                    accepting,
+                    accepting: accepting.clone(),
                 }
             })
             .collect();
@@ -110,11 +128,13 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
         }
     }
 
-    /// Postpone calls that would be ambiguous until they're no longer ambiguous (if possible).
+    /// Postpone calls that would be ambiguous until they're no longer ambiguous (if ever).
     #[inline]
-    #[allow(clippy::todo)] // <-- FIXME
+    #[allow(clippy::panic)]
     fn postpone_ambiguities(&mut self) -> (SubsetsAsStates<I>, Subset) {
-        loop {
+        #[allow(clippy::default_numeric_fallback)]
+        for _ in 0..1000 {
+            let pre = self.clone();
             let mut subsets_as_states = SubsetsAsStates::new();
             match self.traverse(
                 self.initial.iter().copied().collect(),
@@ -122,22 +142,90 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                 vec![],
             ) {
                 Ok(subset) => return (subsets_as_states, subset),
-                Err(_postpone) => todo!(),
+                Err(Postpone {
+                    l_state: l_idx,
+                    ref l_token,
+                    l_so_far,
+                    r_state: r_idx,
+                    ref r_token,
+                    r_so_far,
+                    stash,
+                    pl,
+                    pr,
+                    ..
+                }) => {
+                    let replace = if stash { Call::Stash } else { Call::Pass };
+                    unwrap!(get_mut!(self.states, l_idx).non_epsilon.get_mut(l_token)).call =
+                        replace.clone();
+                    unwrap!(get_mut!(self.states, r_idx).non_epsilon.get_mut(r_token)).call =
+                        replace;
+                    self.postpone(l_idx, &pl, l_so_far, l_token);
+                    self.postpone(r_idx, &pr, r_so_far, r_token);
+                }
             }
+            assert_ne!(
+                *self, pre,
+                "INTERNAL ERROR: \
+                Ran a postponement step but nothing changed. \
+                Please report!",
+            );
         }
+        panic!("Timed out");
+    }
+
+    /// Postpone a call that's already been removed to the set of states that could follow the one it was removed form.
+    fn postpone(&mut self, idx: usize, call: &Call, mut so_far: Vec<I>, token: &I) {
+        let mut did_anything = false;
+        let mut neighbors: Vec<usize> = self
+            .take_all_epsilon_transitions(vec![idx])
+            .into_iter()
+            .flat_map(|i| {
+                self.take_all_epsilon_transitions(
+                    get!(self.states, i)
+                        .non_epsilon
+                        .values()
+                        .flat_map(|&nfa::Transition { ref dsts, .. }| dsts.iter().copied())
+                        .collect(),
+                )
+            })
+            .collect();
+        neighbors.sort_unstable();
+        neighbors.dedup();
+        for &i in &neighbors {
+            get_mut!(self.states, i).take_responsibility_for(call, &mut did_anything);
+        }
+        assert!(
+            did_anything,
+            "Parsing ambiguity after [{}] on token {token:?}: \
+            can't immediately decide between TODO and TODO, \
+            but [EXPLANATION TODO]. \
+            (Internally, we couldn't postpone `{call:?}` \
+            from {idx} to {neighbors:?} \
+            because there's nowhere for it to go.)",
+            so_far.pop().map_or_else(String::new, |last| {
+                so_far
+                    .iter()
+                    .fold(String::new(), |acc, i| acc + &format!("{i:?} -> "))
+                    + &format!("{last:?}")
+            }),
+        );
     }
 
     /// Map which _subsets_ of states transition to which _subsets_ of states.
     /// Return the expansion of the original `queue` argument after taking all epsilon transitions.
     #[inline]
     #[allow(clippy::todo)] // <-- FIXME
-    #[allow(clippy::too_many_lines, clippy::unwrap_in_result)]
+    #[allow(
+        clippy::panic_in_result_fn,
+        clippy::too_many_lines,
+        clippy::unwrap_in_result
+    )]
     fn traverse(
         &self,
         queue: Vec<usize>,
         subsets_as_states: &mut SubsetsAsStates<I>,
         mut so_far: Vec<I>,
-    ) -> Result<Subset, Postpone> // <-- Return the set of states after taking epsilon transitions
+    ) -> Result<Subset, Postpone<I>> // <-- Return the set of states after taking epsilon transitions
     {
         // Take all epsilon transitions immediately
         let post_epsilon = self.take_all_epsilon_transitions(queue);
@@ -148,22 +236,37 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
             Entry::Vacant(empty) => empty,
         };
 
-        // Get all _states_ from indices
-        let subset = post_epsilon.iter().map(|&i| get!(self.states, i));
-
         // For now, so we can't get stuck in a cycle, cache an empty map
+        #[allow(clippy::panic)]
         let _ = tmp.insert(SubsetState {
             transitions: BTreeMap::new(),
-            accepting: subset
-                .clone()
-                .any(|&nfa::State { accepting, .. }| accepting),
+            accepting: post_epsilon.iter().fold(None, |acc, &i| {
+                match (acc, get!(self.states, i).accepting.clone()) {
+                    (None, None) => None,
+                    (Some(x), None) | (None, Some(x)) => Some(x),
+                    (Some(a), Some(b)) => panic!(
+                        "Parsing ambiguity after [{}] if input ends here: \
+                        can't decide between {} and {}.",
+                        so_far.pop().map_or_else(String::new, |last| {
+                            so_far
+                                .iter()
+                                .fold(String::new(), |s, j| s + &format!("{j:?} -> "))
+                                + &format!("{last:?}")
+                        }),
+                        a.verbal(),
+                        b.verbal(),
+                    ),
+                }
+            }),
         });
 
         // Calculate all non-epsilon transitions out of this *subset* of states,
         // converted into transitions out of a *single* DFA state.
         let mut transitions = Transitions::<I>::new();
         // For each state we're currently inhabiting,...
-        for state in subset {
+        for &index in &post_epsilon {
+            let state = get!(self.states, index);
+
             // ... for each non-epsilon transition out of that state...
             for (
                 token,
@@ -184,6 +287,8 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                         let _ = entry.insert(Transition {
                             dsts: map.clone(),
                             call: new_call.clone(),
+                            from_state: index,
+                            on_token: token.clone(),
                             breadcrumbs: input_string,
                         });
                     }
@@ -193,6 +298,8 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                         let &mut Transition {
                             ref mut dsts,
                             call: ref mut existing_call,
+                            ref from_state,
+                            ref on_token,
                             ref mut breadcrumbs,
                         } = entry.into_mut();
                         // ... and if we have a shorter input string that reached here, replace it.
@@ -201,7 +308,7 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                         }
                         // Next, check for trying to call two different functions on the same input.
                         #[allow(clippy::panic)]
-                        match new_call
+                        let compatible = new_call
                             .clone()
                             .compat(existing_call.clone())
                             .unwrap_or_else(|| {
@@ -212,7 +319,7 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                                     (Note: if you rewrite the function without \
                                     reading the value of the token it parsed, \
                                     we can automatically postpone the decision \
-                                    until some later token is different.)",
+                                    until some later token is differ[<43;55;7M[<43;56;7Ment.)",
                                     so_far.pop().map_or_else(String::new, |last| {
                                         so_far.iter().fold(String::new(), |acc, i| {
                                             acc + &format!("{i:?} -> ")
@@ -221,7 +328,8 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                                     new_call.verbal(),
                                     existing_call.verbal(),
                                 )
-                            }) {
+                            });
+                        match compatible {
                             // If it's the same function, ...
                             Ok(common) => {
                                 // ... then just add some states to the subset.
@@ -230,15 +338,34 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
                             }
                             // If not identical but still compatible, ...
                             Err((stash, pl, pr)) => {
-                                // ... update this state not to call (but to save the value if necessary), ...
-                                *existing_call = if stash { Call::Stash } else { Call::Pass };
-                                // ... and push the call back to the next states.
+                                // ... and NOT an accepting state (in which case postponing might mean we never call it), ...
+                                assert_eq!(
+                                    None,
+                                    state.accepting,
+                                    "Parsing ambiguity after [{}] on token {token:?}: \
+                                    can't immediately decide between {} and {}, \
+                                    but this state is accepting, so we can't \
+                                    postpone until a difference is observed.",
+                                    so_far.pop().map_or_else(String::new, |last| {
+                                        so_far.iter().fold(String::new(), |acc, i| {
+                                            acc + &format!("{i:?} -> ")
+                                        }) + &format!("{last:?}")
+                                    }),
+                                    new_call.verbal(),
+                                    existing_call.verbal(),
+                                );
+                                // ... postpone the call to the next subset of states.
                                 return Err(Postpone {
+                                    l_state: index,
+                                    l_token: token.clone(),
+                                    l_so_far: so_far.clone(),
+                                    r_state: *from_state,
+                                    r_token: on_token.clone(),
+                                    r_so_far: so_far.clone(),
+                                    stash,
                                     pl,
                                     pr,
-                                    to: self.take_all_epsilon_transitions(
-                                        dsts.iter().copied().collect(),
-                                    ),
+                                    to: dsts.clone(),
                                 });
                             }
                         }
@@ -268,6 +395,43 @@ impl<I: Clone + Ord + Debug> Nfa<I> {
     }
 }
 
+impl<I: Clone + Expression + Ord> nfa::State<I> {
+    /// Check if this state is not accepting AND has no outgoing transitions.
+    #[allow(dead_code)] // <-- FIXME
+    fn is_dead_end(&self) -> bool {
+        self.accepting.is_none() && self.non_epsilon.is_empty()
+    }
+
+    /// Receive a postponed call and implement it here.
+    #[inline]
+    #[allow(dead_code)] // <-- FIXME
+    fn take_responsibility_for(&mut self, call: &Call, did_anything: &mut bool) {
+        if let Some(ref mut accept_fn) = self.accepting {
+            accept_fn.take_responsibility_for(call.clone(), did_anything);
+        }
+        for transition in self.non_epsilon.values_mut() {
+            transition
+                .call
+                .take_responsibility_for(call.clone(), did_anything);
+            //        ^^^^^ crucial that we call `Call::take_resp...` rather than `State::take_resp...`
+        }
+    }
+}
+
 impl Call {
-    // fn take_responsibility_for(&mut self, postpone: Postpone) {}
+    /// Receive a postponed call and implement it here.
+    #[inline]
+    #[allow(clippy::panic)] // <-- TODO
+    fn take_responsibility_for(&mut self, call: Call, did_anything: &mut bool) {
+        *did_anything = true;
+        match (&*self, call) {
+            (&Self::Pass, other) => *self = other,
+            (_, Self::Pass) => {}
+            _ => panic!(
+                "Not yet implemented. \
+                Please open a pull request with the \
+                exact conditions that led to this error.",
+            ),
+        }
+    }
 }

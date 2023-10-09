@@ -53,7 +53,7 @@ pub(crate) struct Transition {
 
 /// Deterministic finite automata.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Graph<I: Clone + Ord> {
+pub struct Graph<I: Clone + Expression + Ord> {
     /// Every state in this graph (should never be empty!).
     pub(crate) states: Vec<State<I>>,
     /// Initial set of states.
@@ -62,14 +62,14 @@ pub struct Graph<I: Clone + Ord> {
 
 /// State transitions from one state to no more than one other.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct State<I: Clone + Ord> {
+pub struct State<I: Clone + Expression + Ord> {
     /// Transitions that require consuming and matching input.
     pub(crate) transitions: Transitions<I>,
     /// Whether an input that ends in this state ought to be accepted.
-    pub(crate) accepting: bool,
+    pub(crate) accepting: Option<Call>,
 }
 
-impl<I: Clone + Ord> Graph<I> {
+impl<I: Clone + Expression + Ord> Graph<I> {
     /// Decide whether an input belongs to the regular langage this NFA accepts.
     #[inline]
     #[allow(clippy::missing_panics_doc)]
@@ -81,7 +81,7 @@ impl<I: Clone + Ord> Graph<I> {
                 None => return false,
             }
         }
-        get!(self.states, state).accepting
+        get!(self.states, state).accepting.is_some()
     }
 
     /// Decide whether an input belongs to the regular langage this NFA accepts.
@@ -131,7 +131,7 @@ impl<I: Clone + Ord> Graph<I> {
                             )
                         })
                         .collect(),
-                    accepting: state.accepting,
+                    accepting: state.accepting.clone(),
                 })
                 .collect(),
             initial: once(self.initial).collect(),
@@ -154,7 +154,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     pub fn would_ever_accept(&self) -> bool {
-        self.states.iter().any(|state| state.accepting)
+        self.states.iter().any(|state| state.accepting.is_some())
     }
 
     /// Find the minimal input that reaches this state.
@@ -233,10 +233,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn to_ast(&self, name: &str) -> (ItemFn, ItemMod)
-    where
-        I: Expression,
-    {
+    pub fn to_ast(&self, name: &str) -> (ItemFn, ItemMod) {
         let generics = Generics {
             lt_token: Some(Token!(<)(Span::call_site())),
             params: once(GenericParam::Type(TypeParam {
@@ -524,10 +521,7 @@ impl<I: Clone + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn to_fuzz_ast(&self, name: &str) -> (ItemFn, ItemMod)
-    where
-        I: Expression,
-    {
+    pub fn to_fuzz_ast(&self, name: &str) -> (ItemFn, ItemMod) {
         let generics = Generics {
             lt_token: Some(Token!(<)(Span::call_site())),
             params: once(GenericParam::Type(TypeParam {
@@ -845,7 +839,7 @@ impl<A: Ord, B> Ord for CmpFirst<A, B> {
     }
 }
 
-impl<I: Clone + Ord> IntoIterator for Graph<I> {
+impl<I: Clone + Expression + Ord> IntoIterator for Graph<I> {
     type Item = State<I>;
     type IntoIter = IntoIter<State<I>>;
     #[inline(always)]
@@ -854,7 +848,7 @@ impl<I: Clone + Ord> IntoIterator for Graph<I> {
     }
 }
 
-impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
+impl<'a, I: Clone + Expression + Ord> IntoIterator for &'a Graph<I> {
     type Item = &'a State<I>;
     type IntoIter = Iter<'a, State<I>>;
     #[inline(always)]
@@ -863,7 +857,7 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> Display for Graph<I> {
+impl<I: Clone + Expression + Ord> Display for Graph<I> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Initial state: {}", self.initial)?;
@@ -874,14 +868,17 @@ impl<I: Clone + Ord + Expression> Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> Display for State<I> {
+impl<I: Clone + Expression + Ord> Display for State<I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "({}accepting):",
-            if self.accepting { "" } else { "NOT " }
+            "({}):",
+            self.accepting.as_ref().map_or_else(
+                || "Not accepting".to_owned(),
+                |accept_fn| format!("Accepts with `{accept_fn:?}`")
+            )
         )?;
         for (input, &Transition { dst, ref call }) in &self.transitions {
             writeln!(f, "    {input:?} --> {dst} >>= {call:?}")?;
@@ -937,7 +934,7 @@ fn invert<K: Ord, V: Ord>(map: &BTreeMap<K, V>) -> BTreeMap<&V, BTreeSet<&K>> {
     acc
 }
 
-impl<I: Clone + Ord> State<I> {
+impl<I: Clone + Expression + Ord> State<I> {
     /// State to which this state can transition on a given input.
     #[inline]
     pub(crate) fn transition(&self, input: &I) -> Option<&Transition> {
@@ -961,6 +958,7 @@ impl<I: Clone + Ord> State<I> {
 
     /// Print as a Rust source-code function.
     #[inline]
+    #[allow(unused_variables)] // <-- FIXME
     #[allow(clippy::too_many_lines)]
     pub fn to_source(
         &self,
@@ -1222,50 +1220,56 @@ impl<I: Clone + Ord> State<I> {
                                 }),
                                 guard: None,
                                 fat_arrow_token: Token!(=>)(Span::call_site()),
-                                body: Box::new(if self.accepting {
-                                    Expr::Call(ExprCall {
-                                        attrs: vec![],
-                                        func: Box::new(Expr::Path(ExprPath {
+                                body: Box::new(self.accepting.as_ref().map_or_else(
+                                    || {
+                                        Expr::Path(ExprPath {
                                             attrs: vec![],
                                             qself: None,
                                             path: Path {
                                                 leading_colon: None,
                                                 segments: once(PathSegment {
-                                                    ident: Ident::new("Some", Span::call_site()),
+                                                    ident: Ident::new("None", Span::call_site()),
                                                     arguments: PathArguments::None,
                                                 })
                                                 .collect(),
                                             },
-                                        })),
-                                        paren_token: Paren::default(),
-                                        args: once(Expr::Path(ExprPath {
+                                        })
+                                    },
+                                    |accept_fn| {
+                                        Expr::Call(ExprCall {
                                             attrs: vec![],
-                                            qself: None,
-                                            path: Path {
-                                                leading_colon: None,
-                                                segments: once(PathSegment {
-                                                    ident: Ident::new("acc", Span::call_site()),
-                                                    arguments: PathArguments::None,
-                                                })
-                                                .collect(),
-                                            },
-                                        }))
-                                        .collect(),
-                                    })
-                                } else {
-                                    Expr::Path(ExprPath {
-                                        attrs: vec![],
-                                        qself: None,
-                                        path: Path {
-                                            leading_colon: None,
-                                            segments: once(PathSegment {
-                                                ident: Ident::new("None", Span::call_site()),
-                                                arguments: PathArguments::None,
-                                            })
+                                            func: Box::new(Expr::Path(ExprPath {
+                                                attrs: vec![],
+                                                qself: None,
+                                                path: Path {
+                                                    leading_colon: None,
+                                                    segments: once(PathSegment {
+                                                        ident: Ident::new(
+                                                            "Some",
+                                                            Span::call_site(),
+                                                        ),
+                                                        arguments: PathArguments::None,
+                                                    })
+                                                    .collect(),
+                                                },
+                                            })),
+                                            paren_token: Paren::default(),
+                                            args: once(Expr::Path(ExprPath {
+                                                attrs: vec![],
+                                                qself: None,
+                                                path: Path {
+                                                    leading_colon: None,
+                                                    segments: once(PathSegment {
+                                                        ident: Ident::new("acc", Span::call_site()),
+                                                        arguments: PathArguments::None,
+                                                    })
+                                                    .collect(),
+                                                },
+                                            }))
                                             .collect(),
-                                        },
-                                    })
-                                }),
+                                        })
+                                    },
+                                )),
                                 comma: Some(Token!(,)(Span::call_site())),
                             });
                             v.push(syn::Arm {
@@ -1301,6 +1305,7 @@ impl<I: Clone + Ord> State<I> {
 
     /// Print as a Rust source-code function.
     #[inline]
+    #[allow(unused_variables)] // <-- FIXME
     #[allow(clippy::too_many_lines)]
     pub fn to_fuzz_source(
         &self,
@@ -1313,7 +1318,7 @@ impl<I: Clone + Ord> State<I> {
         I: Expression,
     {
         let mut stmts = vec![];
-        if self.accepting {
+        if let Some(ref accept_fn) = self.accepting {
             stmts.push(Stmt::Expr(
                 Expr::If(ExprIf {
                     attrs: vec![],
@@ -1785,7 +1790,7 @@ impl Transition {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + Arbitrary> Arbitrary for Graph<I> {
+impl<I: Expression + Ord + Arbitrary> Arbitrary for Graph<I> {
     #[inline]
     fn arbitrary(g: &mut Gen) -> Self {
         let mut states = Vec::arbitrary(g);
@@ -1818,7 +1823,7 @@ impl<I: Ord + Arbitrary> Arbitrary for Graph<I> {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + Arbitrary> Arbitrary for State<I> {
+impl<I: Expression + Ord + Arbitrary> Arbitrary for State<I> {
     #[inline]
     fn arbitrary(g: &mut Gen) -> Self {
         Self {
@@ -1846,7 +1851,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
                     .iter()
                     .map(|(k, &Transition { dst, ref call })| (k.clone(), dst, call.clone()))
                     .collect::<Vec<_>>(),
-                self.accepting,
+                self.accepting.clone(),
             )
                 .shrink()
                 .map(|(transitions, accepting)| Self {
@@ -1862,7 +1867,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
 
 /// Remove impossible transitions from automatically generated automata.
 #[cfg(feature = "quickcheck")]
-fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
+fn cut_nonsense<I: Clone + Expression + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
         state

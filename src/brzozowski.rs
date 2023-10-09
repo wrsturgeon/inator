@@ -6,14 +6,14 @@
 
 //! Brzozowski's algorithm for minimizing automata.
 
-use crate::{nfa, Compiled as Dfa, Parser as Nfa};
+use crate::{call::Call, nfa, Compiled as Dfa, Expression, Parser as Nfa};
 use core::{
     fmt::Debug,
     iter::{once, repeat},
 };
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-impl<I: Clone + Ord> Nfa<I> {
+impl<I: Clone + Expression + Ord> Nfa<I> {
     /// Reverse all transitions and swap initial with accepting states.
     /// # Panics
     /// TODO
@@ -23,7 +23,7 @@ impl<I: Clone + Ord> Nfa<I> {
         let mut states = repeat(nfa::State {
             epsilon: BTreeSet::new(),
             non_epsilon: BTreeMap::new(),
-            accepting: false,
+            accepting: None,
         })
         .take(self.states.len())
         .collect::<Vec<_>>();
@@ -59,12 +59,12 @@ impl<I: Clone + Ord> Nfa<I> {
                     }
                 }
             }
-            if state.accepting {
+            if state.accepting.is_some() {
                 let _ = initial.insert(src);
             }
         }
         for &index in &self.initial {
-            get_mut!(states, index).accepting = true;
+            get_mut!(states, index).accepting = Some(Call::Pass);
         }
         Self { states, initial }
     }
@@ -78,26 +78,35 @@ impl<I: Clone + Ord> Nfa<I> {
         I: Debug,
     {
         /// Print if and only if we're debugging or testing.
-        #[cfg(any(test, debug_assertions))]
-        macro_rules! dbg_print {
+        #[cfg(debug_assertions)]
+        macro_rules! dbg_println {
             ($($arg:tt)*) => {
                 println!($($arg)*)
             };
         }
         /// Print if and only if we're debugging or testing.
-        #[cfg(not(any(test, debug_assertions)))]
-        macro_rules! dbg_print {
+        #[cfg(not(debug_assertions))]
+        macro_rules! dbg_println {
             ($($arg:tt)*) => {};
         }
-        dbg_print!("Brzozowski: powerset construction (1st time)...");
+        dbg_println!("Brzozowski: powerset construction (1st time)...");
         let dfa = self.subsets();
-        dbg_print!("Brzozowski: reversing (1st time)...");
-        let rev = dfa.generalize().reverse();
-        dbg_print!("Brzozowski: powerset construction (2nd time)...");
+        dbg_println!(" -> {dfa}");
+        dbg_println!("Brzozowski: generalizing (1st time)...");
+        let nfa = dfa.generalize();
+        dbg_println!(" -> {nfa}");
+        dbg_println!("Brzozowski: reversing (1st time)...");
+        let rev = nfa.reverse();
+        dbg_println!(" -> {rev}");
+        dbg_println!("Brzozowski: powerset construction (2nd time)...");
         let halfway = rev.subsets();
-        dbg_print!("Brzozowski: reversing (2nd time)...");
-        let revrev = halfway.generalize().reverse();
-        dbg_print!("Brzozowski: powerset construction (3rd time)...");
+        dbg_println!("Brzozowski: generalizing (2nd time)...");
+        let halfway_nfa = halfway.generalize();
+        dbg_println!(" -> {halfway_nfa}");
+        dbg_println!("Brzozowski: reversing (2nd time)...");
+        let revrev = halfway_nfa.reverse();
+        dbg_println!(" -> {revrev}");
+        dbg_println!("Brzozowski: powerset construction (3rd time)...");
         revrev.subsets()
     }
 }

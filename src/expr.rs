@@ -9,7 +9,8 @@
 use core::{fmt::Debug, iter::once};
 use proc_macro2::Span;
 use syn::{
-    Expr, ExprLit, Lit, LitByte, LitChar, Pat, Path, PathArguments, PathSegment, Type, TypePath,
+    punctuated::Punctuated, token::Paren, Expr, ExprLit, Lit, LitByte, LitChar, Pat, Path,
+    PathArguments, PathSegment, Type, TypePath,
 };
 
 /// Convert to a variety of source-code-related formats.
@@ -83,6 +84,32 @@ impl Expression for u8 {
                 })
                 .collect(),
             },
+        })
+    }
+}
+
+impl Expression for () {
+    #[inline]
+    fn to_expr(&self) -> Expr {
+        Expr::Tuple(syn::ExprTuple {
+            attrs: vec![],
+            paren_token: Paren::default(),
+            elems: Punctuated::new(),
+        })
+    }
+    #[inline]
+    fn to_pattern(&self) -> Pat {
+        Pat::Tuple(syn::PatTuple {
+            attrs: vec![],
+            paren_token: Paren::default(),
+            elems: Punctuated::new(),
+        })
+    }
+    #[inline]
+    fn to_type() -> Type {
+        Type::Tuple(syn::TypeTuple {
+            paren_token: Paren::default(),
+            elems: Punctuated::new(),
         })
     }
 }

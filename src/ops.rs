@@ -6,13 +6,13 @@
 
 //! Operations on NFAs.
 
-use crate::{call::Call, nfa, Parser as Nfa};
+use crate::{call::Call, nfa, Expression, Parser as Nfa};
 use core::{
     iter::once,
     ops::{Add, AddAssign, BitOr, Shr},
 };
 
-impl<I: Clone + Ord> AddAssign<usize> for nfa::State<I> {
+impl<I: Clone + Expression + Ord> AddAssign<usize> for nfa::State<I> {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
         // TODO: We can totally use unsafe here since the order doesn't change
@@ -30,7 +30,7 @@ impl<I: Clone + Ord> AddAssign<usize> for nfa::State<I> {
     }
 }
 
-impl<I: Clone + Ord> BitOr for Nfa<I> {
+impl<I: Clone + Expression + Ord> BitOr for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -49,7 +49,7 @@ impl<I: Clone + Ord> BitOr for Nfa<I> {
     }
 }
 
-impl<I: Clone + Ord> Shr<(I, Call, Nfa<I>)> for Nfa<I> {
+impl<I: Clone + Expression + Ord> Shr<(I, Call, Nfa<I>)> for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -63,8 +63,8 @@ impl<I: Clone + Ord> Shr<(I, Call, Nfa<I>)> for Nfa<I> {
             .iter()
             .map(|x| x.checked_add(index).expect("Huge number of states"));
         for state in &mut self.states {
-            if state.accepting {
-                state.accepting = false;
+            if state.accepting.is_some() {
+                state.accepting = None;
                 state.non_epsilon.extend(
                     incr_initial
                         .clone()
@@ -86,7 +86,7 @@ impl<I: Clone + Ord> Shr<(I, Call, Nfa<I>)> for Nfa<I> {
     }
 }
 
-impl<I: Clone + Ord> Shr for Nfa<I> {
+impl<I: Clone + Expression + Ord> Shr for Nfa<I> {
     type Output = Self;
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::suspicious_arithmetic_impl)]
@@ -100,8 +100,8 @@ impl<I: Clone + Ord> Shr for Nfa<I> {
             .iter()
             .map(|x| x.checked_add(index).expect("Huge number of states"));
         for state in &mut self.states {
-            if state.accepting {
-                state.accepting = false;
+            if state.accepting.is_some() {
+                state.accepting = None;
                 state.epsilon.extend(incr_initial.clone());
             }
         }

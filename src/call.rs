@@ -45,32 +45,31 @@ impl Call {
     /// Check if two calls are compatible and can be reduced or postponed.
     #[inline]
     pub(crate) fn compat(self, other: Self) -> Option<Result<Self, (bool, Self, Self)>> {
-        match (&self, &other) {
-            (&Self::Pass, &Self::Pass) => Some(Ok(Self::Pass)),
-            (&(Self::Pass | Self::Stash), &(Self::Pass | Self::Stash)) => Some(Ok(Self::Stash)),
-            (&Self::WithToken(ref lhs), &Self::WithToken(ref rhs))
-            | (&Self::WithoutToken(ref lhs), &Self::WithoutToken(ref rhs))
-                if lhs == rhs =>
-            {
-                Some(Ok(self))
+        match (self, other) {
+            (Self::Pass, Self::Pass) => Some(Ok(Self::Pass)),
+            (Self::Pass | Self::Stash, Self::Pass | Self::Stash) => Some(Ok(Self::Stash)),
+            (Self::WithToken(lhs), Self::WithToken(rhs)) if lhs == rhs => {
+                Some(Ok(Self::WithToken(lhs)))
+            }
+            (Self::WithoutToken(lhs), Self::WithoutToken(rhs)) if lhs == rhs => {
+                Some(Ok(Self::WithoutToken(lhs)))
             }
             // Rust forbids identically named functions with different arguments
-            (&Self::WithToken(_), &Self::WithoutToken(_))
-            | (&Self::WithoutToken(_), &Self::WithToken(_)) => None,
-            (&Self::WithToken(_), &(Self::Pass | Self::Stash)) => {
-                Some(Err((true, self, Self::Pass)))
+            (Self::WithToken(_), Self::WithoutToken(_))
+            | (Self::WithoutToken(_), Self::WithToken(_)) => None,
+            (lhs @ Self::WithToken(_), Self::Pass | Self::Stash) => {
+                Some(Err((true, lhs, Self::Pass)))
             }
-            (&(Self::Pass | Self::Stash), &Self::WithToken(_)) => {
-                Some(Err((true, Self::Pass, other)))
+            (lhs @ Self::WithoutToken(_), Self::Pass | Self::Stash) => {
+                Some(Err((false, lhs, Self::Pass)))
             }
-            (&Self::WithoutToken(_), &(Self::Pass | Self::Stash)) => {
-                Some(Err((false, self, Self::Pass)))
+            (Self::Pass | Self::Stash, rhs @ (Self::WithToken(_) | Self::WithoutToken(_))) => {
+                Some(Err((false, Self::Pass, rhs)))
             }
-            (&(Self::Pass | Self::Stash), &Self::WithoutToken(_)) => {
-                Some(Err((false, Self::Pass, other)))
+            (lhs @ Self::WithToken(_), rhs @ Self::WithToken(_)) => Some(Err((true, lhs, rhs))),
+            (lhs @ Self::WithoutToken(_), rhs @ Self::WithoutToken(_)) => {
+                Some(Err((false, lhs, rhs)))
             }
-            (&Self::WithToken(_), &Self::WithToken(_)) => Some(Err((true, self, other))),
-            (&Self::WithoutToken(_), &Self::WithoutToken(_)) => Some(Err((false, self, other))),
         }
     }
 

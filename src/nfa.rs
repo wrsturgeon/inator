@@ -42,7 +42,7 @@ pub(crate) struct Transition {
 
 /// Nondeterministic finite automata with epsilon transitions.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Graph<I: Clone + Ord> {
+pub struct Graph<I: Clone + Expression + Ord> {
     /// Every state in this graph.
     pub(crate) states: Vec<State<I>>,
     /// Initial set of states.
@@ -51,20 +51,24 @@ pub struct Graph<I: Clone + Ord> {
 
 /// Transitions from one state to arbitrarily many others, possibly without even consuming input.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct State<I: Clone + Ord> {
+pub struct State<I: Clone + Expression + Ord> {
     /// Transitions that doesn't require consuming input.
     pub(crate) epsilon: Subset,
     /// Transitions that require consuming and matching input.
     pub(crate) non_epsilon: Transitions<I>,
     /// Whether an input that ends in this state ought to be accepted.
-    pub(crate) accepting: bool,
+    pub(crate) accepting: Option<Call>,
 }
 
 /// Test if there is a way to split the input such that
 /// automaton #1 accepts the left part and #2 accepts the right.
 #[inline]
 #[cfg(test)]
-pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -> bool {
+pub(crate) fn chain<I: Clone + Expression + Ord>(
+    a1: &Graph<I>,
+    a2: &Graph<I>,
+    input: &[I],
+) -> bool {
     let mut s1 = a1.step();
     let mut i = input.iter();
     if s1.currently_accepting() && a2.accept(i.clone()) {
@@ -79,7 +83,7 @@ pub(crate) fn chain<I: Clone + Ord>(a1: &Graph<I>, a2: &Graph<I>, input: &[I]) -
     false
 }
 
-impl<I: Clone + Ord> IntoIterator for Graph<I> {
+impl<I: Clone + Expression + Ord> IntoIterator for Graph<I> {
     type Item = State<I>;
     type IntoIter = IntoIter<State<I>>;
     #[inline(always)]
@@ -88,7 +92,7 @@ impl<I: Clone + Ord> IntoIterator for Graph<I> {
     }
 }
 
-impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
+impl<'a, I: Clone + Expression + Ord> IntoIterator for &'a Graph<I> {
     type Item = &'a State<I>;
     type IntoIter = Iter<'a, State<I>>;
     #[inline(always)]
@@ -97,14 +101,14 @@ impl<'a, I: Clone + Ord> IntoIterator for &'a Graph<I> {
     }
 }
 
-impl<I: Clone + Ord> Default for Graph<I> {
+impl<I: Clone + Expression + Ord> Default for Graph<I> {
     #[inline(always)]
     fn default() -> Self {
         Self::void()
     }
 }
 
-impl<I: Clone + Ord> Graph<I> {
+impl<I: Clone + Expression + Ord> Graph<I> {
     /// NFA with zero states.
     #[inline]
     #[must_use]
@@ -123,7 +127,7 @@ impl<I: Clone + Ord> Graph<I> {
             states: vec![State {
                 epsilon: Subset::new(),
                 non_epsilon: BTreeMap::new(),
-                accepting: true,
+                accepting: Some(Call::Pass),
             }],
             initial: once(0).collect(),
         }
@@ -203,7 +207,7 @@ impl<I: Clone + Ord> Graph<I> {
     pub fn repeat(&self) -> Self {
         let mut s = self.clone();
         for state in &mut s.states {
-            if state.accepting {
+            if state.accepting.is_some() {
                 state.epsilon.extend(s.initial.iter());
             }
         }
@@ -236,7 +240,7 @@ impl<I: Clone + Ord> Graph<I> {
     }
 }
 
-impl<I: Clone + Ord> State<I> {
+impl<I: Clone + Expression + Ord> State<I> {
     /// Set of states to which this state can transition on a given input.
     #[inline]
     #[cfg(test)]
@@ -245,7 +249,7 @@ impl<I: Clone + Ord> State<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> Display for Graph<I> {
+impl<I: Clone + Expression + Ord> Display for Graph<I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -257,14 +261,17 @@ impl<I: Clone + Ord + Expression> Display for Graph<I> {
     }
 }
 
-impl<I: Clone + Ord + Expression> Display for State<I> {
+impl<I: Clone + Expression + Ord> Display for State<I> {
     #[inline]
     #[allow(clippy::use_debug)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "({}accepting):",
-            if self.accepting { "" } else { "NOT " }
+            "({}):",
+            self.accepting.as_ref().map_or_else(
+                || "Not accepting".to_owned(),
+                |accept_fn| format!("Accepts with `{accept_fn:?}`")
+            )
         )?;
         if !self.epsilon.is_empty() {
             writeln!(f, "    epsilon --> {:?}", self.epsilon)?;
@@ -276,7 +283,7 @@ impl<I: Clone + Ord + Expression> Display for State<I> {
     }
 }
 
-impl<I: Clone + Ord> State<I> {
+impl<I: Clone + Expression + Ord> State<I> {
     /// Remove all calls (set them to `None`).
     #[inline]
     #[must_use]
@@ -307,7 +314,7 @@ impl Transition {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + Arbitrary> Arbitrary for Graph<I> {
+impl<I: Expression + Ord + Arbitrary> Arbitrary for Graph<I> {
     #[inline]
     fn arbitrary(g: &mut Gen) -> Self {
         let mut states = Arbitrary::arbitrary(g);
@@ -330,7 +337,7 @@ impl<I: Ord + Arbitrary> Arbitrary for Graph<I> {
 }
 
 #[cfg(feature = "quickcheck")]
-impl<I: Ord + Arbitrary> Arbitrary for State<I> {
+impl<I: Expression + Ord + Arbitrary> Arbitrary for State<I> {
     #[inline]
     fn arbitrary(g: &mut Gen) -> Self {
         Self {
@@ -362,7 +369,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
                         (token.clone(), (dsts.clone(), call.clone()))
                     })
                     .collect::<BTreeMap<_, _>>(),
-                self.accepting,
+                self.accepting.clone(),
             )
                 .shrink()
                 .map(|(epsilon, non_epsilon, accepting)| Self {
@@ -379,7 +386,7 @@ impl<I: Ord + Arbitrary> Arbitrary for State<I> {
 
 /// Remove impossible transitions from automatically generated automata.
 #[cfg(feature = "quickcheck")]
-fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
+fn cut_nonsense<I: Clone + Expression + Ord>(v: &mut Vec<State<I>>) {
     let size = v.len();
     for state in v {
         state.epsilon.retain(|i| i < &size);
@@ -392,7 +399,7 @@ fn cut_nonsense<I: Clone + Ord>(v: &mut Vec<State<I>>) {
 /// Step through an automaton one token at a time.
 #[cfg(test)]
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) struct Stepper<'graph, I: Clone + Ord> {
+pub(crate) struct Stepper<'graph, I: Clone + Expression + Ord> {
     /// The graph we're riding.
     graph: &'graph Graph<I>,
     /// Current state after the input we've received so far.
@@ -400,7 +407,7 @@ pub(crate) struct Stepper<'graph, I: Clone + Ord> {
 }
 
 #[cfg(test)]
-impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
+impl<'graph, I: Clone + Expression + Ord> Stepper<'graph, I> {
     /// Start from the empty string on a certain automaton.
     #[inline]
     #[must_use]
@@ -427,7 +434,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
     #[inline]
     fn currently_accepting(&self) -> bool {
         for &index in &self.state {
-            if get!(self.graph.states, index).accepting {
+            if get!(self.graph.states, index).accepting.is_some() {
                 return true;
             }
         }
@@ -436,7 +443,7 @@ impl<'graph, I: Clone + Ord> Stepper<'graph, I> {
 }
 
 #[cfg(test)]
-impl<I: Clone + Ord, B: Borrow<I>> Extend<B> for Stepper<'_, I> {
+impl<I: Clone + Expression + Ord, B: Borrow<I>> Extend<B> for Stepper<'_, I> {
     #[inline]
     fn extend<T: IntoIterator<Item = B>>(&mut self, iter: T) {
         for input in iter {

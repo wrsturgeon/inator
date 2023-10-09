@@ -134,7 +134,7 @@ macro_rules! get_mut {
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! get_mut {
     ($expr:expr, $index:expr) => {{
-        #[allow(unsafe_code)]
+        #[allow(unsafe_code, unused_unsafe)]
         let result = unsafe { $expr.get_unchecked_mut($index) };
         result
     }};
@@ -168,21 +168,21 @@ use call::Call;
 /// Accept only the empty string.
 #[must_use]
 #[inline(always)]
-pub fn empty<I: Clone + Ord>() -> Parser<I> {
+pub fn empty<I: Clone + Expression + Ord>() -> Parser<I> {
     Parser::empty()
 }
 
 /// Accept this token if we see it here, but throw it away.
 #[must_use]
 #[inline(always)]
-pub fn ignore<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn ignore<I: Clone + Expression + Ord>(token: I) -> Parser<I> {
     Parser::unit(token, Call::Pass)
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
-pub fn on<I: Clone + Ord>(token: I, fn_name: &str) -> Parser<I> {
+pub fn on<I: Clone + Expression + Ord>(token: I, fn_name: &str) -> Parser<I> {
     Parser::unit(token, Call::WithoutToken(fn_name.to_owned()))
 }
 
@@ -196,7 +196,10 @@ pub fn on<I: Clone + Ord>(token: I, fn_name: &str) -> Parser<I> {
 #[must_use]
 #[inline(always)]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II, fn_name: &str) -> Parser<I> {
+pub fn on_seq<I: Clone + Expression + Ord, II: IntoIterator<Item = I>>(
+    tokens: II,
+    fn_name: &str,
+) -> Parser<I> {
     let mut iter = tokens.into_iter();
     iter.next()
         .map_or_else(empty, |first| on(first, fn_name) >> seq(iter.map(ignore)))
@@ -205,7 +208,7 @@ pub fn on_seq<I: Clone + Ord, II: IntoIterator<Item = I>>(tokens: II, fn_name: &
 /// Accept either this token or nothing.
 #[inline]
 #[must_use]
-pub fn opt<I: Clone + Ord>(token: I) -> Parser<I> {
+pub fn opt<I: Clone + Expression + Ord>(token: I) -> Parser<I> {
     ignore(token).optional()
 }
 
@@ -237,7 +240,9 @@ pub fn parenthesized(p: Parser<char>) -> Parser<char> {
 /// Accept anything accepted by any of these parsers.
 #[inline]
 #[must_use]
-pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II) -> Parser<I> {
+pub fn any<I: Clone + Expression + Ord, II: IntoIterator<Item = Parser<I>>>(
+    alternatives: II,
+) -> Parser<I> {
     alternatives
         .into_iter()
         .fold(Parser::void(), |acc, p| acc | p)
@@ -247,6 +252,8 @@ pub fn any<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(alternatives: II)
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn seq<I: Clone + Ord, II: IntoIterator<Item = Parser<I>>>(in_order: II) -> Parser<I> {
+pub fn seq<I: Clone + Expression + Ord, II: IntoIterator<Item = Parser<I>>>(
+    in_order: II,
+) -> Parser<I> {
     in_order.into_iter().fold(empty(), |acc, p| acc >> p)
 }

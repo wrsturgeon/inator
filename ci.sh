@@ -41,3 +41,6 @@ if [ $? -eq 0 ]
 then
   exit 1
 fi
+
+# Print remaining `TODO`s
+grep -Rnw . -e TODO
