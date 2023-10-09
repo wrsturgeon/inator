@@ -51,9 +51,8 @@ impl<I: Clone + Expression + Ord> Nfa<I> {
                         Entry::Occupied(entry) => {
                             let &mut nfa::Transition {
                                 dsts: ref mut mut_set,
-                                call: ref existing_fn_name,
+                                ..
                             } = entry.into_mut();
-                            assert_eq!(*call, *existing_fn_name, "MESSAGE TODO");
                             let _ = mut_set.insert(src);
                         }
                     }

@@ -244,6 +244,7 @@ impl<I: Clone + Expression + Ord + Debug> Nfa<I> {
                 match (acc, get!(self.states, i).accepting.clone()) {
                     (None, None) => None,
                     (Some(x), None) | (None, Some(x)) => Some(x),
+                    (Some(a), Some(b)) if a == b => Some(a),
                     (Some(a), Some(b)) => panic!(
                         "Parsing ambiguity after [{}] if input ends here: \
                         can't decide between {} and {}.",

@@ -42,6 +42,15 @@ impl Call {
         }
     }
 
+    /// Remove all calls (set them to `None`).
+    #[must_use]
+    #[cfg(test)]
+    #[inline(always)]
+    #[allow(clippy::unused_self)]
+    pub(crate) fn remove_calls(self) -> Self {
+        Self::Pass
+    }
+
     /// Check if two calls are compatible and can be reduced or postponed.
     #[inline]
     pub(crate) fn compat(self, other: Self) -> Option<Result<Self, (bool, Self, Self)>> {

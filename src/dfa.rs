@@ -952,7 +952,7 @@ impl<I: Clone + Expression + Ord> State<I> {
                 .into_iter()
                 .map(|(token, transition)| (token, transition.remove_calls()))
                 .collect(),
-            ..self
+            accepting: self.accepting.map(Call::remove_calls),
         }
     }
 

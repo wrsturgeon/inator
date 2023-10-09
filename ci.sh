@@ -2,7 +2,6 @@
 
 set -eux
 
-export RUST_BACKTRACE=1
 export MIRIFLAGS=-Zmiri-backtrace=1
 
 # Update our workbench
