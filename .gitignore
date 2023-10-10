@@ -3,3 +3,4 @@
 **/autogen.rs
 **/Cargo.lock
 !/Cargo.lock
+/examples/**/parser.rs
