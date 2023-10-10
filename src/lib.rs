@@ -142,7 +142,7 @@ macro_rules! get_mut {
 
 // TODO: write an inherent impl for `Nfa<char>` with a bunch of stuff like `parenthesized`
 
-// TODO: have a recommended path for each thing, e.g. instead of `optional` have `encouraged` and `discouraged` then use this to format
+// TODO: fucking use ranges! it's absolutely ridiculous to have a separate branch for each value of `char`
 
 mod brzozowski;
 mod call;
@@ -183,7 +183,7 @@ pub fn ignore<I: Clone + Expression + Ord>(token: I) -> Parser<I> {
 #[must_use]
 #[inline(always)]
 pub fn on<I: Clone + Expression + Ord>(token: I, fn_name: &str) -> Parser<I> {
-    Parser::unit(token, Call::WithoutToken(fn_name.to_owned()))
+    Parser::unit(token, Call::WithoutToken(vec![fn_name.to_owned()]))
 }
 
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

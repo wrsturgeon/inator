@@ -414,7 +414,7 @@ impl<I: Clone + Expression + Ord> nfa::State<I> {
             transition
                 .call
                 .take_responsibility_for(call.clone(), did_anything);
-            //        ^^^^^ crucial that we call `Call::take_resp...` rather than `State::take_resp...`
+            //        ^^^^^ crucial that we call `Call::take_resp...` rather than `State::take_resp...` to avoid infinite recursion
         }
     }
 }
@@ -425,14 +425,29 @@ impl Call {
     #[allow(clippy::panic)] // <-- TODO
     fn take_responsibility_for(&mut self, call: Call, did_anything: &mut bool) {
         *did_anything = true;
-        match (&*self, call) {
-            (&Self::Pass, other) => *self = other,
-            (_, Self::Pass) => {}
-            _ => panic!(
+        if call == Self::Pass || *self == call {
+            return;
+        }
+        match *self {
+            Self::Pass => *self = call,
+            Self::Stash => panic!(
                 "Not yet implemented. \
                 Please open a pull request with the \
-                exact conditions that led to this error.",
+                conditions that led to this error \
+                and a copy of the following: \
+                \"({self:?}, {call:?})\"",
             ),
+            Self::WithToken(ref mut stack) | Self::WithoutToken(ref mut stack) => match call {
+                Self::Pass => {}
+                Self::Stash => panic!(
+                    "Not yet implemented. \
+                    Please open a pull request with the \
+                    conditions that led to this error \
+                    and a copy of the following: \
+                    \"({self:?}, {call:?})\"",
+                ),
+                Self::WithToken(other) | Self::WithoutToken(other) => stack.extend(other),
+            },
         }
     }
 }

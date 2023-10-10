@@ -6,10 +6,9 @@
 
 //! User-defined functions to call on transitions.
 
-use crate::dfa::config_path;
 use core::iter::once;
 use proc_macro2::{Ident, Span};
-use syn::{token::Paren, Expr, ExprCall, ExprPath, Path, PathArguments, PathSegment};
+use syn::{Expr, ExprPath, Path, PathArguments, PathSegment};
 
 #[cfg(feature = "quickcheck")]
 use quickcheck::*;
@@ -25,9 +24,9 @@ pub(crate) enum Call {
     /// Read this token onto the stack but don't call yet.
     Stash,
     /// Read this token and immediately call a function on it, which becomes an identifier only AFTER `build.rs`.
-    WithToken(String),
+    WithToken(Vec<String>),
     /// Ignore this token and immediately call a function, which becomes an identifier only AFTER `build.rs`.
-    WithoutToken(String),
+    WithoutToken(Vec<String>),
 }
 
 #[allow(clippy::multiple_inherent_impl)]
@@ -38,7 +37,9 @@ impl Call {
         match *self {
             Self::Pass => "discarding the token".to_owned(),
             Self::Stash => "stashing the token for later".to_owned(),
-            Self::WithToken(ref name) | Self::WithoutToken(ref name) => format!("calling `{name}`"),
+            Self::WithToken(ref stack) | Self::WithoutToken(ref stack) => {
+                format!("calling {stack:?}")
+            }
         }
     }
 
@@ -57,26 +58,29 @@ impl Call {
         match (self, other) {
             (Self::Pass, Self::Pass) => Some(Ok(Self::Pass)),
             (Self::Pass | Self::Stash, Self::Pass | Self::Stash) => Some(Ok(Self::Stash)),
-            (Self::WithToken(lhs), Self::WithToken(rhs)) if lhs == rhs => {
-                Some(Ok(Self::WithToken(lhs)))
-            }
-            (Self::WithoutToken(lhs), Self::WithoutToken(rhs)) if lhs == rhs => {
-                Some(Ok(Self::WithoutToken(lhs)))
+            (lhs @ Self::WithToken { .. }, rhs @ Self::WithToken { .. })
+            | (lhs @ Self::WithoutToken { .. }, rhs @ Self::WithoutToken { .. })
+                if lhs == rhs =>
+            {
+                Some(Ok(lhs))
             }
             // Rust forbids identically named functions with different arguments
-            (Self::WithToken(_), Self::WithoutToken(_))
-            | (Self::WithoutToken(_), Self::WithToken(_)) => None,
-            (lhs @ Self::WithToken(_), Self::Pass | Self::Stash) => {
+            (Self::WithToken { .. }, Self::WithoutToken { .. })
+            | (Self::WithoutToken { .. }, Self::WithToken { .. }) => None,
+            (lhs @ Self::WithToken { .. }, Self::Pass | Self::Stash) => {
                 Some(Err((true, lhs, Self::Pass)))
             }
-            (lhs @ Self::WithoutToken(_), Self::Pass | Self::Stash) => {
+            (lhs @ Self::WithoutToken { .. }, Self::Pass | Self::Stash) => {
                 Some(Err((false, lhs, Self::Pass)))
             }
-            (Self::Pass | Self::Stash, rhs @ (Self::WithToken(_) | Self::WithoutToken(_))) => {
-                Some(Err((false, Self::Pass, rhs)))
+            (
+                Self::Pass | Self::Stash,
+                rhs @ (Self::WithToken { .. } | Self::WithoutToken { .. }),
+            ) => Some(Err((false, Self::Pass, rhs))),
+            (lhs @ Self::WithToken { .. }, rhs @ Self::WithToken { .. }) => {
+                Some(Err((true, lhs, rhs)))
             }
-            (lhs @ Self::WithToken(_), rhs @ Self::WithToken(_)) => Some(Err((true, lhs, rhs))),
-            (lhs @ Self::WithoutToken(_), rhs @ Self::WithoutToken(_)) => {
+            (lhs @ Self::WithoutToken { .. }, rhs @ Self::WithoutToken { .. }) => {
                 Some(Err((false, lhs, rhs)))
             }
         }
@@ -84,6 +88,7 @@ impl Call {
 
     /// Convert to a `syn::Expr`.
     #[inline]
+    #[allow(clippy::todo)] // <-- FIXME
     pub(crate) fn to_expr(&self) -> Expr {
         match *self {
             Self::Pass => Expr::Path(ExprPath {
@@ -110,65 +115,67 @@ impl Call {
                     .collect(),
                 },
             }),
-            Self::WithToken(ref name) => Expr::Call(ExprCall {
-                attrs: vec![],
-                func: Box::new(Expr::Path(ExprPath {
-                    attrs: vec![],
-                    qself: None,
-                    path: config_path(name, name),
-                })),
-                paren_token: Paren::default(),
-                args: [
-                    Expr::Path(ExprPath {
-                        attrs: vec![],
-                        qself: None,
-                        path: Path {
-                            leading_colon: None,
-                            segments: once(PathSegment {
-                                ident: Ident::new("acc", Span::call_site()),
-                                arguments: PathArguments::None,
-                            })
-                            .collect(),
-                        },
-                    }),
-                    Expr::Path(ExprPath {
-                        attrs: vec![],
-                        qself: None,
-                        path: Path {
-                            leading_colon: None,
-                            segments: once(PathSegment {
-                                ident: Ident::new("token", Span::call_site()),
-                                arguments: PathArguments::None,
-                            })
-                            .collect(),
-                        },
-                    }),
-                ]
-                .into_iter()
-                .collect(),
-            }),
-            Self::WithoutToken(ref name) => Expr::Call(ExprCall {
-                attrs: vec![],
-                func: Box::new(Expr::Path(ExprPath {
-                    attrs: vec![],
-                    qself: None,
-                    path: config_path(name, name),
-                })),
-                paren_token: Paren::default(),
-                args: once(Expr::Path(ExprPath {
-                    attrs: vec![],
-                    qself: None,
-                    path: Path {
-                        leading_colon: None,
-                        segments: once(PathSegment {
-                            ident: Ident::new("acc", Span::call_site()),
-                            arguments: PathArguments::None,
-                        })
-                        .collect(),
-                    },
-                }))
-                .collect(),
-            }),
+            Self::WithToken(ref _stack) => todo!(),
+            // Expr::Call(ExprCall {
+            //     attrs: vec![],
+            //     func: Box::new(Expr::Path(ExprPath {
+            //         attrs: vec![],
+            //         qself: None,
+            //         path: config_path(name, name),
+            //     })),
+            //     paren_token: Paren::default(),
+            //     args: [
+            //         Expr::Path(ExprPath {
+            //             attrs: vec![],
+            //             qself: None,
+            //             path: Path {
+            //                 leading_colon: None,
+            //                 segments: once(PathSegment {
+            //                     ident: Ident::new("acc", Span::call_site()),
+            //                     arguments: PathArguments::None,
+            //                 })
+            //                 .collect(),
+            //             },
+            //         }),
+            //         Expr::Path(ExprPath {
+            //             attrs: vec![],
+            //             qself: None,
+            //             path: Path {
+            //                 leading_colon: None,
+            //                 segments: once(PathSegment {
+            //                     ident: Ident::new("token", Span::call_site()),
+            //                     arguments: PathArguments::None,
+            //                 })
+            //                 .collect(),
+            //             },
+            //         }),
+            //     ]
+            //     .into_iter()
+            //     .collect(),
+            // }),
+            Self::WithoutToken(ref _stack) => todo!(),
+            // Expr::Call(ExprCall {
+            //     attrs: vec![],
+            //     func: Box::new(Expr::Path(ExprPath {
+            //         attrs: vec![],
+            //         qself: None,
+            //         path: config_path(name, name),
+            //     })),
+            //     paren_token: Paren::default(),
+            //     args: once(Expr::Path(ExprPath {
+            //         attrs: vec![],
+            //         qself: None,
+            //         path: Path {
+            //             leading_colon: None,
+            //             segments: once(PathSegment {
+            //                 ident: Ident::new("acc", Span::call_site()),
+            //                 arguments: PathArguments::None,
+            //             })
+            //             .collect(),
+            //         },
+            //     }))
+            //     .collect(),
+            // }),
         }
     }
 }
