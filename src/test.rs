@@ -14,7 +14,7 @@ use {core::cmp::Ordering, quickcheck::*};
 
 #[cfg(not(feature = "quickcheck"))]
 use {
-    crate::call::Call,
+    crate::{call::Call, range::Range},
     core::{fmt::Debug, iter::once, panic::RefUnwindSafe},
     std::collections::{BTreeMap, BTreeSet},
 };
@@ -169,7 +169,7 @@ mod prop {
             if reject == accept {
                 return TestResult::discard();
             }
-            let nfa = Nfa::unit(singleton, Call::Pass);
+            let nfa = Nfa::unit(Range::singleton(singleton), Call::Pass);
             TestResult::from_bool(nfa.accept(accept) && !nfa.accept(reject))
         }
 
@@ -413,7 +413,7 @@ mod reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: once((0, nfa::Transition::default())).collect(),
+                    non_epsilon: once((Range::singleton(0), nfa::Transition::default())).collect(),
                     accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
@@ -450,7 +450,8 @@ mod reduced {
             &Nfa {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
-                    non_epsilon: once((255, nfa::Transition::default())).collect(),
+                    non_epsilon: once((Range::singleton(255), nfa::Transition::default()))
+                        .collect(),
                     accepting: Some(Call::Pass),
                 }],
                 initial: once(0).collect(),
@@ -472,7 +473,7 @@ mod reduced {
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: once((
-                            255,
+                            Range::singleton(255),
                             nfa::Transition {
                                 dsts: once(0).collect(),
                                 call: Call::Pass,
@@ -543,7 +544,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: once((
-                        0,
+                        Range::singleton(0),
                         nfa::Transition {
                             dsts: once(0).collect(),
                             call: Call::Pass,
@@ -603,7 +604,7 @@ mod reduced {
                 states: vec![nfa::State {
                     epsilon: BTreeSet::new(),
                     non_epsilon: once((
-                        1,
+                        Range::singleton(1),
                         nfa::Transition {
                             dsts: once(0).collect(),
                             call: Call::Pass,
@@ -658,7 +659,7 @@ mod reduced {
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: once((
-                            2,
+                            Range::singleton(2),
                             nfa::Transition {
                                 dsts: once(1).collect(),
                                 call: Call::Pass,
@@ -675,7 +676,7 @@ mod reduced {
                     nfa::State {
                         epsilon: BTreeSet::new(),
                         non_epsilon: once((
-                            1,
+                            Range::singleton(1),
                             nfa::Transition {
                                 dsts: once(1).collect(),
                                 call: Call::Pass,

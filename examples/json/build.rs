@@ -1,12 +1,12 @@
 //! Literal transcription of <https://www.json.org/json-en.html>
 
-use inator::{any, ignore, on, on_seq, space, Parser};
+use inator::{any, ignore, on, on_range, on_seq, space, Parser};
 
 fn parser() -> Parser<char> {
     // Define a bunch of parsers, starting small, and keep combining until we have a full JSON parser.
 
     // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-    let digit = any(('0'..='9').map(|c| on(c, "digit")));
+    let digit = on_range('0'..='9', "digit");
 
     // e.g. -1.000e-10
     //            ^^^^
@@ -24,10 +24,9 @@ fn parser() -> Parser<char> {
         on('-', "negative").optional() >> digit.repeat() >> fractional.optional() >> exp.optional();
 
     // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F
-    let hex = any(('0'..='9')
-        .chain('A'..'F')
-        .chain('a'..'f')
-        .map(|c| on(c, "hex_digit")));
+    let hex = on_range('0'..='9', "hex_digit_digit")
+        | on_range('A'..='F', "hex_digit_capitalized")
+        | on_range('a'..='f', "hex_digit_lowercase");
 
     // e.g. \u47FD
     //        ^^^^
@@ -46,7 +45,7 @@ fn parser() -> Parser<char> {
             | on('t', "esc_t"));
 
     // Any usual character in a string (not the above, not control characters like delete).
-    let non_escaped_character = any((0..u8::MAX)
+    let non_escaped_character = any((0..=127)
         .filter(|&c| c != b'"' && c != b'\\' && !c.is_ascii_control())
         .map(|c| on(c.into(), "character")));
 

@@ -8,7 +8,7 @@
 
 use crate::{Compiled as Dfa, Expression};
 use core::fmt;
-use rand::{rngs::ThreadRng, Rng};
+use rand::{distributions::uniform::SampleUniform, rngs::ThreadRng, Rng};
 
 /// Infinite iterator over inputs guaranteed to be accepted by a given automaton.
 #[derive(Clone, Debug)]
@@ -24,7 +24,7 @@ pub struct Fuzzer<I: Clone + Expression + Ord> {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NeverAccepts;
 
-impl<I: Clone + Expression + Ord> Iterator for Fuzzer<I> {
+impl<I: Clone + Expression + Ord + SampleUniform> Iterator for Fuzzer<I> {
     type Item = Vec<I>;
     #[inline]
     #[allow(clippy::unwrap_in_result)]
@@ -46,7 +46,7 @@ impl<I: Clone + Expression + Ord> Iterator for Fuzzer<I> {
                     .transitions
                     .keys()
                     .nth(self.rng.gen_range(0..state.transitions.len())));
-                v.push(key.clone());
+                v.push(key.random(&mut self.rng));
                 index = unwrap!(state.transitions.get(key)).dst;
             }
         }

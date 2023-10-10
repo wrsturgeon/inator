@@ -8,7 +8,7 @@
 
 #![cfg_attr(test, allow(dead_code))] // <-- FIXME
 
-use crate::{call::Call, nfa, Expression};
+use crate::{call::Call, nfa, range::Range, Expression};
 use core::{
     cmp::{Ordering, Reverse},
     fmt::{self, Debug, Display},
@@ -40,7 +40,7 @@ use quickcheck::*;
 type Subset = BTreeSet<usize>;
 
 /// From a single state, all tokens and the transitions each would induce.
-type Transitions<I> = BTreeMap<I, Transition>;
+type Transitions<I> = BTreeMap<Range<I>, Transition>;
 
 /// A single edge triggered by a token.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -76,7 +76,7 @@ impl<I: Clone + Expression + Ord> Graph<I> {
     pub fn accept<Iter: IntoIterator<Item = I>>(&self, iter: Iter) -> bool {
         let mut state = self.initial;
         for input in iter {
-            match get!(self.states, state).transition(&input) {
+            match get!(self.states, state).find_transition(&input) {
                 Some(&Transition { dst, .. }) => state = dst,
                 None => return false,
             }
@@ -177,7 +177,7 @@ impl<I: Clone + Expression + Ord> Graph<I> {
             let state = get!(self.states, index);
             for (token, &Transition { dst, .. }) in &state.transitions {
                 if let Entry::Vacant(entry) = cache.entry(dst) {
-                    entry.insert(cached.clone()).push(token.clone());
+                    entry.insert(cached.clone()).push(token.start.clone());
                     queue.push(Reverse(CmpFirst(distance.saturating_add(1), dst)));
                 }
             }
@@ -937,8 +937,19 @@ fn invert<K: Ord, V: Ord>(map: &BTreeMap<K, V>) -> BTreeMap<&V, BTreeSet<&K>> {
 impl<I: Clone + Expression + Ord> State<I> {
     /// State to which this state can transition on a given input.
     #[inline]
-    pub(crate) fn transition(&self, input: &I) -> Option<&Transition> {
-        self.transitions.get(input)
+    pub(crate) fn find_transition(&self, input: &I) -> Option<&Transition> {
+        // self.transitions.get(input)
+        let mut found = None;
+        for (range, transition) in &self.transitions {
+            if range.contains(input) {
+                assert_eq!(
+                    found, None,
+                    "Duplicate transition (TODO: improve error message here!)",
+                );
+                found = Some(transition);
+            }
+        }
+        found
     }
 
     /// Remove all calls (set them to `None`).

@@ -152,6 +152,7 @@ mod fuzz;
 mod nfa;
 mod ops;
 mod powerset_construction;
+mod range;
 
 #[cfg(test)]
 mod test;
@@ -163,7 +164,8 @@ pub use {
     nfa::Graph as Parser,
 };
 
-use call::Call;
+use crate::{call::Call, range::Range};
+use core::ops::RangeInclusive;
 
 /// Accept only the empty string.
 #[must_use]
@@ -176,14 +178,31 @@ pub fn empty<I: Clone + Expression + Ord>() -> Parser<I> {
 #[must_use]
 #[inline(always)]
 pub fn ignore<I: Clone + Expression + Ord>(token: I) -> Parser<I> {
-    Parser::unit(token, Call::Pass)
+    Parser::unit(Range::singleton(token), Call::Pass)
 }
 
 /// Accept this token if we see it here, then call this user-defined function on it.
 #[must_use]
 #[inline(always)]
 pub fn on<I: Clone + Expression + Ord>(token: I, fn_name: &str) -> Parser<I> {
-    Parser::unit(token, Call::WithoutToken(vec![fn_name.to_owned()]))
+    Parser::unit(
+        Range::singleton(token),
+        Call::WithoutToken(vec![fn_name.to_owned()]),
+    )
+}
+
+/// Accept this token if we see it here, but throw it away.
+#[must_use]
+#[inline(always)]
+pub fn ignore_range<I: Clone + Expression + Ord>(token: RangeInclusive<I>) -> Parser<I> {
+    Parser::unit(token.into(), Call::Pass)
+}
+
+/// Accept this token if we see it here, then call this user-defined function on it.
+#[must_use]
+#[inline(always)]
+pub fn on_range<I: Clone + Expression + Ord>(token: RangeInclusive<I>, fn_name: &str) -> Parser<I> {
+    Parser::unit(token.into(), Call::WithoutToken(vec![fn_name.to_owned()]))
 }
 
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -210,6 +229,13 @@ pub fn on_seq<I: Clone + Expression + Ord, II: IntoIterator<Item = I>>(
 #[must_use]
 pub fn opt<I: Clone + Expression + Ord>(token: I) -> Parser<I> {
     ignore(token).optional()
+}
+
+/// Accept either this token or nothing.
+#[inline]
+#[must_use]
+pub fn opt_range<I: Clone + Expression + Ord>(token: RangeInclusive<I>) -> Parser<I> {
+    ignore_range(token).optional()
 }
 
 /// A single character of whitespace (or exactly one "\r\n").

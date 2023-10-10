@@ -7,7 +7,7 @@
 //! The powerset construction algorithm for constructing an equivalent DFA from an arbitrary NFA.
 //! Also known as the subset construction algorithm.
 
-use crate::{call::Call, dfa, nfa, Compiled as Dfa, Expression, Parser as Nfa};
+use crate::{call::Call, dfa, nfa, range::Range, Compiled as Dfa, Expression, Parser as Nfa};
 use core::fmt::Debug;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
@@ -15,11 +15,11 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 type Subset = BTreeSet<usize>;
 
 /// From a single state, all tokens and the transitions each would induce.
-type Transitions<I> = BTreeMap<I, Transition<I>>;
+type Transitions<I> = BTreeMap<Range<I>, Transition<I>>;
 
 /// A single edge triggered by a token.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct Transition<I> {
+struct Transition<I: Clone + Ord> {
     /// Set of destination states.
     dsts: Subset,
     /// Function (or none) to call on this edge.
@@ -27,14 +27,14 @@ struct Transition<I> {
     /// Index of the state this transition *leaves*.
     from_state: usize,
     /// Token that triggers this transition.
-    on_token: I,
+    on_token: Range<I>,
     /// Minimal reproducible input string to reach this transition.
     breadcrumbs: Vec<I>,
 }
 
 /// A collection of outgoing edges and a boolean to mark accepting states.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct SubsetState<I> {
+struct SubsetState<I: Clone + Ord> {
     /// Transitions from this subset of states to other subsets on certain tokens.
     transitions: Transitions<I>,
     /// Whether we should accept a string that ends in this state.
@@ -50,13 +50,13 @@ struct Postpone<I: Clone + Expression + Ord> {
     /// Origin of the transition on the original graph.
     l_state: usize,
     /// Token that generates an ambiguous transition.
-    l_token: I,
+    l_token: Range<I>,
     /// Sequence of tokens that could lead to `l_state`.
     l_so_far: Vec<I>,
     /// Origin of the transition on the original graph.
     r_state: usize,
     /// Token that generates an ambiguous transition.
-    r_token: I,
+    r_token: Range<I>,
     /// Sequence of tokens that could lead to `r_state`.
     r_so_far: Vec<I>,
     /// Whether to save the value of this token for later.
@@ -132,8 +132,9 @@ impl<I: Clone + Expression + Ord + Debug> Nfa<I> {
     #[inline]
     #[allow(clippy::panic)]
     fn postpone_ambiguities(&mut self) -> (SubsetsAsStates<I>, Subset) {
-        #[allow(clippy::default_numeric_fallback)]
-        for _ in 0..1000 {
+        // #[allow(clippy::default_numeric_fallback)]
+        // for _ in 0..(1_usize << self.states.len()) {
+        loop {
             let pre = self.clone();
             let mut subsets_as_states = SubsetsAsStates::new();
             match self.traverse(
@@ -159,6 +160,10 @@ impl<I: Clone + Expression + Ord + Debug> Nfa<I> {
                         replace.clone();
                     unwrap!(get_mut!(self.states, r_idx).non_epsilon.get_mut(r_token)).call =
                         replace;
+                    #[allow(clippy::print_stdout)]
+                    {
+                        println!("Postponing ({pl:?}, {pr:?}) from (#{l_idx} on {l_token:?}, #{r_idx} on {r_token:?}). So far: {l_so_far:?}");
+                    }
                     self.postpone(l_idx, &pl, l_so_far, l_token);
                     self.postpone(r_idx, &pr, r_so_far, r_token);
                 }
@@ -170,11 +175,11 @@ impl<I: Clone + Expression + Ord + Debug> Nfa<I> {
                 Please report!",
             );
         }
-        panic!("Timed out");
+        // panic!("Timed out");
     }
 
     /// Postpone a call that's already been removed to the set of states that could follow the one it was removed form.
-    fn postpone(&mut self, idx: usize, call: &Call, mut so_far: Vec<I>, token: &I) {
+    fn postpone(&mut self, idx: usize, call: &Call, mut so_far: Vec<I>, token: &Range<I>) {
         let mut did_anything = false;
         let mut neighbors: Vec<usize> = self
             .take_all_epsilon_transitions(vec![idx])
@@ -279,7 +284,7 @@ impl<I: Clone + Expression + Ord + Debug> Nfa<I> {
             {
                 // ... compute the input string that reached this state ...
                 let mut input_string = so_far.clone();
-                input_string.push(token.clone());
+                input_string.push(token.start.clone());
                 // ... check if we already have any other transitions on that token.
                 match transitions.entry(token.clone()) {
                     // If we don't, ...

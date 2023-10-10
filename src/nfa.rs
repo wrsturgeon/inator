@@ -8,7 +8,7 @@
 
 #![cfg_attr(test, allow(dead_code))] // <-- FIXME
 
-use crate::{call::Call, Expression};
+use crate::{call::Call, range::Range, Expression};
 use core::{
     fmt::{self, Debug, Display},
     iter::once,
@@ -29,7 +29,7 @@ use quickcheck::*;
 type Subset = BTreeSet<usize>;
 
 /// From a single state, all tokens and the transitions each would induce.
-type Transitions<I> = BTreeMap<I, Transition>;
+type Transitions<I> = BTreeMap<Range<I>, Transition>;
 
 /// A single edge triggered by a token.
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -137,8 +137,8 @@ impl<I: Clone + Expression + Ord> Graph<I> {
     #[inline]
     #[must_use]
     #[allow(clippy::arithmetic_side_effects)]
-    pub(crate) fn unit(singleton: I, call: Call) -> Self {
-        Self::empty() >> (singleton, call, Self::empty())
+    pub(crate) fn unit(range: Range<I>, call: Call) -> Self {
+        Self::empty() >> (range, call, Self::empty())
     }
 
     /// Take every transition that doesn't require input.
@@ -244,8 +244,19 @@ impl<I: Clone + Expression + Ord> State<I> {
     /// Set of states to which this state can transition on a given input.
     #[inline]
     #[cfg(test)]
-    pub(crate) fn transition(&self, input: &I) -> Option<&Transition> {
-        self.non_epsilon.get(input)
+    pub(crate) fn find_transition(&self, input: &I) -> Option<&Transition> {
+        // self.non_epsilon.get(input)
+        let mut found = None;
+        for (range, transition) in &self.non_epsilon {
+            if range.contains(input) {
+                assert_eq!(
+                    found, None,
+                    "Duplicate transition (TODO: improve error message here!)",
+                );
+                found = Some(transition);
+            }
+        }
+        found
     }
 }
 
@@ -343,7 +354,7 @@ impl<I: Expression + Ord + Arbitrary> Arbitrary for State<I> {
     fn arbitrary(g: &mut Gen) -> Self {
         Self {
             epsilon: Arbitrary::arbitrary(g),
-            non_epsilon: BTreeMap::<I, Subset>::arbitrary(g)
+            non_epsilon: BTreeMap::<Range<I>, Subset>::arbitrary(g)
                 .into_iter()
                 .map(|(k, v)| {
                     (
@@ -425,7 +436,7 @@ impl<'graph, I: Clone + Expression + Ord> Stepper<'graph, I> {
         self.state = self.graph.take_all_epsilon_transitions(
             self.state
                 .iter()
-                .filter_map(|&index| get!(self.graph.states, index).transition(token))
+                .filter_map(|&index| get!(self.graph.states, index).find_transition(token))
                 .flat_map(|&Transition { ref dsts, .. }| dsts.iter().copied())
                 .collect(),
         );
