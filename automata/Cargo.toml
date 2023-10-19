@@ -1,0 +1,21 @@
+[package]
+name = "inator-automata"
+authors = ["Will Sturgeon <willstrgn@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+description = "Automata loosely based on visibly pushdown automata."
+license = "MPL-2.0"
+repository = "https://github.com/wrsturgeon/inator"
+build = "build.rs"
+
+[dependencies]
+# none
+
+# Optional dependencies:
+quickcheck = { version = "1.0.3", optional = true }
+
+[dev-dependencies]
+rand = "0.8.5"
+
+[features]
+quickcheck = ["dep:quickcheck"]
