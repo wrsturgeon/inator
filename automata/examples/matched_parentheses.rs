@@ -1,6 +1,6 @@
 use core::iter;
 use inator_automata::{
-    call, Action, CurryInput, CurryStack, Deterministic, Graph, Range, RangeMap, Run, State,
+    update, Action, CurryInput, CurryStack, Deterministic, Graph, Range, RangeMap, Run, State,
     Transition,
 };
 use rand::{thread_rng, RngCore};
@@ -11,7 +11,7 @@ enum Symbol {
 }
 
 /// Very manually constructed parser recognizing only valid parentheses.
-fn parser() -> Deterministic<char, Symbol> {
+fn parser() -> Deterministic<char, Symbol, ()> {
     Graph {
         states: vec![State {
             transitions: CurryStack {
@@ -20,10 +20,8 @@ fn parser() -> Deterministic<char, Symbol> {
                         Range::unit('('),
                         Transition {
                             dst: 0,
-                            act: Action::Push {
-                                f: call!(|x| {}),
-                                push: Symbol::Paren,
-                            },
+                            update: update!(|(), _| ()),
+                            act: Action::Push(Symbol::Paren),
                         },
                     )],
                 })),
@@ -35,7 +33,8 @@ fn parser() -> Deterministic<char, Symbol> {
                             Range::unit(')'),
                             Transition {
                                 dst: 0,
-                                act: Action::Pop { f: call!(|x| {}) },
+                                update: update!(|(), _| ()),
+                                act: Action::Pop,
                             },
                         )],
                     }),
@@ -97,11 +96,12 @@ pub fn main() {
     // Accept all valid strings
     for _ in 0..5 {
         let s = generate(&mut rng);
-        println!("{s}");
+        println!();
+        println!("\"{s}\"");
         let mut run = s.chars().run(&parser);
-        println!("    {run:?}");
+        println!("{run:?}");
         while run.next().is_some() {
-            println!("    {run:?}");
+            println!("{run:?}");
         }
         assert_eq!(run.ctrl, Err(true));
     }
@@ -109,11 +109,12 @@ pub fn main() {
     // Reject all invalid strings
     for _ in 0..5 {
         let s = shitpost(&mut rng);
-        println!("{s}");
+        println!();
+        println!("\"{s}\"");
         let mut run = s.chars().run(&parser);
-        println!("    {run:?}");
+        println!("{run:?}");
         while run.next().is_some() {
-            println!("    {run:?}");
+            println!("{run:?}");
         }
         assert_eq!(run.ctrl, Err(accept(s.chars())));
     }

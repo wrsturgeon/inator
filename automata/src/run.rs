@@ -6,7 +6,8 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{Ctrl, Graph, InProgress, Input};
+use crate::{Ctrl, Graph, InProgress, Input, Output, Stack};
+use core::mem;
 
 /// Execute an automaton on an input sequence.
 pub trait Run: IntoIterator + Sized
@@ -15,10 +16,10 @@ where
 {
     /// Execute an automaton on an input sequence.
     #[must_use]
-    fn run<S, C: Ctrl>(
+    fn run<S: Stack, O: Output, C: Ctrl<Self::Item, S, O>>(
         self,
-        graph: &Graph<Self::Item, S, C>,
-    ) -> InProgress<'_, Self::IntoIter, S, C>;
+        graph: &Graph<Self::Item, S, O, C>,
+    ) -> InProgress<'_, Self::Item, S, O, C, Self::IntoIter>;
 }
 
 impl<In: IntoIterator> Run for In
@@ -27,15 +28,16 @@ where
 {
     #[inline]
     #[must_use]
-    fn run<S, C: Ctrl>(
+    fn run<S: Stack, O: Output, C: Ctrl<Self::Item, S, O>>(
         self,
-        graph: &Graph<Self::Item, S, C>,
-    ) -> InProgress<'_, Self::IntoIter, S, C> {
+        graph: &Graph<Self::Item, S, O, C>,
+    ) -> InProgress<'_, Self::Item, S, O, C, Self::IntoIter> {
         InProgress {
             graph,
             input: self.into_iter(),
             stack: vec![],
             ctrl: Ok(graph.initial.clone()),
+            output: mem::MaybeUninit::new(O::default()),
         }
     }
 }

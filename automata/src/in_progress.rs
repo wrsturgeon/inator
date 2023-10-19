@@ -6,65 +6,104 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{Ctrl, Graph, IllFormed, Input, Transition};
-use core::mem;
+use crate::{try_merge, Ctrl, Graph, IllFormed, Input, Output, Stack, Transition};
+use core::{fmt, mem};
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct InProgress<'graph, In: Iterator, S, C: Ctrl>
-where
-    In::Item: Input,
-{
+pub struct InProgress<
+    'graph,
+    I: Input,
+    S: Stack,
+    O: Output,
+    C: Ctrl<I, S, O>,
+    In: Iterator<Item = I>,
+> {
     /// Reference to the graph we're riding.
-    pub graph: &'graph Graph<In::Item, S, C>,
+    pub graph: &'graph Graph<I, S, O, C>,
     /// Iterator over input tokens.
     pub input: In,
     /// Internal stack.
     pub stack: Vec<S>,
     /// Internal state.
     pub ctrl: Result<C, bool>,
+    /// Output accumulator.
+    pub output: mem::MaybeUninit<O>,
 }
 
-impl<In: Iterator, S, C: Ctrl> Iterator for InProgress<'_, In, S, C>
-where
-    In::Item: Input,
+impl<
+        I: Input,
+        S: fmt::Debug + Stack,
+        O: fmt::Debug + Output,
+        C: Ctrl<I, S, O>,
+        In: Iterator<Item = I>,
+    > fmt::Debug for InProgress<'_, I, S, O, C, In>
 {
-    type Item = Result<In::Item, IllFormed<In::Item, S, C>>;
+    #[inline]
+    #[allow(unsafe_code)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "In progress: {:?} @ {:?} -> {:?}",
+            self.stack,
+            self.ctrl.as_ref().map(|c| c.view().collect::<Vec<_>>()),
+            // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
+            unsafe { self.output.assume_init_ref() },
+        )
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>, In: Iterator<Item = I>> Iterator
+    for InProgress<'_, I, S, O, C, In>
+{
+    type Item = Result<I, IllFormed<I, S, O, C>>;
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let maybe_token = self.input.next();
-        if self.ctrl.is_ok() {
-            match step(
+        if let Ok(ref ctrl) = self.ctrl {
+            let (c, o) = match step(
                 self.graph,
-                unwrap!(mem::replace(&mut self.ctrl, Err(false))),
-                &mut self.stack,
+                ctrl,
                 maybe_token.as_ref(),
+                &mut self.stack,
+                #[allow(unsafe_code)]
+                // SAFETY: All good: nowhere else uninitialized and initialized later in this function.
+                unsafe {
+                    mem::replace(&mut self.output, mem::MaybeUninit::uninit()).assume_init()
+                },
             ) {
-                Ok(ok) => self.ctrl = ok,
+                Ok(ok) => ok,
                 Err(e) => return Some(Err(e)),
             };
+            self.ctrl = c;
+            let _ = self.output.write(o);
         }
         maybe_token.map(Ok) // <-- Propagate the iterator's input
     }
 }
 
-fn step<I: Input, S, C: Ctrl>(
-    graph: &Graph<I, S, C>,
-    ctrl: C,
-    stack: &mut Vec<S>,
+/// Act on the automaton graph in response to one input token.
+#[inline]
+#[allow(clippy::type_complexity)]
+fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
+    graph: &Graph<I, S, O, C>,
+    ctrl: &C,
     maybe_token: Option<&I>,
-) -> Result<Result<C, bool>, IllFormed<I, S, C>> {
+    stack: &mut Vec<S>,
+    output: O,
+) -> Result<(Result<C, bool>, O), IllFormed<I, S, O, C>> {
     let mut states = ctrl.view().map(|i| get!(graph.states, i));
     let Some(token) = maybe_token else {
-        return Ok(Err(stack.is_empty() && states.any(|s| s.accepting)));
+        return Ok((Err(stack.is_empty() && states.any(|s| s.accepting)), output));
     };
     let maybe_stack_top = stack.last();
-    let edges = states.filter_map(|s| s.transitions.get((maybe_stack_top, (token, ()))));
-    let mega_edge: Transition<I, S, C> = match merge(edges) {
-        None => return Ok(Err(false)),
-        Some(Err(e)) => return Err(e),
-        Some(Ok(ok)) => ok,
+    let edges = states.filter_map(|s| match s.transitions.get(maybe_stack_top, token) {
+        Err(e) => Some(Err(e)),
+        Ok(opt) => opt.map(Ok),
+    });
+    let mega_transition: Transition<I, S, O, C> = match try_merge(edges) {
+        None => return Ok((Err(false), output)),
+        Some(r) => r?,
     };
-    Ok(mega_edge.invoke(stack))
+    Ok(mega_transition.invoke(token, stack, output))
 }

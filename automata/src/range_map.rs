@@ -6,46 +6,48 @@
 
 //! Map from ranges of keys to values.
 
-use crate::{Ctrl, Input, Range, Transition};
-use core::slice::SliceIndex;
+use crate::{Ctrl, IllFormed, Input, Output, Range, Stack, Transition};
 
 /// Map from ranges of keys to values.
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct RangeMap<I: Input, S, C: Ctrl> {
+pub struct RangeMap<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Key-value entries as tuples.
-    pub entries: Vec<(Range<I>, Transition<I, S, C>)>,
+    #[allow(clippy::type_complexity)]
+    pub entries: Vec<(Range<I>, Transition<I, S, O, C>)>,
 }
 
-impl<I: Input, S, C: Ctrl> RangeMap<I, S, C> {
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     /// Iterate over references to keys and values without consuming anything.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &(Range<I>, Transition<I, S, C>)> {
+    pub fn iter(&self) -> impl Iterator<Item = &(Range<I>, Transition<I, S, O, C>)> {
         self.entries.iter()
     }
 
-    /// Get key-value pairs by index.
+    /// Look up an argument; fit any range that contains it.
+    /// # Errors
+    /// If multiple ranges fit an argument.
     #[inline]
-    #[must_use]
-    pub fn get<Index: SliceIndex<[(Range<I>, Transition<I, S, C>)]>>(
-        &self,
-        index: Index,
-    ) -> Option<&Index::Output> {
-        self.entries.get(index)
-    }
-
-    /// Get key-value pairs by index.
-    /// # Safety
-    /// Identical to `Vec::get_unchecked`:
-    /// "Calling this method with an out-of-bounds index is undefined behavior even if the resulting reference is not used."
-    #[inline]
-    #[must_use]
-    #[allow(unsafe_code, unsafe_op_in_unsafe_fn)]
-    pub unsafe fn get_unchecked<Index: SliceIndex<[(Range<I>, Transition<I, S, C>)]>>(
-        &self,
-        index: Index,
-    ) -> &Index::Output {
-        self.entries.get_unchecked(index)
+    #[allow(
+        clippy::missing_panics_doc,
+        clippy::unwrap_in_result,
+        clippy::type_complexity
+    )]
+    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, O, C>>, IllFormed<I, S, O, C>> {
+        let mut acc = None;
+        for &(ref range, ref transition) in &self.entries {
+            if range.contains(key) {
+                match acc {
+                    None => acc = Some((range, transition)),
+                    Some((prev_range, _)) => {
+                        return Err(IllFormed::RangeMapOverlap(unwrap!(range
+                            .clone()
+                            .intersection(prev_range.clone()))))
+                    }
+                }
+            }
+        }
+        Ok(acc.map(|(_, transition)| transition))
     }
 }

@@ -6,6 +6,7 @@
 
 //! Automata loosely based on visibly pushdown automata.
 
+#![allow(unused_macros)] // <-- FIXME
 #![deny(warnings)]
 #![allow(unknown_lints)]
 #![warn(
@@ -88,9 +89,9 @@
 
 /// Call a function that will also be available to the compiled parser.
 #[macro_export]
-macro_rules! call {
+macro_rules! update {
     ($ex:expr) => {
-        $crate::Call {
+        $crate::Update {
             ptr: $ex,
             src: stringify!($ex),
         }
@@ -112,6 +113,25 @@ macro_rules! unwrap {
         #[allow(unsafe_code)]
         let result = unsafe { $expr.unwrap_unchecked() };
         result
+    }};
+}
+
+/// Unreachable state, but checked if we're debugging.
+#[cfg(any(debug_assertions, test))]
+macro_rules! never {
+    () => {
+        unreachable!()
+    };
+}
+
+/// Unreachable state, but checked if we're debugging.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! never {
+    () => {{
+        #[allow(unsafe_code)]
+        unsafe {
+            core::hint::unreachable_unchecked()
+        }
     }};
 }
 
@@ -154,7 +174,6 @@ macro_rules! get_mut {
 */
 
 mod action;
-mod call;
 mod check;
 mod ctrl;
 mod curry_input;
@@ -163,15 +182,17 @@ mod graph;
 mod in_progress;
 mod input;
 mod merge;
+mod output;
 mod range;
 mod range_map;
 mod run;
+mod stack;
 mod state;
 mod transition;
+mod update;
 
 pub use {
     action::Action,
-    call::Call,
     check::{Check, IllFormed},
     ctrl::Ctrl,
     curry_input::CurryInput,
@@ -179,13 +200,22 @@ pub use {
     graph::{Deterministic, Graph, Nondeterministic},
     in_progress::InProgress,
     input::Input,
-    merge::Merge,
+    merge::{merge, try_merge, Merge},
+    output::Output,
     range::Range,
     range_map::RangeMap,
     run::Run,
+    stack::Stack,
     state::State,
     transition::Transition,
+    update::Update,
 };
 
 #[cfg(test)]
+mod test;
+
+#[cfg(test)]
 use rand as _; // <-- needed in an example
+
+#[cfg(feature = "quickcheck")]
+mod qc;

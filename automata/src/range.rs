@@ -29,12 +29,19 @@ impl<I: Input> Range<I> {
         }
     }
 
+    /// Check if a value lies within this range.
+    #[inline]
+    #[must_use]
+    pub fn contains(&self, value: &I) -> bool {
+        *value >= self.first && *value <= self.last
+    }
+
     /// If two ranges overlap, return their intersection.
     #[inline]
     #[must_use]
-    pub fn intersection(&self, other: &Self) -> Option<Self> {
+    pub fn intersection(self, other: Self) -> Option<Self> {
         let first = self.first.clone().max(other.first.clone());
-        let last = self.last.clone().min(other.clone().last);
+        let last = self.last.min(other.last);
         (first <= last).then_some(Self { first, last })
     }
 }

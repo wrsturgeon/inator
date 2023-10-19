@@ -9,4 +9,4 @@
 /// Typing convenience: trait satisfying everything required for an input token.
 pub trait Input: Clone + Ord {}
 
-impl<T: Clone + Ord> Input for T {}
+impl<I: Clone + Ord> Input for I {}

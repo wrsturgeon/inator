@@ -6,14 +6,41 @@
 
 //! Edge in an automaton graph: an action and a destination state.
 
-use crate::{Action, Ctrl, Input};
+use crate::{Action, Ctrl, Input, Output, Stack, Update};
 
 /// Edge in an automaton graph: an action and a destination state.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Transition<I: Input, S, C: Ctrl> {
+#[derive(Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Transition<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Go to this state.
     pub dst: C,
+    /// Call this Rust function to update the output we're building.
+    pub update: Update<I, O>,
     /// Take this action: maybe push/pop from the stack.
-    pub act: Action<I, S>,
+    pub act: Action<S>,
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for Transition<I, S, O, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            dst: self.dst.clone(),
+            update: self.update,
+            act: self.act,
+        }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
+    /// Take this transition in an actual execution.
+    /// Return the index of the machine's state after this transition.
+    /// # Errors
+    /// If we try to pop from an empty stack.
+    #[inline]
+    pub fn invoke(&self, token: &I, stack: &mut Vec<S>, output: O) -> (Result<C, bool>, O) {
+        (
+            self.act.invoke(stack).map(|()| self.dst.clone()),
+            (self.update.ptr)(output, token),
+        )
+    }
 }

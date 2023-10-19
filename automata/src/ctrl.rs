@@ -6,20 +6,32 @@
 
 //! Necessary preconditions to function as an index.
 
+use crate::{Check, Input, Output, Stack};
 use core::iter;
+use std::collections::{btree_set, BTreeSet};
 
 /// Necessary preconditions to function as an index.
-pub trait Ctrl: Clone {
+pub trait Ctrl<I: Input, S: Stack, O: Output>: Check<I, S, O, Self> + Clone {
     /// Non-owning view over each index in what may be a collection.
-    type View: Iterator<Item = usize>;
+    type View<'s>: Iterator<Item = usize>
+    where
+        Self: 's;
     /// View each index in what may be a collection.
-    fn view(&self) -> Self::View;
+    fn view(&self) -> Self::View<'_>;
 }
 
-impl Ctrl for usize {
-    type View = iter::Once<usize>;
+impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
+    type View<'s> = iter::Once<usize>;
     #[inline]
-    fn view(&self) -> Self::View {
+    fn view(&self) -> Self::View<'_> {
         iter::once(*self)
+    }
+}
+
+impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<usize> {
+    type View<'s> = iter::Copied<btree_set::Iter<'s, usize>>;
+    #[inline]
+    fn view(&self) -> Self::View<'_> {
+        self.iter().copied()
     }
 }

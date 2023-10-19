@@ -6,14 +6,14 @@
 
 //! State, i.e. a node in an automaton graph.
 
-use crate::{Ctrl, CurryStack, Input};
+use crate::{Ctrl, CurryStack, Input, Output, Stack};
 
 /// State, i.e. a node in an automaton graph.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct State<I: Input, S, C: Ctrl> {
+pub struct State<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Map from input tokens to actions.
-    pub transitions: CurryStack<I, S, C>,
+    pub transitions: CurryStack<I, S, O, C>,
     /// If input ends while in this state, should we accept?
     pub accepting: bool,
 }
