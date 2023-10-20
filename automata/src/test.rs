@@ -24,5 +24,55 @@ mod prop {
                 TestResult::discard()
             }
         }
+
+        // With discarding, takes a ridiculously long time.
+        /*
+        fn check_implies_no_runtime_errors(
+            nd: Nondeterministic<u8, u8, u8>,
+            input: Vec<u8>
+        ) -> TestResult {
+            if nd.check().is_err() {
+                return TestResult::discard();
+            }
+            let mut run = input.run(&nd);
+            for r in &mut run {
+                if r.is_err() {
+                    return TestResult::failed();
+                }
+            }
+            TestResult::passed()
+        }
+        */
+
+        fn check_implies_no_runtime_errors(
+            nd: Nondeterministic<u8, u8, u8>,
+            input: Vec<u8>
+        ) -> bool {
+            if nd.check().is_err() {
+                return true;
+            }
+            let mut run = input.run(&nd);
+            for r in &mut run {
+                if r.is_err() {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn runtime_error_implies_not_check(
+            nd: Nondeterministic<u8, u8, u8>,
+            input: Vec<u8>
+        ) -> TestResult {
+            let mut run = input.run(&nd);
+            for r in &mut run {
+                if r.is_err() {
+                    return TestResult::from_bool(
+                        nd.check().is_err(),
+                    );
+                }
+            }
+            TestResult::discard()
+        }
     }
 }

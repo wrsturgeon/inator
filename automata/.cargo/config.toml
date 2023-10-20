@@ -1,0 +1,7 @@
+[env]
+MIRIFLAGS = "-Zmiri-disable-isolation"
+QUICKCHECK_GENERATOR_SIZE = "32"
+RUST_BACKTRACE = "1"
+
+[term]
+color = "always"

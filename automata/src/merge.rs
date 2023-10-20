@@ -79,23 +79,23 @@ impl<T: Clone> Merge for Option<T> {
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for Transition<I, S, O, C> {
     type Error = IllFormed<I, S, O, C>;
     #[inline]
-    #[allow(clippy::todo, unused_variables)] // <-- TODO: formalize errors
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
             dst: self
                 .dst
                 .merge(other.dst)
                 .map_err(|e: CtrlMergeConflict| match e {
-                    CtrlMergeConflict::NotEqual(a, b) => todo!(),
+                    CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
                 })?,
-            update: self
-                .update
-                .merge(other.update)
-                .map_err(|(a, b): (Update<I, O>, Update<I, O>)| todo!())?,
             act: self
                 .act
                 .merge(other.act)
-                .map_err(|(a, b): (Action<S>, Action<S>)| todo!())?,
+                .map_err(|(a, b): (Action<S>, Action<S>)| {
+                    IllFormed::IncompatibleStackActions(a, b)
+                })?,
+            update: self.update.merge(other.update).map_err(
+                |(a, b): (Update<I, O>, Update<I, O>)| IllFormed::IncompatibleCallbacks(a, b),
+            )?,
         })
     }
 }

@@ -14,10 +14,10 @@ use crate::{Action, Ctrl, Input, Output, Stack, Update};
 pub struct Transition<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Go to this state.
     pub dst: C,
-    /// Call this Rust function to update the output we're building.
-    pub update: Update<I, O>,
     /// Take this action: maybe push/pop from the stack.
     pub act: Action<S>,
+    /// Call this Rust function to update the output we're building.
+    pub update: Update<I, O>,
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for Transition<I, S, O, C> {
@@ -25,8 +25,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for Transition<I, S,
     fn clone(&self) -> Self {
         Self {
             dst: self.dst.clone(),
-            update: self.update,
             act: self.act.clone(),
+            update: self.update,
         }
     }
 }
@@ -34,7 +34,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for Transition<I, S,
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for Transition<I, S, O, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.dst == other.dst && self.update == other.update && self.act == other.act
+        self.dst == other.dst && self.act == other.act && self.update == other.update
     }
 }
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for Transition<I, S, O, C> {}

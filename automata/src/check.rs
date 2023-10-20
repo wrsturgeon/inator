@@ -8,6 +8,7 @@
 
 use crate::{
     Action, Ctrl, CurryInput, CurryStack, Input, Output, Range, RangeMap, Stack, State, Transition,
+    Update,
 };
 use core::num::NonZeroUsize;
 use std::collections::BTreeSet;
@@ -35,6 +36,12 @@ pub enum IllFormed<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
         /// Second output possibility.
         possibility_2: Transition<I, S, O, C>,
     },
+    /// Can't go to two different (deterministic) states at the same time.
+    Superposition(usize, usize),
+    /// Can't e.g. push and pop from the stack at the same time.
+    IncompatibleStackActions(Action<S>, Action<S>),
+    /// Can't call two different functions on half-constructed outputs at the same time.
+    IncompatibleCallbacks(Update<I, O>, Update<I, O>),
 }
 
 /// Check well-formedness.

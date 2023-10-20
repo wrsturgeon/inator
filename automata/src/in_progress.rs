@@ -92,6 +92,13 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
     stack: &mut Vec<S>,
     output: O,
 ) -> Result<(Result<C, bool>, O), IllFormed<I, S, O, C>> {
+    ctrl.view().try_fold((), |(), i| {
+        if graph.states.get(i).is_none() {
+            Err(IllFormed::OutOfBounds(i))
+        } else {
+            Ok(())
+        }
+    })?;
     let mut states = ctrl.view().map(|i| get!(graph.states, i));
     let Some(token) = maybe_token else {
         return Ok((Err(stack.is_empty() && states.any(|s| s.accepting)), output));
