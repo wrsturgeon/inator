@@ -2,7 +2,7 @@
 
 set -eux
 
-if [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ]
+if [ "$(git symbolic-ref --short HEAD)" = "main" ]
 then
   export QUICKCHECK_TESTS=1000000
 else
