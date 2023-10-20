@@ -6,12 +6,24 @@
 
 //! Necessary preconditions to function as an index.
 
-use crate::{Check, Input, Output, Stack};
+use crate::{Check, Input, Merge, Output, Stack};
 use core::iter;
 use std::collections::{btree_set, BTreeSet};
 
+/// Everything that could go wrong merging _any_ kind of indices.
+/// No claim to be exhaustive: just the kinds that I've implemented so far.
+#[non_exhaustive]
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum CtrlMergeConflict {
+    /// Tried to merge two literal `usize`s that were not equal.
+    NotEqual(usize, usize),
+}
+
 /// Necessary preconditions to function as an index.
-pub trait Ctrl<I: Input, S: Stack, O: Output>: Check<I, S, O, Self> + Clone {
+pub trait Ctrl<I: Input, S: Stack, O: Output>:
+    Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + PartialEq
+{
     /// Non-owning view over each index in what may be a collection.
     type View<'s>: Iterator<Item = usize>
     where

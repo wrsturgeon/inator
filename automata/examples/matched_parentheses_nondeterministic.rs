@@ -1,6 +1,6 @@
 use core::iter;
 use inator_automata::{
-    update, Action, CurryInput, CurryStack, Deterministic, Graph, Range, RangeMap, Run, State,
+    update, Action, CurryInput, CurryStack, Graph, Nondeterministic, Range, RangeMap, Run, State,
     Transition,
 };
 use rand::{thread_rng, RngCore};
@@ -11,7 +11,7 @@ enum Symbol {
 }
 
 /// Very manually constructed parser recognizing only valid parentheses.
-fn parser() -> Deterministic<char, Symbol, ()> {
+fn parser() -> Nondeterministic<char, Symbol, ()> {
     Graph {
         states: vec![State {
             transitions: CurryStack {
@@ -19,7 +19,7 @@ fn parser() -> Deterministic<char, Symbol, ()> {
                     entries: vec![(
                         Range::unit('('),
                         Transition {
-                            dst: 0,
+                            dst: iter::once(0).collect(),
                             update: update!(|(), _| ()),
                             act: Action::Push(Symbol::Paren),
                         },
@@ -32,7 +32,7 @@ fn parser() -> Deterministic<char, Symbol, ()> {
                         entries: vec![(
                             Range::unit(')'),
                             Transition {
-                                dst: 0,
+                                dst: iter::once(0).collect(),
                                 update: update!(|(), _| ()),
                                 act: Action::Pop,
                             },
@@ -43,7 +43,7 @@ fn parser() -> Deterministic<char, Symbol, ()> {
             },
             accepting: true,
         }],
-        initial: 0,
+        initial: iter::once(0).collect(),
     }
 }
 

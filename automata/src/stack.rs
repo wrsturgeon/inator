@@ -7,6 +7,6 @@
 //! Stack symbol.
 
 /// Stack symbol.
-pub trait Stack: Copy + Ord {}
+pub trait Stack: Clone + Ord {}
 
-impl<S: Copy + Ord> Stack for S {}
+impl<S: Clone + Ord> Stack for S {}

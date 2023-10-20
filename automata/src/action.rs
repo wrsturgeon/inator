@@ -10,13 +10,14 @@
 //! - `Pop`, which can only pop from the stack.
 
 use crate::Stack;
+use core::cmp;
 
 /// Actions inspired by visibly pushdown automata: either
 /// - `Local`, which can neither push nor pop from the stack;
 /// - `Push`, which can only push to the stack; or
 /// - `Pop`, which can only pop from the stack.
 #[allow(clippy::exhaustive_enums)]
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub enum Action<S: Stack> {
     /// Neither push nor pop from the stack.
     Local,
@@ -24,6 +25,35 @@ pub enum Action<S: Stack> {
     Push(S),
     /// Pop a symbol from the stack.
     Pop,
+}
+
+impl<S: Stack> PartialEq for Action<S> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (&Self::Local, &Self::Local) | (&Self::Pop, &Self::Pop) => true,
+            (&Self::Push(ref a), &Self::Push(ref b)) => a == b,
+            _ => false,
+        }
+    }
+}
+impl<S: Stack> Eq for Action<S> {}
+impl<S: Stack> PartialOrd for Action<S> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<S: Stack> Ord for Action<S> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match (self, other) {
+            (&Self::Local, &Self::Local) | (&Self::Pop, &Self::Pop) => cmp::Ordering::Equal,
+            (&Self::Local, _) | (&Self::Push(..), &Self::Pop) => cmp::Ordering::Less,
+            (&Self::Push(..), &Self::Local) | (&Self::Pop, _) => cmp::Ordering::Greater,
+            (&Self::Push(ref a), &Self::Push(ref b)) => a.cmp(b),
+        }
+    }
 }
 
 impl<S: Stack> Action<S> {
@@ -35,7 +65,7 @@ impl<S: Stack> Action<S> {
     pub fn invoke(&self, stack: &mut Vec<S>) -> Result<(), bool> {
         match *self {
             Self::Local => {}
-            Self::Push(symbol) => stack.push(symbol),
+            Self::Push(ref symbol) => stack.push(symbol.clone()),
             Self::Pop => {
                 if stack.pop().is_none() {
                     return Err(false);

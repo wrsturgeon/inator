@@ -15,7 +15,9 @@ where
     Self::Item: Input,
 {
     /// Execute an automaton on an input sequence.
-    #[must_use]
+    /// # Errors
+    /// If the automaton is not well-formed (with a witness to why).
+    #[allow(clippy::type_complexity)]
     fn run<S: Stack, O: Output, C: Ctrl<Self::Item, S, O>>(
         self,
         graph: &Graph<Self::Item, S, O, C>,
@@ -27,7 +29,6 @@ where
     In::Item: Input,
 {
     #[inline]
-    #[must_use]
     fn run<S: Stack, O: Output, C: Ctrl<Self::Item, S, O>>(
         self,
         graph: &Graph<Self::Item, S, O, C>,

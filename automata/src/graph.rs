@@ -6,7 +6,8 @@
 
 //! Automaton loosely based on visibly pushdown automata.
 
-use crate::{Ctrl, Input, Output, Stack, State};
+use crate::{Check, Ctrl, IllFormed, Input, Output, Stack, State};
+use core::num::NonZeroUsize;
 use std::collections::BTreeSet;
 
 /// One token corresponds to at most one transition.
@@ -18,10 +19,30 @@ pub type Nondeterministic<I, S, O> = Graph<I, S, O, BTreeSet<usize>>;
 
 /// Automaton loosely based on visibly pushdown automata.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Graph<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Every state, indexed.
     pub states: Vec<State<I, S, O, C>>,
     /// Initial state of the machine (before reading input).
     pub initial: C,
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
+    /// Check well-formedness.
+    /// # Errors
+    /// When not well-formed (with a witness).
+    #[inline]
+    pub fn check(&self) -> Result<(), IllFormed<I, S, O, C>> {
+        let n_states = self.states.len();
+        if let Some(i) = self
+            .initial
+            .view()
+            .fold(None, |acc, i| acc.or_else(|| (i >= n_states).then_some(i)))
+        {
+            return Err(IllFormed::OutOfBounds(i));
+        }
+        NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
+            self.states.iter().try_fold((), |(), state| state.check(nz))
+        })
+    }
 }

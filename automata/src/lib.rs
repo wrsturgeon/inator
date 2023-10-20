@@ -6,7 +6,6 @@
 
 //! Automata loosely based on visibly pushdown automata.
 
-#![allow(unused_macros)] // <-- FIXME
 #![deny(warnings)]
 #![allow(unknown_lints)]
 #![warn(
@@ -84,7 +83,8 @@
     clippy::std_instead_of_alloc,
     clippy::string_add,
     clippy::use_self,
-    clippy::wildcard_imports
+    clippy::wildcard_imports,
+    unused_macros, // <-- TODO: keep checking if we've used them <3
 )]
 
 /// Call a function that will also be available to the compiled parser.
@@ -194,7 +194,7 @@ mod update;
 pub use {
     action::Action,
     check::{Check, IllFormed},
-    ctrl::Ctrl,
+    ctrl::{Ctrl, CtrlMergeConflict},
     curry_input::CurryInput,
     curry_stack::CurryStack,
     graph::{Deterministic, Graph, Nondeterministic},

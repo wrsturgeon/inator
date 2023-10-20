@@ -1,5 +1,6 @@
 **/.DS_Store
 **/target/
+**/result
 **/autogen.rs
 **/examples/**/parser.rs
 **/examples/**/Cargo.lock

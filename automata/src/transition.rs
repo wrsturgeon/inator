@@ -4,13 +4,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! Edge in an automaton graph: an action and a destination state.
+//! Transition in an automaton: an action and a destination state.
 
 use crate::{Action, Ctrl, Input, Output, Stack, Update};
 
-/// Edge in an automaton graph: an action and a destination state.
+/// Transition in an automaton: an action and a destination state.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Debug)]
 pub struct Transition<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Go to this state.
     pub dst: C,
@@ -26,10 +26,18 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for Transition<I, S,
         Self {
             dst: self.dst.clone(),
             update: self.update,
-            act: self.act,
+            act: self.act.clone(),
         }
     }
 }
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for Transition<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.dst == other.dst && self.update == other.update && self.act == other.act
+    }
+}
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for Transition<I, S, O, C> {}
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
     /// Take this transition in an actual execution.

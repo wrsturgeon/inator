@@ -97,11 +97,11 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
         return Ok((Err(stack.is_empty() && states.any(|s| s.accepting)), output));
     };
     let maybe_stack_top = stack.last();
-    let edges = states.filter_map(|s| match s.transitions.get(maybe_stack_top, token) {
+    let transitions = states.filter_map(|s| match s.transitions.get(maybe_stack_top, token) {
         Err(e) => Some(Err(e)),
         Ok(opt) => opt.map(Ok),
     });
-    let mega_transition: Transition<I, S, O, C> = match try_merge(edges) {
+    let mega_transition: Transition<I, S, O, C> = match try_merge(transitions) {
         None => return Ok((Err(false), output)),
         Some(r) => r?,
     };

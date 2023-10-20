@@ -7,13 +7,13 @@
 //! Read the symbol at the top of the stack (if any), then
 //! return another function that reads input and decides an action.
 
-use crate::{Ctrl, CurryInput, IllFormed, Input, Merge, Output, Stack, Transition};
+use crate::{Ctrl, CurryInput, IllFormed, Input, Merge, Output, Range, Stack, Transition};
 use std::collections::BTreeMap;
 
 /// Read the symbol at the top of the stack (if any), then
 /// return another function that reads input and decides an action.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CurryStack<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// No matter what the stack says, try this first.
     pub wildcard: Option<CurryInput<I, S, O, C>>,
@@ -50,10 +50,14 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
                             .map_or(Ok(None), |curry| curry.get(token))
                     },
                 )?;
-                wildcard
-                    .cloned()
-                    .merge(non_wildcard.cloned())
-                    .map_err(|(a, b)| IllFormed::WildcardMask(a, b))
+                wildcard.cloned().merge(non_wildcard.cloned()).map_err(
+                    |(possibility_1, possibility_2)| IllFormed::WildcardMask {
+                        arg_stack: stack.cloned(),
+                        arg_token: Some(Range::unit(token.clone())),
+                        possibility_1,
+                        possibility_2,
+                    },
+                )
             })
     }
 }

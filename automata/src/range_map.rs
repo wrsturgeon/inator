@@ -11,7 +11,7 @@ use crate::{Ctrl, IllFormed, Input, Output, Range, Stack, Transition};
 /// Map from ranges of keys to values.
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RangeMap<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
@@ -49,5 +49,27 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
             }
         }
         Ok(acc.map(|(_, transition)| transition))
+    }
+
+    /// Assert that this map has no keys in common with another.
+    /// # Errors
+    /// If there are keys in common, don't panic: instead, return them.
+    #[inline]
+    #[allow(clippy::type_complexity)]
+    pub fn disjoint(
+        &self,
+        other: &Self,
+    ) -> Result<(), (Range<I>, Transition<I, S, O, C>, Transition<I, S, O, C>)> {
+        self.entries.iter().try_fold((), |(), &(ref lk, ref lv)| {
+            other.entries.iter().try_fold((), |(), &(ref rk, ref rv)| {
+                rk.clone().intersection(lk.clone()).map_or(Ok(()), |range| {
+                    if lv == rv {
+                        Ok(())
+                    } else {
+                        Err((range, lv.clone(), rv.clone()))
+                    }
+                })
+            })
+        })
     }
 }
