@@ -2,7 +2,7 @@
 
 set -eux
 
-if [ "$(git symbolic-ref --short HEAD)" = "main" ]
+if [ "$(git branch --show-current)" = "main" ]
 then
   export QUICKCHECK_TESTS=1000000
 else
