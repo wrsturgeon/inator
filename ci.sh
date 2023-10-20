@@ -7,6 +7,7 @@ then
   cd automata
   ../ci.sh
   cd ..
+  exit 0 # <-- TODO: remove
 fi
 
 # Update our workbench

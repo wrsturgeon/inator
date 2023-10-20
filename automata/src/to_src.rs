@@ -6,8 +6,9 @@
 
 //! Translate an automaton into Rust source code.
 
-use crate::{Ctrl, CurryStack, Graph, Input, Output, Stack, State};
-use core::iter;
+use crate::{
+    Action, CurryInput, CurryStack, Graph, Input, Output, Range, RangeMap, Stack, State, Transition,
+};
 use std::collections::BTreeSet;
 
 /// Translate a value into Rust source code that reproduces it.
@@ -20,6 +21,19 @@ pub trait ToSrc {
     fn src_type() -> String;
 }
 
+impl ToSrc for () {
+    #[inline(always)]
+    #[must_use]
+    fn to_src(&self) -> String {
+        Self::src_type()
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "()".to_owned()
+    }
+}
+
 impl ToSrc for usize {
     #[inline]
     #[must_use]
@@ -30,6 +44,32 @@ impl ToSrc for usize {
     #[must_use]
     fn src_type() -> String {
         "usize".to_owned()
+    }
+}
+
+impl ToSrc for u8 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u8".to_owned()
+    }
+}
+
+impl ToSrc for char {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("'{}'", self.escape_default())
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "char".to_owned()
     }
 }
 
@@ -62,10 +102,8 @@ impl<T: ToSrc> ToSrc for Option<T> {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        match *self {
-            None => "None".to_owned(),
-            Some(ref x) => format!("Some({})", x.to_src()),
-        }
+        self.as_ref()
+            .map_or_else(|| "None".to_owned(), |x| format!("Some({})", x.to_src()))
     }
     #[inline]
     #[must_use]
@@ -74,19 +112,41 @@ impl<T: ToSrc> ToSrc for Option<T> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
+impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
+        format!("{}..={}", self.first.to_src(), self.last.to_src())
+    }
+    #[inline(always)]
+    #[must_use]
+    fn src_type() -> String {
+        T::src_type()
+    }
+}
+
+impl<I: Input, S: Stack, O: Output> Graph<I, S, O, usize> {
+    /// Translate a value into Rust source code that reproduces it.
+    #[inline]
+    #[must_use]
+    pub fn to_src(&self) -> String {
+        let output_t = O::src_type();
         format!(
-            "#[inline]
-            pub fn parse<I: IntoIterator<Item = {}>>(input: I) -> Result<{}, {}> {{
-                state_{}(&mut input.into_iter(), None)
+            "\
+            type R<I> = Result<(F, {output_t}), TODO_ERROR_TYPE>;\r\n\
+            type F<I> = fn(&mut I, Option<{}>, {output_t}) -> R<I>;\r\n\
+            \r\n\
+            #[inline]\r\n\
+            pub fn parse<I: IntoIterator<Item = {}>>(input: I) -> Result<{output_t}, {}> {{\r\n\
+                match state_{}(&mut input.into_iter(), None, <{output_t} as Default>::default())? {{\r\n\
+                    (None, out) => Ok(out),\r\n\
+                    (Some(..), _) => Err(POPPED_EMPTY_STACK),\r\n\
+                }}\r\n\
             }}{}",
+            S::src_type(),
             I::src_type(),
-            O::src_type(),
             "TODO_ERROR_TYPE",
-            self.initial.to_src(),
+            self.initial,
             self.states
                 .iter()
                 .enumerate()
@@ -98,24 +158,27 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> State<I, S, O, C> {
+impl<I: Input, S: Stack, O: Output> State<I, S, O, usize> {
+    /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
     fn to_src(&self, i: usize) -> String {
+        let output_t = O::src_type();
         format!(
-            "#[inline]
-            fn state_{i}<I: Iterator<Item = {}>>(input: &mut I, context: Option<{}>) -> Result<{}, {}> {{
-                match input.next() {{
-                    None => {},
-                    Some(token) => {},
-                }}
+            "\
+            \r\n\
+            \r\n\
+            #[inline]\r\n\
+            fn state_{i}<I: Iterator<Item = {}>>(input: &mut I, context: Option<{}>, acc: {output_t}) -> R {{\r\n\
+                match input.next() {{\r\n\
+                    None => {},\r\n\
+                    Some(token) => {},\r\n\
+                }}\r\n\
             }}",
             I::src_type(),
             S::src_type(),
-            O::src_type(),
-            "TODO_ERROR_TYPE",
             if self.accepting {
-                "Ok(acc)"
+                "Ok((None, acc))"
             } else {
                 "Err(TODO)"
             },
@@ -124,54 +187,55 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> State<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
+impl<I: Input, S: Stack, O: Output> CurryStack<I, S, O, usize> {
+    /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
+    #[allow(clippy::arithmetic_side_effects)] // <-- string concatenation with `+`
     fn to_src(&self) -> String {
         format!(
-            "match (context, token) {{{}
+            "\
+            match (&context, &token) {{{}\r\n
+                _ => Err(TODO),\r\n
             }}",
             self.wildcard
                 .iter()
                 .map(|v| ("_".to_owned(), v))
-                .chain(self.map_none.iter().map(|v| ("None".to_owned(), v)))
+                .chain(self.map_none.iter().map(|v| ("&None".to_owned(), v)))
                 .chain(
                     self.map_some
                         .iter()
-                        .map(|(k, v)| (format!("Some({})", k.to_src()), v))
+                        .map(|(k, v)| (format!("&Some({})", k.to_src()), v))
                 )
-                .fold(String::new(), |(k, v)| v.to_src(k)),
+                .fold(String::new(), |acc, (k, v)| acc + &v.to_src(&k)),
         )
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, O: Output> CurryInput<I, S, O, usize> {
+    /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
-    fn to_src(&self, stack_symbol: String) -> String {
+    fn to_src(&self, stack_symbol: &str) -> String {
         match *self {
-            Self::Wildcard(etc) => {
-                format!(
-                    "
-                        ({stack_symbol}, _) => {},",
-                    etc.to_src(),
-                )
+            Self::Wildcard(ref etc) => {
+                format!("\r\n    ({stack_symbol}, _) => {},", etc.to_src(),)
             }
-            Self::Scrutinize(etc) => etc.to_src(stack_symbol),
+            Self::Scrutinize(ref etc) => etc.to_src(stack_symbol),
         }
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
+    /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
-    fn to_src(&self, stack_symbol: String) -> String {
+    fn to_src(&self, stack_symbol: &str) -> String {
         self.entries
             .iter()
             .fold(String::new(), |acc, &(ref k, ref v)| {
                 format!(
-                    "
-                        ({stack_symbol}, {}) => {},",
+                    "{acc}\r\n    ({stack_symbol}, &({})) => {},",
                     k.to_src(),
                     v.to_src(),
                 )
@@ -179,14 +243,32 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
+impl<I: Input, S: Stack, O: Output> Transition<I, S, O, usize> {
+    /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
-    fn to_src(&self, stack_symbol: String) -> String {
+    fn to_src(&self) -> String {
+        let dst = self.dst;
+        let f = self.update.src;
         match self.act {
-            Action::Local => todo!(),
-            Action::Push(ref s) => todo!(),
-            Action::Pop => todo!(),
+            Action::Local => format!(
+                "\
+                match state_{dst}(input, context, ({f})(acc, token))? {{\r\n\
+                    (None, acc) => if context.is_none() {{ Ok((None, acc)) }} else {{ Err(FINISHED_WITHOUT_EMPTYING_STACK) }},\r\n\
+                    (Some(f), acc) => f(input, context, acc),\r\n\
+                }}",
+            ),
+            Action::Push(ref s) => {
+                format!(
+                    "\
+                    match state_{dst}(input, Some({}), ({f})(acc, token))? {{\r\n\
+                        (None, acc) => if context.is_none() {{ Ok((None, acc)) }} else {{ Err(FINISHED_WITHOUT_EMPTYING_STACK) }},\r\n\
+                        (Some(f), acc) => f(input, context, acc);\r\n\
+                    }}",
+                    s.to_src(),
+                )
+            }
+            Action::Pop => format!("return Ok((Some(state_{dst}), ({f})(acc, token)))"),
         }
     }
 }

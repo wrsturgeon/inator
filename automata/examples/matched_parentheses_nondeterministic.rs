@@ -1,13 +1,26 @@
 use core::iter;
 use inator_automata::{
     update, Action, CurryInput, CurryStack, Graph, Nondeterministic, Range, RangeMap, Run, State,
-    Transition,
+    ToSrc, Transition,
 };
 use rand::{thread_rng, RngCore};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Symbol {
     Paren, // Just one value, but e.g. if we had parens and brackets, we would use two.
+}
+
+impl ToSrc for Symbol {
+    #[inline]
+    fn to_src(&self) -> String {
+        match *self {
+            Self::Paren => "Symbol::Paren".to_owned(),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        "Symbol".to_owned()
+    }
 }
 
 /// Very manually constructed parser recognizing only valid parentheses.
