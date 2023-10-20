@@ -6,7 +6,7 @@
 
 //! Necessary preconditions to function as an index.
 
-use crate::{Check, Input, Merge, Output, Stack};
+use crate::{Check, Input, Merge, Output, Stack, ToSrc};
 use core::iter;
 use std::collections::{btree_set, BTreeSet};
 
@@ -25,7 +25,7 @@ pub enum CtrlMergeConflict {
 
 /// Necessary preconditions to function as an index.
 pub trait Ctrl<I: Input, S: Stack, O: Output>:
-    Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + PartialEq
+    Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
     type View<'s>: Iterator<Item = usize>

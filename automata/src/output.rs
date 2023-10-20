@@ -6,7 +6,9 @@
 
 //! Trait defining everything required to work as output of an automaton.
 
-/// Trait defining everything required to work as output of an automaton.
-pub trait Output: Default + Sized {}
+use crate::ToSrc;
 
-impl<O: Default + Sized> Output for O {}
+/// Trait defining everything required to work as output of an automaton.
+pub trait Output: Default + Sized + ToSrc {}
+
+impl<O: Default + Sized + ToSrc> Output for O {}

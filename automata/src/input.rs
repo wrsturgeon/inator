@@ -6,7 +6,9 @@
 
 //! Typing convenience: trait satisfying everything required for an input token.
 
-/// Typing convenience: trait satisfying everything required for an input token.
-pub trait Input: Clone + Ord {}
+use crate::ToSrc;
 
-impl<I: Clone + Ord> Input for I {}
+/// Typing convenience: trait satisfying everything required for an input token.
+pub trait Input: Clone + Ord + ToSrc {}
+
+impl<I: Clone + Ord + ToSrc> Input for I {}

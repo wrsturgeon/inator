@@ -6,7 +6,9 @@
 
 //! Stack symbol.
 
-/// Stack symbol.
-pub trait Stack: Clone + Ord {}
+use crate::ToSrc;
 
-impl<S: Clone + Ord> Stack for S {}
+/// Stack symbol.
+pub trait Stack: Clone + Ord + ToSrc {}
+
+impl<S: Clone + Ord + ToSrc> Stack for S {}

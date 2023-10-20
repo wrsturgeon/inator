@@ -188,6 +188,7 @@ mod range_map;
 mod run;
 mod stack;
 mod state;
+mod to_src;
 mod transition;
 mod update;
 
@@ -207,6 +208,7 @@ pub use {
     run::Run,
     stack::Stack,
     state::State,
+    to_src::ToSrc,
     transition::Transition,
     update::Update,
 };
