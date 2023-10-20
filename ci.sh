@@ -2,7 +2,7 @@
 
 set -eux
 
-if [ "$(git branch | grep '^\* ' | cut -d ' ' -f 2 | cut -d 'D' -f 2 | cut -d ')' -f 1)" = "main" ]
+if [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ]
 then
   export QUICKCHECK_TESTS=1000000
 else
