@@ -25,25 +25,7 @@ mod prop {
             }
         }
 
-        // With discarding, takes a ridiculously long time.
-        /*
-        fn check_implies_no_runtime_errors(
-            nd: Nondeterministic<u8, u8, u8>,
-            input: Vec<u8>
-        ) -> TestResult {
-            if nd.check().is_err() {
-                return TestResult::discard();
-            }
-            let mut run = input.run(&nd);
-            for r in &mut run {
-                if r.is_err() {
-                    return TestResult::failed();
-                }
-            }
-            TestResult::passed()
-        }
-        */
-
+        // With discarding, this takes a ridiculously long time.
         fn check_implies_no_runtime_errors(
             nd: Nondeterministic<u8, u8, u8>,
             input: Vec<u8>
