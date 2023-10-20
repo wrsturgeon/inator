@@ -2,6 +2,13 @@
 
 set -eux
 
+if [ "$(git branch | grep '^\* ' | cut -d ' ' -f 2)" = "main" ]
+then
+  export QUICKCHECK_TESTS=1000000
+else
+  export QUICKCHECK_TESTS=1000
+fi
+
 if [ -d automata ]
 then
   cd automata
