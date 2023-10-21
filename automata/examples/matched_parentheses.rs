@@ -61,13 +61,16 @@ fn parser() -> Deterministic<char, Symbol, ()> {
 }
 
 /// Generate test cases (has nothing to do with automata!).
-fn generate<R: RngCore>(rng: &mut R) -> String {
-    let f: [fn(&mut R) -> String; 3] = [
-        |_| String::new(),
-        |r| "(".to_owned() + &generate(r) + ")",
-        |r| generate(r) + &generate(r),
+fn generate<R: RngCore>(rng: &mut R, fuel: u8) -> String {
+    let Some(depleted) = fuel.checked_sub(1) else {
+        return String::new();
+    };
+    let f: [fn(&mut R, u8) -> String; 3] = [
+        |_, _| String::new(),
+        |r, d| "(".to_owned() + &generate(r, d) + ")",
+        |r, d| generate(r, d >> 1) + &generate(r, d >> 1),
     ];
-    f[(rng.next_u32() % 3) as usize](rng)
+    f[(rng.next_u32() % 3) as usize](rng, depleted)
 }
 
 /// Check if this string consists of matched parentheses.
@@ -107,8 +110,8 @@ pub fn main() {
     let mut rng = thread_rng();
 
     // Accept all valid strings
-    for _ in 0..5 {
-        let s = generate(&mut rng);
+    for _ in 0..10 {
+        let s = generate(&mut rng, 32);
         println!();
         println!("\"{s}\"");
         let mut run = s.chars().run(&parser);
@@ -120,7 +123,7 @@ pub fn main() {
     }
 
     // Reject all invalid strings
-    for _ in 0..5 {
+    for _ in 0..10 {
         let s = shitpost(&mut rng);
         println!();
         println!("\"{s}\"");

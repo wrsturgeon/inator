@@ -8,7 +8,7 @@
 
 use crate::{Check, Ctrl, IllFormed, Input, Output, Stack, State};
 use core::num::NonZeroUsize;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ffi::OsStr, fs, io, path::Path, process::Command};
 
 /// One token corresponds to at most one transition.
 pub type Deterministic<I, S, O> = Graph<I, S, O, usize>;
@@ -44,5 +44,14 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
+    }
+}
+
+impl<I: Input, S: Stack, O: Output> Graph<I, S, O, usize> {
+    /// Write this parser as a Rust source file.
+    #[inline]
+    pub fn to_file<P: AsRef<OsStr> + AsRef<Path>>(&self, path: P) -> io::Result<()> {
+        fs::write(&path, self.to_src())?;
+        Command::new("rustfmt").arg(path).output().map(|_| {})
     }
 }
