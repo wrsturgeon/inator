@@ -49,6 +49,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
 
 impl<I: Input, S: Stack, O: Output> Graph<I, S, O, usize> {
     /// Write this parser as a Rust source file.
+    /// # Errors
+    /// If file creation or formatting fails.
     #[inline]
     pub fn to_file<P: AsRef<OsStr> + AsRef<Path>>(&self, path: P) -> io::Result<()> {
         fs::write(&path, self.to_src())?;

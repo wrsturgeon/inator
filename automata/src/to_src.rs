@@ -293,6 +293,7 @@ impl<I: Input, S: Stack, O: Output> Transition<I, S, O, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
+    #[allow(clippy::todo)] // TODO: what the fuck does the last case mean?
     fn to_src(&self, stack_symbol: Option<Option<&str>>) -> String {
         let dst = self.dst;
         let f = self.update.src;
