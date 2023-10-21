@@ -69,6 +69,7 @@
     clippy::mod_module_files,
     clippy::multiple_unsafe_ops_per_block,
     clippy::needless_borrowed_reference,
+    clippy::option_option,
     clippy::partial_pub_fields,
     clippy::pub_use,
     clippy::pub_with_shorthand,
