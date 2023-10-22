@@ -39,6 +39,33 @@ mod prop {
             }
         }
 
+        fn check_implies_determinize(nd: Nondeterministic<u8, u8, u8>) -> bool {
+            if nd.check().is_ok() {
+                nd.determinize().is_ok()
+            } else {
+                true
+            }
+        }
+
+        fn determinize_implies_no_runtime_errors(
+            d: Deterministic<u8, u8, u8>,
+            input: Vec<u8>
+        ) -> bool {
+            if d.check().is_ok() {
+                !matches!(d.accept(input), Err(ParseError::BadParser(..)))
+            } else {
+                true
+            }
+        }
+
+        fn determinize_identity(d: Deterministic<u8, u8, u8>) -> bool {
+            if d.check().is_ok() {
+                d.determinize() == Ok(d)
+            } else {
+                true
+            }
+        }
+
         fn union(
             lhs: Nondeterministic<u8, u8, u8>,
             rhs: Nondeterministic<u8, u8, u8>,
@@ -65,6 +92,34 @@ mod prop {
             rhs: Nondeterministic<u8, u8, u8>
         ) -> bool {
             (lhs.check().is_err() || rhs.check().is_err()) == (lhs | rhs).check().is_err()
+        }
+
+        fn intersection(
+            lhs: Nondeterministic<u8, u8, u8>,
+            rhs: Nondeterministic<u8, u8, u8>,
+            input: Vec<u8>
+        ) -> bool {
+            if lhs.check().is_err() || rhs.check().is_err() {
+                return true;
+            }
+            let intersection = lhs.clone() & rhs.clone();
+            let intersection_accept = intersection.accept(input.iter().copied());
+            lhs.accept(input.iter().copied())
+                .and_then(|_| rhs.accept(input.iter().copied()))
+                .map_or_else(
+                    |e| match e {
+                        reject @ ParseError::BadInput(..) => intersection_accept == Err(reject),
+                        ParseError::BadParser(..) => unreachable!(),
+                    },
+                    |ok| intersection_accept == Ok(ok),
+                )
+        }
+
+        fn intersection_preserves_ill_formedness(
+            lhs: Nondeterministic<u8, u8, u8>,
+            rhs: Nondeterministic<u8, u8, u8>
+        ) -> bool {
+            (lhs.check().is_err() || rhs.check().is_err()) == (lhs & rhs).check().is_err()
         }
     }
 }

@@ -9,12 +9,12 @@ else
   export QUICKCHECK_TESTS=1000
 fi
 
-# if [ -d automata ]
-# then
-#   cd automata
-#   ../ci.sh
-#   cd ..
-# fi
+if [ -d automata ]
+then
+  cd automata
+  ../ci.sh
+  cd ..
+fi
 
 # Update our workbench
 rustup update || :

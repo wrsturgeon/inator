@@ -25,7 +25,7 @@ pub enum CtrlMergeConflict {
 
 /// Necessary preconditions to function as an index.
 pub trait Ctrl<I: Input, S: Stack, O: Output>:
-    Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + PartialEq + ToSrc
+    Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
     type View<'s>: Iterator<Item = usize>
