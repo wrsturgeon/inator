@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 /// Read the symbol at the top of the stack (if any), then
 /// return another function that reads input and decides an action.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct CurryStack<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// No matter what the stack says, try this first.
     pub wildcard: Option<CurryInput<I, S, O, C>>,
@@ -21,6 +21,17 @@ pub struct CurryStack<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     pub map_none: Option<CurryInput<I, S, O, C>>,
     /// If input does not end (i.e. an iterator yields `Some(..)`), try this.
     pub map_some: BTreeMap<S, CurryInput<I, S, O, C>>,
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for CurryStack<I, S, O, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            wildcard: self.wildcard.clone(),
+            map_none: self.map_none.clone(),
+            map_some: self.map_some.clone(),
+        }
+    }
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
@@ -59,5 +70,14 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
                     },
                 )
             })
+    }
+
+    /// All values in this collection, without their associated keys.
+    #[inline]
+    pub fn values(&self) -> impl Iterator<Item = &CurryInput<I, S, O, C>> {
+        self.wildcard
+            .iter()
+            .chain(self.map_none.iter())
+            .chain(self.map_some.values())
     }
 }

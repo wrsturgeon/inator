@@ -6,8 +6,11 @@
 
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
-use crate::{Action, Ctrl, CtrlMergeConflict, IllFormed, Input, Output, Stack, Transition, Update};
-use std::collections::BTreeSet;
+use crate::{
+    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Output, Range,
+    RangeMap, Stack, State, Transition, Update,
+};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
 
 /// Trait to fallibly combine multiple values into one value with identical semantics.
 pub trait Merge: Sized {
@@ -42,6 +45,19 @@ pub fn try_merge<M: Merge, In: IntoIterator<Item = Result<M, M::Error>>>(
     )
 }
 
+impl<T> Merge for Option<T> {
+    type Error = (T, T);
+    #[inline]
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        match (self, other) {
+            (None, None) => Ok(None),
+            (Some(a), None) => Ok(Some(a)),
+            (None, Some(b)) => Ok(Some(b)),
+            (Some(a), Some(b)) => Err((a, b)),
+        }
+    }
+}
+
 impl Merge for usize {
     type Error = CtrlMergeConflict;
     #[inline]
@@ -63,16 +79,90 @@ impl<T: Ord> Merge for BTreeSet<T> {
     }
 }
 
-impl<T: Clone> Merge for Option<T> {
-    type Error = (T, T);
+impl<K: Ord, V: Merge> Merge for BTreeMap<K, V> {
+    type Error = V::Error;
+    #[inline]
+    fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
+        for (k, v) in other {
+            match self.entry(k) {
+                btree_map::Entry::Occupied(extant) => {
+                    let (lk, lv) = extant.remove_entry();
+                    drop(self.insert(lk, lv.merge(v)?));
+                }
+                btree_map::Entry::Vacant(empty) => drop(empty.insert(v)),
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for State<I, S, O, C> {
+    type Error = IllFormed<I, S, O, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        Ok(Self {
+            transitions: self.transitions.merge(other.transitions)?,
+            accepting: self.accepting || other.accepting,
+        })
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryStack<I, S, O, C> {
+    type Error = IllFormed<I, S, O, C>;
+    #[inline]
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        Ok(Self {
+            wildcard: self
+                .wildcard
+                .merge(other.wildcard)
+                .or_else(|(a, b)| Ok(Some(a.merge(b)?)))?,
+            map_none: self
+                .map_none
+                .merge(other.map_none)
+                .or_else(|(a, b)| Ok(Some(a.merge(b)?)))?,
+            map_some: self.map_some.merge(other.map_some)?,
+        })
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryInput<I, S, O, C> {
+    type Error = IllFormed<I, S, O, C>;
+    #[inline]
+    #[allow(clippy::todo)] // <-- TODO
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
         match (self, other) {
-            (None, None) => Ok(None),
-            (Some(a), None) => Ok(Some(a)),
-            (None, Some(b)) => Ok(Some(b)),
-            (Some(a), Some(b)) => Err((a, b)),
+            (Self::Wildcard(lhs), Self::Wildcard(rhs)) => Ok(Self::Wildcard(lhs.merge(rhs)?)),
+            (Self::Wildcard(w), Self::Scrutinize(s)) | (Self::Scrutinize(s), Self::Wildcard(w)) => {
+                if s.entries.is_empty() {
+                    Ok(Self::Wildcard(w))
+                } else {
+                    todo!()
+                }
+            }
+            (Self::Scrutinize(lhs), Self::Scrutinize(rhs)) => Ok(Self::Scrutinize(lhs.merge(rhs)?)),
         }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for RangeMap<I, S, O, C> {
+    type Error = IllFormed<I, S, O, C>;
+    #[inline]
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        Ok(Self {
+            entries: self.entries.merge(other.entries)?,
+        })
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
+    for Vec<(Range<I>, Transition<I, S, O, C>)>
+{
+    type Error = IllFormed<I, S, O, C>;
+    #[inline]
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        let a: BTreeMap<_, _> = self.into_iter().collect();
+        let b: BTreeMap<_, _> = other.into_iter().collect();
+        Ok(a.merge(b)?.into_iter().collect())
     }
 }
 

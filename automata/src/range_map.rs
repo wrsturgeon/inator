@@ -11,11 +11,20 @@ use crate::{Ctrl, IllFormed, Input, Output, Range, Stack, Transition};
 /// Map from ranges of keys to values.
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct RangeMap<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
     pub entries: Vec<(Range<I>, Transition<I, S, O, C>)>,
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+        }
+    }
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
@@ -71,5 +80,11 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
                 })
             })
         })
+    }
+
+    /// All values in this collection, without their associated keys.
+    #[inline]
+    pub fn values(&self) -> impl Iterator<Item = &Transition<I, S, O, C>> {
+        self.entries.iter().map(|&(_, ref v)| v)
     }
 }

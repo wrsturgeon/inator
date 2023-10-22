@@ -7,15 +7,26 @@
 //! Read the next input symbol and decide an action.
 
 use crate::{Ctrl, IllFormed, Input, Output, Range, RangeMap, Stack, Transition};
+use core::iter;
 
 /// Read the next input symbol and decide an action.
 #[allow(clippy::exhaustive_enums)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum CurryInput<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Throw away the input (without looking at it) and do this.
     Wildcard(Transition<I, S, O, C>),
     /// Map specific ranges of inputs to actions.
     Scrutinize(RangeMap<I, S, O, C>),
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for CurryInput<I, S, O, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        match *self {
+            Self::Wildcard(ref etc) => Self::Wildcard(etc.clone()),
+            Self::Scrutinize(ref etc) => Self::Scrutinize(etc.clone()),
+        }
+    }
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
@@ -72,6 +83,15 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
             (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a
                 .disjoint(b)
                 .map_err(|(intersection, lv, rv)| (Some(intersection), lv, rv)),
+        }
+    }
+
+    /// All values in this collection, without their associated keys.
+    #[inline]
+    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, S, O, C>>> {
+        match *self {
+            Self::Wildcard(ref etc) => Box::new(iter::once(etc)),
+            Self::Scrutinize(ref etc) => Box::new(etc.values()),
         }
     }
 }
