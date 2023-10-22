@@ -62,16 +62,12 @@ impl<S: Stack> Action<S> {
     /// # Errors
     /// If we try to pop from an empty stack.
     #[inline]
-    pub fn invoke(&self, stack: &mut Vec<S>) -> Result<(), bool> {
+    pub fn invoke(&self, stack: &mut Vec<S>) -> Option<()> {
         match *self {
             Self::Local => {}
             Self::Push(ref symbol) => stack.push(symbol.clone()),
-            Self::Pop => {
-                if stack.pop().is_none() {
-                    return Err(false);
-                }
-            }
+            Self::Pop => drop(stack.pop()?),
         }
-        Ok(())
+        Some(())
     }
 }

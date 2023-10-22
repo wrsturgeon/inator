@@ -1,25 +1,41 @@
-# `inator`: an evil parsing library
-## You supply the evil plan; we supply the _**-inator!**_
-### or, Provably Optimal Zero-Copy Parsers with Nondeterministic Finite Automata
+# `inator`: An evil parsing library.
+## You supply the evil plan; we supply the _**-inator**_.
 
 ![Portrait of the eminent Dr. Heinz Doofenshmirtz](http://images6.fanpop.com/image/polls/1198000/1198459_1364687083851_full.jpg)
 
 🚧 Development still ongoing! 🚧
 
-## Why?
-Computability theory has known for ages that a certain class of languages have a unique and provably optimal representation as a graph.
-This is the insight behind regular-expression searchers like `grep`, but anything more than accepting or rejecting a string is difficult to reason about and impossible to optimize.
+## TL;DR
 
-## How?
-This library uses the same high-level machinery as tools like `grep` but augmented with some extra goods:
+We ask for a specification and turn it into a graph where we know exactly what might happen at each step.
+We then ruthlessly cut things that won't happen, combine identical things, and output the result as a Rust file.
+Compile this with the rest of your code and, _voila!_, you've got a hand-rolled zero-copy parser.
 
-Given a specification like "parse A after B" or "put this thing in parentheses" (and infinite combinations of similar things), we write a graph with a set of initial nodes, a set of accepting nodes, and some directed edges marked with input characters.
-From this, the computability theory stuff kicks in: we can minimize this to a graph with the provably minimal number of states that will tell us "is this valid syntax or not?"
+## The long explanation
 
-Then, although we can't provably optimize _your_ code, we let you write functions that effectively _hitch a ride_ on the optimal decision graph we just made.
-Specifically, each edge—that is, each time you said "parse this token"—you can call a function on the data so far, using that token, that returns the next state.
+Given a spec like "`AAAAAAAAB` or `AAAAAAAAC`", we'd like to write a parser that takes the common-sense route:
+blow through all the `A`s as a group, _then_ match on the `B` or `C` once.
+This has several advantages:
+- We never rewind the tape, so we don't need to store any previous input.
+- In the limit, it's double as fast as trying one, then trying the other. If we added a third case, it'd be 3x. You get the point.
+Yet, as far as I know, no existing parsing library even tries to optimize these cases, and for good reason: it's _hard_.
 
-Last of all, you can convert this optimal graph to a _Rust source file_: not only can we prove the implementation is optimal, we can leverage Rust's binary optimizer to make it run literally as fast as possible.
+The problem with parsers is that, the more you can do with them, the less you can say about them before they run.
+
+Regular languages are great to reason about, but they can't even parse parentheses. For a programming language, they're totally out of the running.
+
+Context-free grammars are on the other end of the spectrum:
+they're almost always all you need in practice, but there's no algorithm to compute the union of two pushdown automata, so you can't ask for "`AAAAAAAAB` or `AAAAAAAAC`" at all.
+They're also just not closed on intersection, so there _can be_ no algorithm to require both A and B to accept an input C.
+
+Visibly pushdown automata, which you've probably never heard of, bridge this gap:
+Each symbol is permanently and universally associated with either pushing to the stack, popping from it, or not touching it.
+They're closed under union and intersection, which is great, but the partitioning of input characters runs into some snags:
+e.g. you can't use `<` both to open angle brackets and to compute a less-than relation.
+(Also, shoutout to my professor Rajeev Alur, who—I later learned—co-invented these!)
+
+In this library, we've gone totally opportunistic: just act like a pushdown automata until we hit an impossible intersection, then complain.
+Every case I know of in which intersection fails has nothing to do with parsing, but if it is a limitation in practice for you, please let me know.
 
 ## What does this whole process look like?
 

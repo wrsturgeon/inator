@@ -45,7 +45,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
     /// # Errors
     /// If we try to pop from an empty stack.
     #[inline]
-    pub fn invoke(&self, token: &I, stack: &mut Vec<S>, output: O) -> (Result<C, bool>, O) {
+    pub fn invoke(&self, token: &I, stack: &mut Vec<S>, output: O) -> (Option<C>, O) {
         (
             self.act.invoke(stack).map(|()| self.dst.clone()),
             (self.update.ptr)(output, token),

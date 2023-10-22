@@ -37,7 +37,7 @@ where
             graph,
             input: self.into_iter(),
             stack: vec![],
-            ctrl: Ok(graph.initial.clone()),
+            ctrl: graph.initial.clone(),
             output: mem::MaybeUninit::new(O::default()),
         }
     }

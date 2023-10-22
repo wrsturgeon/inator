@@ -3,16 +3,13 @@ name = "inator"
 authors = ["Will Sturgeon <willstrgn@gmail.com>"]
 version = "0.3.0"
 edition = "2021"
-description = "Optimal zero-copy parsers with nondeterministic finite automata"
+description = "An evil parsing library."
 license = "MPL-2.0"
 repository = "https://github.com/wrsturgeon/inator"
 build = "build.rs"
 
 [dependencies]
-proc-macro2 = "1.0.67"
-syn = { version = "2.0.34", features = ["full"] }
-rand = "0.8.5"
-prettyplease = "0.2.15"
+# none
 
 # Optional dependencies:
 quickcheck = { version = "1.0.3", optional = true }

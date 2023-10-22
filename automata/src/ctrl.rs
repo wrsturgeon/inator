@@ -38,6 +38,9 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
     #[must_use]
     #[cfg(feature = "quickcheck")]
     fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self;
+    /// Apply a function to each index.
+    #[must_use]
+    fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self;
 }
 
 impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
@@ -53,6 +56,10 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
         use quickcheck::Arbitrary;
         // SAFETY: Added one.
         Self::arbitrary(g) % unsafe { NonZeroUsize::new_unchecked(n_states + 1) }
+    }
+    #[inline]
+    fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
+        f(self)
     }
 }
 
@@ -71,5 +78,9 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<usize> {
         // SAFETY: Added one.
         let nz = unsafe { NonZeroUsize::new_unchecked(n_states + 1) };
         collection.into_iter().map(|i| i % nz).collect()
+    }
+    #[inline]
+    fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
+        self.into_iter().map(f).collect()
     }
 }

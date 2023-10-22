@@ -6,7 +6,7 @@
 
 //! Automaton loosely based on visibly pushdown automata.
 
-use crate::{Check, Ctrl, IllFormed, Input, Output, Stack, State};
+use crate::{Check, Ctrl, IllFormed, Input, Output, ParseError, Stack, State};
 use core::num::NonZeroUsize;
 use std::{collections::BTreeSet, ffi::OsStr, fs, io, path::Path, process::Command};
 
@@ -44,6 +44,31 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
+    }
+
+    /// Run this parser to completion and check the result.
+    /// # Errors
+    /// If the parser determines there should be an error.
+    #[inline]
+    #[allow(unsafe_code)]
+    pub fn accept<In: IntoIterator<Item = I>>(
+        &self,
+        input: In,
+    ) -> Result<Option<O>, ParseError<I, S, O, C>> {
+        use crate::Run;
+        let mut run = input.run(self);
+        for r in &mut run {
+            drop(r?);
+        }
+        let output = run
+            .ctrl
+            .view()
+            .any(|i| get!(self.states, i).accepting)
+            .then(|| {
+                // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
+                unsafe { run.output.assume_init() }
+            });
+        Ok(output)
     }
 }
 

@@ -176,12 +176,14 @@ macro_rules! get_mut {
 
 mod action;
 mod check;
+mod combinators;
 mod ctrl;
 mod curry_input;
 mod curry_stack;
 mod graph;
 mod in_progress;
 mod input;
+mod map_indices;
 mod merge;
 mod output;
 mod range;
@@ -200,7 +202,7 @@ pub use {
     curry_input::CurryInput,
     curry_stack::CurryStack,
     graph::{Deterministic, Graph, Nondeterministic},
-    in_progress::InProgress,
+    in_progress::{InProgress, ParseError},
     input::Input,
     merge::{merge, try_merge, Merge},
     output::Output,
