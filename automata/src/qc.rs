@@ -7,8 +7,8 @@
 //! `QuickCheck` implementations for various types.
 
 use crate::{
-    Action, Ctrl, CurryInput, CurryStack, Graph, Input, Output, Range, RangeMap, Stack, State,
-    Transition, Update,
+    Action, Ctrl, CurryInput, CurryStack, Graph, Input, Range, RangeMap, Stack, State, Transition,
+    Update,
 };
 use core::{iter, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
@@ -135,11 +135,9 @@ impl Arbitrary for Update<u8, u8> {
 macro_rules! shrink_only {
     (|$self:ident: &$t:ident| $body:expr) => {
         impl<
-                I: Arbitrary + Input,
                 S: Arbitrary + Stack,
-                O: 'static + Clone + Output,
-                C: Arbitrary + Ctrl<I, S, O>,
-            > Arbitrary for $t<I, S, O, C>
+                C: Arbitrary + Ctrl<u8, S, u8>,
+            > Arbitrary for $t<u8, S, u8, C>
         {
             #[inline(always)]
             fn arbitrary(_: &mut Gen) -> Self {
@@ -153,11 +151,47 @@ macro_rules! shrink_only {
     };
 }
 
-shrink_only!(|self: &CurryInput| todo!());
-shrink_only!(|self: &CurryStack| todo!());
-shrink_only!(|self: &RangeMap| todo!());
-shrink_only!(|self: &Transition| todo!());
-shrink_only!(|self: &State| todo!());
+shrink_only!(
+    |self: &State| Box::new((self.transitions.clone(), self.accepting).shrink().map(
+        |(transitions, accepting)| Self {
+            transitions,
+            accepting
+        }
+    ))
+);
+
+shrink_only!(|self: &CurryStack| Box::new(
+    (
+        self.wildcard.clone(),
+        self.map_none.clone(),
+        self.map_some.clone()
+    )
+        .shrink()
+        .map(|(wildcard, map_none, map_some)| Self {
+            wildcard,
+            map_none,
+            map_some
+        })
+));
+
+shrink_only!(|self: &RangeMap| Box::new(self.entries.shrink().map(|entries| Self { entries })));
+
+shrink_only!(|self: &CurryInput| match *self {
+    Self::Wildcard(ref etc) => Box::new(etc.shrink().map(Self::Wildcard)),
+    Self::Scrutinize(ref etc) => Box::new(
+        etc.entries
+            .first()
+            .map(|&(_, ref transition)| Self::Wildcard(transition.clone()))
+            .into_iter()
+            .chain(etc.shrink().map(Self::Scrutinize))
+    ),
+});
+
+shrink_only!(|self: &Transition| Box::new(
+    (self.dst.clone(), self.act.clone(), self.update)
+        .shrink()
+        .map(|(dst, act, update)| Self { dst, act, update })
+));
 
 impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.

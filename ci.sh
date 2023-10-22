@@ -9,13 +9,12 @@ else
   export QUICKCHECK_TESTS=1000
 fi
 
-if [ -d automata ]
-then
-  cd automata
-  ../ci.sh
-  cd ..
-  exit 0 # <-- TODO: remove
-fi
+# if [ -d automata ]
+# then
+#   cd automata
+#   ../ci.sh
+#   cd ..
+# fi
 
 # Update our workbench
 rustup update || :
@@ -27,26 +26,15 @@ cargo fmt --check
 cargo clippy --all-targets --no-default-features
 cargo clippy --all-targets --all-features
 
-# Non-property tests
-cargo install cargo-careful || :
-cargo +nightly careful test --no-default-features \
-|| cargo +nightly miri test --no-default-features
-cargo +nightly careful test --no-default-features --examples \
-|| cargo +nightly miri test --no-default-features --examples
-cargo +nightly careful test -r --no-default-features \
-|| cargo +nightly miri test -r --no-default-features
-cargo +nightly careful test -r --no-default-features --examples \
-|| cargo +nightly miri test -r --no-default-features --examples
-
-# Property tests
-cargo test -r --all-features
-cargo test -r --all-features --examples
-
 # Extremely slow (but lovely) UB checks
 cargo +nightly miri test --no-default-features
 cargo +nightly miri test --no-default-features --examples
 cargo +nightly miri test -r --no-default-features
 cargo +nightly miri test -r --no-default-features --examples
+
+# Property tests
+cargo test -r --all-features
+cargo test -r --all-features --examples
 
 # Run examples
 set +e
@@ -55,12 +43,18 @@ set -e
 if [ ! -z "$EXAMPLES" ]
 then
   echo $EXAMPLES | xargs -n 1 cargo +nightly miri run --example
-  echo $EXAMPLES | xargs -n 1 cargo +nightly careful run --all-features --example
 fi
-if [ -f run-examples.sh ]
-then
-  ./run-examples.sh
-fi
+
+# Examples that are crates themselves
+for dir in $(ls -A examples)
+do
+  if [ -d examples/$dir ]
+  then
+    cd examples/$dir
+    cargo +nightly miri run
+    cd ../..
+  fi
+done
 
 # Nix build status
 git add -A

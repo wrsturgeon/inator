@@ -116,23 +116,27 @@ pub fn main() {
         println!("\"{s}\"");
         let mut run = s.chars().run(&parser);
         println!("    {run:?}");
-        while let Some(Ok(c)) = run.next() {
+        while let Some(r) = run.next() {
+            let Ok(c) = r else { panic!() };
             println!("{c:?} {run:?}");
         }
-        assert_eq!(run.ctrl, Err(true));
     }
 
     // Reject all invalid strings
-    for _ in 0..10 {
+    'examples: for _ in 0..10 {
         let s = shitpost(&mut rng);
         println!();
         println!("\"{s}\"");
         let mut run = s.chars().run(&parser);
         println!("    {run:?}");
-        while let Some(Ok(c)) = run.next() {
+        while let Some(r) = run.next() {
+            let Ok(c) = r else {
+                assert!(!accept(s.chars()));
+                continue 'examples;
+            };
             println!("{c:?} {run:?}");
         }
-        assert_eq!(run.ctrl, Err(accept(s.chars())));
+        assert!(accept(s.chars()));
     }
 
     // Print the Rust source representation of this parser
