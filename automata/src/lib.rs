@@ -207,7 +207,7 @@ pub use {
     merge::{merge, try_merge, Merge},
     output::Output,
     range::Range,
-    range_map::RangeMap,
+    range_map::{CmpFirst, RangeMap},
     run::Run,
     stack::Stack,
     state::State,

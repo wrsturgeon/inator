@@ -7,6 +7,7 @@
 //! Transition in an automaton: an action and a destination state.
 
 use crate::{Action, Ctrl, Input, Output, Stack, Update};
+use core::cmp;
 
 /// Transition in an automaton: an action and a destination state.
 #[allow(clippy::exhaustive_structs)]
@@ -38,6 +39,23 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for Transition<I
     }
 }
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for Transition<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for Transition<I, S, O, C> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.dst
+            .cmp(&other.dst)
+            .then_with(|| self.act.cmp(&other.act))
+            .then_with(|| self.update.cmp(&other.update))
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for Transition<I, S, O, C> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
     /// Take this transition in an actual execution.

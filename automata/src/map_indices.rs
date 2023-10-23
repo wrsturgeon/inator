@@ -7,7 +7,8 @@
 //! Apply a function to each index in a structure.
 
 use crate::{
-    Ctrl, CurryInput, CurryStack, Graph, Input, Output, RangeMap, Stack, State, Transition,
+    CmpFirst, Ctrl, CurryInput, CurryStack, Graph, Input, Output, RangeMap, Stack, State,
+    Transition,
 };
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
@@ -76,7 +77,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
             entries: self
                 .entries
                 .into_iter()
-                .map(|(k, v)| (k, v.map_indices(&mut f)))
+                .map(|CmpFirst(k, v)| CmpFirst(k, v.map_indices(&mut f)))
                 .collect(),
         }
     }

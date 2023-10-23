@@ -7,7 +7,8 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Graph, Input, Output, Range, RangeMap, Stack, State, Transition,
+    Action, CmpFirst, CurryInput, CurryStack, Graph, Input, Output, Range, RangeMap, Stack, State,
+    Transition,
 };
 use core::borrow::Borrow;
 use std::collections::BTreeSet;
@@ -113,7 +114,7 @@ impl<T: ToSrc> ToSrc for Option<T> {
     }
 }
 
-impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
+impl<T: Input> ToSrc for Range<T> {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
@@ -278,7 +279,7 @@ impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
         );
         self.entries
             .iter()
-            .fold(String::new(), |acc, &(ref k, ref v)| {
+            .fold(String::new(), |acc, &CmpFirst(ref k, ref v)| {
                 format!(
                     r#"{acc}
             (&{s}, &({})) => {},"#,

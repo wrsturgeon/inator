@@ -37,7 +37,7 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
     /// Should fail occasionally but not often.
     #[must_use]
     #[cfg(feature = "quickcheck")]
-    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self;
+    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen, well_formed: bool) -> Self;
     /// Apply a function to each index.
     #[must_use]
     fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self;
@@ -50,12 +50,12 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
         iter::once(*self)
     }
     #[inline]
-    #[allow(clippy::arithmetic_side_effects, unsafe_code)]
+    #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
     #[cfg(feature = "quickcheck")]
-    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen, well_formed: bool) -> Self {
         use quickcheck::Arbitrary;
-        // SAFETY: Added one.
-        Self::arbitrary(g) % unsafe { NonZeroUsize::new_unchecked(n_states + 1) }
+        Self::arbitrary(g)
+            % NonZeroUsize::new(if well_formed { n_states } else { n_states + 1 }).unwrap()
     }
     #[inline]
     fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
@@ -70,13 +70,12 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<usize> {
         self.iter().copied()
     }
     #[inline]
-    #[allow(clippy::arithmetic_side_effects, unsafe_code)]
+    #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
     #[cfg(feature = "quickcheck")]
-    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen, well_formed: bool) -> Self {
         use quickcheck::Arbitrary;
         let collection = Self::arbitrary(g);
-        // SAFETY: Added one.
-        let nz = unsafe { NonZeroUsize::new_unchecked(n_states + 1) };
+        let nz = NonZeroUsize::new(if well_formed { n_states } else { n_states + 1 }).unwrap();
         collection.into_iter().map(|i| i % nz).collect()
     }
     #[inline]

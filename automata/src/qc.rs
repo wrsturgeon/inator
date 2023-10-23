@@ -7,8 +7,8 @@
 //! `QuickCheck` implementations for various types.
 
 use crate::{
-    Action, Ctrl, CurryInput, CurryStack, Graph, Input, Range, RangeMap, Stack, State, Transition,
-    Update,
+    Action, CmpFirst, Ctrl, CurryInput, CurryStack, Graph, Input, Range, RangeMap, Stack, State,
+    Transition, Update,
 };
 use core::{iter, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
@@ -48,10 +48,12 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S, u8>> Arbitrary for Graph<u
     #[inline]
     fn arbitrary(g: &mut Gen) -> Self {
         let size = within_size(g);
-        let initial = C::arbitrary_given(size, g);
+        let initial = C::arbitrary_given(size, g, false);
         if let Some(nz) = NonZeroUsize::new(size) {
             Self {
-                states: (0..size).map(|_| State::arbitrary_given(nz, g)).collect(),
+                states: (0..size)
+                    .map(|_| State::arbitrary_given(nz, g, false))
+                    .collect(),
                 initial,
             }
         } else {
@@ -141,7 +143,7 @@ macro_rules! shrink_only {
         {
             #[inline(always)]
             fn arbitrary(_: &mut Gen) -> Self {
-                unreachable!()
+                never!()
             }
             #[inline]
             fn shrink(&$self) -> Box<dyn Iterator<Item = Self>> {
@@ -181,7 +183,7 @@ shrink_only!(|self: &CurryInput| match *self {
     Self::Scrutinize(ref etc) => Box::new(
         etc.entries
             .first()
-            .map(|&(_, ref transition)| Self::Wildcard(transition.clone()))
+            .map(|&CmpFirst(_, ref transition)| Self::Wildcard(transition.clone()))
             .into_iter()
             .chain(etc.shrink().map(Self::Scrutinize))
     ),
@@ -193,13 +195,28 @@ shrink_only!(|self: &Transition| Box::new(
         .map(|(dst, act, update)| Self { dst, act, update })
 ));
 
+impl<K: Arbitrary + Ord, V: Arbitrary + Eq> Arbitrary for CmpFirst<K, V> {
+    #[inline(always)]
+    fn arbitrary(_: &mut Gen) -> Self {
+        never!()
+    }
+    #[inline]
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            (self.0.clone(), self.1.clone())
+                .shrink()
+                .map(|(k, v)| Self(k, v)),
+        )
+    }
+}
+
 impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen, well_formed: bool) -> Self {
         Self {
-            transitions: CurryStack::arbitrary_given(n_states, g),
+            transitions: CurryStack::arbitrary_given(n_states, g, well_formed),
             accepting: bool::arbitrary(g),
         }
     }
@@ -209,12 +226,19 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryStack<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen, well_formed: bool) -> Self {
         Self {
-            wildcard: bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g)),
-            map_none: bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g)),
+            wildcard: bool::arbitrary(g)
+                .then(|| CurryInput::arbitrary_given(n_states, g, well_formed)),
+            map_none: bool::arbitrary(g)
+                .then(|| CurryInput::arbitrary_given(n_states, g, well_formed)),
             map_some: (0..within_size(g))
-                .map(|_| (S::arbitrary(g), CurryInput::arbitrary_given(n_states, g)))
+                .map(|_| {
+                    (
+                        S::arbitrary(g),
+                        CurryInput::arbitrary_given(n_states, g, well_formed),
+                    )
+                })
                 .collect(),
         }
     }
@@ -224,11 +248,11 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryInput<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen, well_formed: bool) -> Self {
         if bool::arbitrary(g) {
-            Self::Wildcard(Transition::arbitrary_given(n_states, g))
+            Self::Wildcard(Transition::arbitrary_given(n_states, g, well_formed))
         } else {
-            Self::Scrutinize(RangeMap::arbitrary_given(n_states, g))
+            Self::Scrutinize(RangeMap::arbitrary_given(n_states, g, well_formed))
         }
     }
 }
@@ -237,13 +261,13 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> RangeMap<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen, well_formed: bool) -> Self {
         Self {
             entries: (0..within_size(g))
                 .map(|_| {
-                    (
+                    CmpFirst(
                         Range::arbitrary(g),
-                        Transition::arbitrary_given(n_states, g),
+                        Transition::arbitrary_given(n_states, g, well_formed),
                     )
                 })
                 .collect(),
@@ -255,9 +279,9 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> Transition<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen, well_formed: bool) -> Self {
         Self {
-            dst: C::arbitrary_given(n_states.into(), g),
+            dst: C::arbitrary_given(n_states.into(), g, well_formed),
             act: Action::arbitrary(g),
             update: Update::arbitrary(g),
         }

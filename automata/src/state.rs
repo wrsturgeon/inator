@@ -7,10 +7,11 @@
 //! State, i.e. a node in an automaton graph.
 
 use crate::{Ctrl, CurryStack, Input, Output, Stack};
+use core::cmp;
 
 /// State, i.e. a node in an automaton graph.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct State<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Map from input tokens to actions.
     pub transitions: CurryStack<I, S, O, C>,
@@ -23,6 +24,43 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for State<I, S, O, C
     fn clone(&self) -> Self {
         Self {
             transitions: self.transitions.clone(),
+            accepting: self.accepting,
+        }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for State<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for State<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.accepting == other.accepting && self.transitions == other.transitions
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for State<I, S, O, C> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.transitions
+            .cmp(&other.transitions)
+            .then_with(|| self.accepting.cmp(&other.accepting))
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for State<I, S, O, C> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> State<I, S, O, C> {
+    /// Chop off parts of the automaton until it's valid.
+    #[inline]
+    #[must_use]
+    pub fn procrustes(self) -> Self {
+        Self {
+            transitions: self.transitions.procrustes(),
             accepting: self.accepting,
         }
     }

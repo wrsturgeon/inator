@@ -8,12 +8,13 @@
 //! return another function that reads input and decides an action.
 
 use crate::{Ctrl, CurryInput, IllFormed, Input, Merge, Output, Range, Stack, Transition};
+use core::cmp;
 use std::collections::BTreeMap;
 
 /// Read the symbol at the top of the stack (if any), then
 /// return another function that reads input and decides an action.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct CurryStack<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// No matter what the stack says, try this first.
     pub wildcard: Option<CurryInput<I, S, O, C>>,
@@ -31,6 +32,34 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for CurryStack<I, S,
             map_none: self.map_none.clone(),
             map_some: self.map_some.clone(),
         }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for CurryStack<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for CurryStack<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.wildcard == other.wildcard
+            && self.map_none == other.map_none
+            && self.map_some == other.map_some
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for CurryStack<I, S, O, C> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.wildcard
+            .cmp(&other.wildcard)
+            .then_with(|| self.map_none.cmp(&other.map_none))
+            .then_with(|| self.map_some.cmp(&other.map_some))
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for CurryStack<I, S, O, C> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -79,5 +108,35 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
             .iter()
             .chain(self.map_none.iter())
             .chain(self.map_some.values())
+    }
+
+    /// Chop off parts of the automaton until it's valid.
+    #[inline]
+    #[must_use]
+    pub fn procrustes(self) -> Self {
+        let wildcard = self.wildcard.map(CurryInput::procrustes);
+        let mut map_none = self.map_none.map(CurryInput::procrustes);
+        let mut map_some: BTreeMap<_, _> = self
+            .map_some
+            .into_iter()
+            .map(|(k, v)| (k, v.procrustes()))
+            .collect();
+        if let Some(ref wild) = wildcard {
+            for some in map_some.values_mut() {
+                while let Err((arg_token, _, _)) = wild.disjoint(some) {
+                    some.remove(arg_token);
+                }
+            }
+            if let Some(ref mut none) = map_none {
+                while let Err((arg_token, _, _)) = wild.disjoint(none) {
+                    none.remove(arg_token);
+                }
+            }
+        }
+        Self {
+            wildcard,
+            map_none,
+            map_some,
+        }
     }
 }

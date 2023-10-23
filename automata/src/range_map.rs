@@ -7,15 +7,37 @@
 //! Map from ranges of keys to values.
 
 use crate::{Ctrl, IllFormed, Input, Output, Range, Stack, Transition};
+use core::cmp;
+use std::collections::BTreeSet;
+
+/// Compare only the first element for `PartialOrd` & `Ord`;
+/// compare both for `PartialEq` & `Eq`.
+#[allow(clippy::exhaustive_structs)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct CmpFirst<K: Ord, V: Eq>(pub K, pub V);
+
+impl<K: Ord, V: Eq> PartialOrd for CmpFirst<K, V> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<K: Ord, V: Eq> Ord for CmpFirst<K, V> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
 
 /// Map from ranges of keys to values.
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default)]
 pub struct RangeMap<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
-    pub entries: Vec<(Range<I>, Transition<I, S, O, C>)>,
+    pub entries: BTreeSet<CmpFirst<Range<I>, Transition<I, S, O, C>>>,
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O, C> {
@@ -27,10 +49,33 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O
     }
 }
 
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for RangeMap<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for RangeMap<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for RangeMap<I, S, O, C> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.entries.cmp(&other.entries)
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for RangeMap<I, S, O, C> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     /// Iterate over references to keys and values without consuming anything.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &(Range<I>, Transition<I, S, O, C>)> {
+    pub fn iter(&self) -> impl Iterator<Item = &CmpFirst<Range<I>, Transition<I, S, O, C>>> {
         self.entries.iter()
     }
 
@@ -45,7 +90,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     )]
     pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, O, C>>, IllFormed<I, S, O, C>> {
         let mut acc = None;
-        for &(ref range, ref transition) in &self.entries {
+        for &CmpFirst(ref range, ref transition) in &self.entries {
             if range.contains(key) {
                 match acc {
                     None => acc = Some((range, transition)),
@@ -69,22 +114,56 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
         &self,
         other: &Self,
     ) -> Result<(), (Range<I>, Transition<I, S, O, C>, Transition<I, S, O, C>)> {
-        self.entries.iter().try_fold((), |(), &(ref lk, ref lv)| {
-            other.entries.iter().try_fold((), |(), &(ref rk, ref rv)| {
-                rk.clone().intersection(lk.clone()).map_or(Ok(()), |range| {
-                    if lv == rv {
-                        Ok(())
-                    } else {
-                        Err((range, lv.clone(), rv.clone()))
-                    }
-                })
+        self.entries
+            .iter()
+            .try_fold((), |(), &CmpFirst(ref lk, ref lv)| {
+                other
+                    .entries
+                    .iter()
+                    .try_fold((), |(), &CmpFirst(ref rk, ref rv)| {
+                        rk.clone()
+                            .intersection(lk.clone())
+                            .map_or(Ok(()), |range| Err((range, lv.clone(), rv.clone())))
+                    })
             })
-        })
     }
 
     /// All values in this collection, without their associated keys.
     #[inline]
     pub fn values(&self) -> impl Iterator<Item = &Transition<I, S, O, C>> {
-        self.entries.iter().map(|&(_, ref v)| v)
+        self.entries.iter().map(|&CmpFirst(_, ref v)| v)
+    }
+
+    /// Remove an entry by key.
+    #[inline]
+    pub fn remove(&mut self, key: &Range<I>) {
+        self.entries
+            .retain(|&CmpFirst(ref k, _)| key.clone().intersection(k.clone()).is_none());
+    }
+
+    /// Chop off parts of the automaton until it's valid.
+    #[inline]
+    #[must_use]
+    pub fn procrustes(mut self) -> Self {
+        while let Some(overlap) = self
+            .entries
+            .iter()
+            .fold(None, |acc, &CmpFirst(ref k, ref v)| {
+                acc.or_else(|| {
+                    self.entries.range(..CmpFirst(k.clone(), v.clone())).fold(
+                        None,
+                        |opt, &CmpFirst(ref range, _)| {
+                            opt.or_else(|| range.clone().intersection(k.clone()))
+                        },
+                    )
+                })
+            })
+        {
+            self.entries
+                .retain(|&CmpFirst(ref k, _)| k.clone().intersection(overlap.clone()).is_none());
+        }
+        self.entries
+            .retain(|&CmpFirst(_, ref v)| v.dst.view().next().is_some());
+        self
     }
 }

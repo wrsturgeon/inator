@@ -7,8 +7,8 @@
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
 use crate::{
-    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Output, Range,
-    RangeMap, Stack, State, Transition, Update,
+    Action, CmpFirst, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Output,
+    Range, RangeMap, Stack, State, Transition, Update,
 };
 use std::collections::{btree_map, BTreeMap, BTreeSet};
 
@@ -70,7 +70,7 @@ impl Merge for usize {
     }
 }
 
-impl<T: Ord> Merge for BTreeSet<T> {
+impl Merge for BTreeSet<usize> {
     type Error = CtrlMergeConflict;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
@@ -155,14 +155,17 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for RangeMap<I, S, O
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
-    for Vec<(Range<I>, Transition<I, S, O, C>)>
+    for BTreeSet<CmpFirst<Range<I>, Transition<I, S, O, C>>>
 {
     type Error = IllFormed<I, S, O, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
-        let a: BTreeMap<_, _> = self.into_iter().collect();
-        let b: BTreeMap<_, _> = other.into_iter().collect();
-        Ok(a.merge(b)?.into_iter().collect())
+        let a: BTreeMap<_, _> = self.into_iter().map(|CmpFirst(k, v)| (k, v)).collect();
+        let b: BTreeMap<_, _> = other.into_iter().map(|CmpFirst(k, v)| (k, v)).collect();
+        Ok(a.merge(b)?
+            .into_iter()
+            .map(|(k, v)| CmpFirst(k, v))
+            .collect())
     }
 }
 

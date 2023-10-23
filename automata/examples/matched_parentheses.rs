@@ -1,7 +1,7 @@
 use core::iter;
 use inator_automata::{
-    update, Action, CurryInput, CurryStack, Deterministic, Graph, Range, RangeMap, Run, State,
-    ToSrc, Transition,
+    update, Action, CmpFirst, CurryInput, CurryStack, Deterministic, Graph, Range, RangeMap, Run,
+    State, ToSrc, Transition,
 };
 use rand::{thread_rng, RngCore};
 
@@ -29,27 +29,29 @@ fn parser() -> Deterministic<char, Symbol, ()> {
         states: vec![State {
             transitions: CurryStack {
                 wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: vec![(
+                    entries: iter::once(CmpFirst(
                         Range::unit('('),
                         Transition {
                             dst: 0,
                             update: update!(|(), _| ()),
                             act: Action::Push(Symbol::Paren),
                         },
-                    )],
+                    ))
+                    .collect(),
                 })),
                 map_none: None,
                 map_some: iter::once((
                     Symbol::Paren,
                     CurryInput::Scrutinize(RangeMap {
-                        entries: vec![(
+                        entries: iter::once(CmpFirst(
                             Range::unit(')'),
                             Transition {
                                 dst: 0,
                                 update: update!(|(), _| ()),
                                 act: Action::Pop,
                             },
-                        )],
+                        ))
+                        .collect(),
                     }),
                 ))
                 .collect(),
