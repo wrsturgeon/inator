@@ -39,7 +39,7 @@ pub fn main() -> io::Result<()> {
                 .collect(),
             },
             accepting: true,
-            tag: None,
+            tag: vec![],
         }],
         initial: 0,
     };
