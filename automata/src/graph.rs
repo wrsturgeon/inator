@@ -173,10 +173,10 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
 
         // Merge this subset of states into one (most of the heavy lifting)
         let mega_state: State<I, S, O, C> = match try_merge(subset.view().flat_map(|r| match r {
-            Ok(i) => iter::once(Ok(get!(self.states, i).clone())).collect::<Vec<_>>(),
-            Err(s) => find_tag(&self.states, s).map_or_else(
-                |e| iter::once(Err(e)).collect(),
-                |x| x.into_iter().map(|st| Ok(st.clone())).collect(),
+            Ok(i) => vec![Ok(get!(self.states, i).clone())],
+            Err(tag) => find_tag(&self.states, tag).map_or_else(
+                |e| vec![Err(e)],
+                |set| set.into_iter().map(|st| Ok(st.clone())).collect(),
             ),
         })) {
             // If no state follows, reject immediately.
