@@ -1,7 +1,6 @@
 use core::iter;
 use inator_automata::{
-    update, Action, CmpFirst, CurryInput, CurryStack, Deterministic, Range, RangeMap, State,
-    Transition,
+    update, Action, CurryInput, CurryStack, Deterministic, Range, RangeMap, State, Transition,
 };
 use std::io;
 use symbols::Symbol;
@@ -12,7 +11,7 @@ pub fn main() -> io::Result<()> {
         states: vec![State {
             transitions: CurryStack {
                 wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: iter::once(CmpFirst(
+                    entries: iter::once((
                         Range::unit('('),
                         Transition {
                             dst: 0,
@@ -26,7 +25,7 @@ pub fn main() -> io::Result<()> {
                 map_some: iter::once((
                     Symbol::Paren,
                     CurryInput::Scrutinize(RangeMap {
-                        entries: iter::once(CmpFirst(
+                        entries: iter::once((
                             Range::unit(')'),
                             Transition {
                                 dst: 0,

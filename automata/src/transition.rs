@@ -63,10 +63,22 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
     /// # Errors
     /// If we try to pop from an empty stack.
     #[inline]
-    pub fn invoke(&self, token: &I, stack: &mut Vec<S>, output: O) -> (Option<C>, O) {
-        (
-            self.act.invoke(stack).map(|()| self.dst.clone()),
-            (self.update.ptr)(output, token),
-        )
+    pub fn invoke(&self, token: &I, stack: &mut Vec<S>, output: O) -> Option<(C, O)> {
+        self.act
+            .invoke(stack)
+            .map(|()| (self.dst.clone(), (self.update.ptr)(output, token)))
+    }
+}
+
+impl<I: Input, S: Stack, O: Output> Transition<I, S, O, usize> {
+    /// Convert the control parameter from `usize` to anything else.
+    #[inline]
+    #[must_use]
+    pub fn convert_ctrl<C: Ctrl<I, S, O>>(self) -> Transition<I, S, O, C> {
+        Transition {
+            dst: C::from_usize(self.dst),
+            act: self.act,
+            update: self.update,
+        }
     }
 }

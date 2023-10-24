@@ -6,9 +6,9 @@
 
 //! Read the next input symbol and decide an action.
 
-use crate::{CmpFirst, Ctrl, IllFormed, Input, Output, Range, RangeMap, Stack, Transition};
+use crate::{Ctrl, IllFormed, Input, Output, Range, RangeMap, Stack, Transition};
 use core::{cmp, iter};
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 /// Read the next input symbol and decide an action.
 #[allow(clippy::exhaustive_enums)]
@@ -84,7 +84,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
     /// - `Some(range)`: Conflict on at least this range of values,
     ///   which is an intersection of two offending ranges.
     #[inline]
-    #[allow(clippy::print_stdout)] // FIXME
     #[allow(clippy::type_complexity)]
     pub fn disjoint(
         &self,
@@ -101,7 +100,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
             (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
             | (&Self::Scrutinize(ref s), &Self::Wildcard(ref w)) => {
-                s.entries.first().map_or(Ok(()), |&CmpFirst(ref k, ref v)| {
+                s.entries.first_key_value().map_or(Ok(()), |(k, v)| {
                     Err((Some(k.clone()), w.clone(), v.clone()))
                 })
             }
@@ -133,7 +132,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
                 //     but the map took a wildcard",
                 // );
                 *self = Self::Scrutinize(RangeMap {
-                    entries: BTreeSet::new(),
+                    entries: BTreeMap::new(),
                 });
             }
             Self::Scrutinize(ref mut etc) => etc.remove(&key.expect(
@@ -141,23 +140,5 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
                 but the map took a specific value",
             )),
         };
-    }
-
-    /// Chop off parts of the automaton until it's valid.
-    #[inline]
-    #[must_use]
-    pub fn procrustes(self) -> Self {
-        match self {
-            Self::Wildcard(etc) => {
-                if etc.dst.view().next().is_none() {
-                    Self::Scrutinize(RangeMap {
-                        entries: BTreeSet::new(),
-                    })
-                } else {
-                    Self::Wildcard(etc)
-                }
-            }
-            Self::Scrutinize(etc) => Self::Scrutinize(etc.procrustes()),
-        }
     }
 }

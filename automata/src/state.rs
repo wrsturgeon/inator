@@ -53,15 +53,3 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for State<I, S,
         Some(self.cmp(other))
     }
 }
-
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> State<I, S, O, C> {
-    /// Chop off parts of the automaton until it's valid.
-    #[inline]
-    #[must_use]
-    pub fn procrustes(self) -> Self {
-        Self {
-            transitions: self.transitions.procrustes(),
-            accepting: self.accepting,
-        }
-    }
-}

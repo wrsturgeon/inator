@@ -109,34 +109,4 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
             .chain(self.map_none.iter())
             .chain(self.map_some.values())
     }
-
-    /// Chop off parts of the automaton until it's valid.
-    #[inline]
-    #[must_use]
-    pub fn procrustes(self) -> Self {
-        let wildcard = self.wildcard.map(CurryInput::procrustes);
-        let mut map_none = self.map_none.map(CurryInput::procrustes);
-        let mut map_some: BTreeMap<_, _> = self
-            .map_some
-            .into_iter()
-            .map(|(k, v)| (k, v.procrustes()))
-            .collect();
-        if let Some(ref wild) = wildcard {
-            for some in map_some.values_mut() {
-                while let Err((arg_token, _, _)) = wild.disjoint(some) {
-                    some.remove(arg_token);
-                }
-            }
-            if let Some(ref mut none) = map_none {
-                while let Err((arg_token, _, _)) = wild.disjoint(none) {
-                    none.remove(arg_token);
-                }
-            }
-        }
-        Self {
-            wildcard,
-            map_none,
-            map_some,
-        }
-    }
 }

@@ -1,7 +1,7 @@
 use core::iter;
 use inator_automata::{
-    update, Action, CmpFirst, CurryInput, CurryStack, Graph, Nondeterministic, Range, RangeMap,
-    Run, State, ToSrc, Transition,
+    update, Action, CurryInput, CurryStack, Graph, Nondeterministic, Range, RangeMap, Run, State,
+    ToSrc, Transition,
 };
 use rand::{thread_rng, RngCore};
 
@@ -29,7 +29,7 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
         states: vec![State {
             transitions: CurryStack {
                 wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: iter::once(CmpFirst(
+                    entries: iter::once((
                         Range::unit('('),
                         Transition {
                             dst: iter::once(0).collect(),
@@ -43,7 +43,7 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
                 map_some: iter::once((
                     Symbol::Paren,
                     CurryInput::Scrutinize(RangeMap {
-                        entries: iter::once(CmpFirst(
+                        entries: iter::once((
                             Range::unit(')'),
                             Transition {
                                 dst: iter::once(0).collect(),
@@ -119,7 +119,7 @@ pub fn main() {
         let mut run = s.chars().run(&parser);
         println!("    {run:?}");
         while let Some(r) = run.next() {
-            let Ok(c) = r else { panic!() };
+            let Ok(c) = r else { panic!("{r:?}") };
             println!("{c:?} {run:?}");
         }
     }

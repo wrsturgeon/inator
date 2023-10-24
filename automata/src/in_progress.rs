@@ -6,7 +6,7 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{try_merge, Ctrl, Graph, IllFormed, Input, Output, Stack, Transition};
+use crate::{try_merge, Ctrl, Graph, IllFormed, Input, Output, Stack};
 use core::{fmt, mem};
 
 /// Execute an automaton on an input sequence.
@@ -61,6 +61,8 @@ pub enum InputError {
     NotAccepting,
     /// Ended input with items in the stack.
     Unclosed,
+    /// Tried to close a region that hadn't been opened.
+    Unopened,
     /// Tried to take a transition that did not exist.
     Absurd,
 }
@@ -96,8 +98,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>, In: Iterator<Item = I>> It
             Ok(ok) => ok,
             Err(e) => return Some(Err(e)),
         };
-        self.ctrl = c?;
         let _ = self.output.write(o);
+        self.ctrl = c?;
         maybe_token.map(Ok) // <-- Propagate the iterator's input
     }
 }
@@ -113,11 +115,11 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
     output: O,
 ) -> Result<(Option<C>, O), ParseError<I, S, O, C>> {
     ctrl.view().try_fold((), |(), i| {
-        if graph.states.get(i).is_none() {
-            Err(ParseError::BadParser(IllFormed::OutOfBounds(i)))
-        } else {
-            Ok(())
-        }
+        graph
+            .states
+            .get(i)
+            .map(|_| {})
+            .ok_or(ParseError::BadParser(IllFormed::OutOfBounds(i)))
     })?;
     let mut states = ctrl.view().map(|i| get!(graph.states, i));
     let Some(token) = maybe_token else {
@@ -136,17 +138,15 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
         Err(e) => Some(Err(e)),
         Ok(opt) => opt.map(Ok),
     });
-    try_merge(transitions).map_or(
-        // None
-        Err(ParseError::BadInput(InputError::Absurd)),
-        // Some(..)
-        |r| {
-            r.map_or_else(
-                |e| Err(ParseError::BadParser(e)),
-                |mega_transition: Transition<I, S, O, C>| {
-                    Ok(mega_transition.invoke(token, stack, output))
-                },
-            )
-        },
-    )
+    try_merge(transitions).map_or(Err(ParseError::BadInput(InputError::Absurd)), |r| {
+        r.map_or_else(
+            |e| Err(ParseError::BadParser(e)),
+            |mega_transition| {
+                mega_transition.invoke(token, stack, output).map_or(
+                    Err(ParseError::BadInput(InputError::Unopened)),
+                    |(c, out)| Ok((Some(c), out)),
+                )
+            },
+        )
+    })
 }

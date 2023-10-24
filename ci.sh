@@ -4,9 +4,9 @@ set -eux
 
 if [ "${GITHUB_REF##*/}" = "main" ]
 then
-  export QUICKCHECK_TESTS=100000
+  export QUICKCHECK_TESTS=10000000
 else
-  export QUICKCHECK_TESTS=100
+  export QUICKCHECK_TESTS=10000
 fi
 
 if [ -d automata ]

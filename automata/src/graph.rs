@@ -7,14 +7,10 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    merge, Check, CmpFirst, Ctrl, CurryInput, CurryStack, IllFormed, Input, Output, ParseError,
+    merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{
-    cmp::Ordering,
-    mem::{transmute, MaybeUninit},
-    num::NonZeroUsize,
-};
+use core::{cmp::Ordering, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -61,8 +57,10 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for Graph<I, S, 
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     /// Check well-formedness.
+    /// Note that this can't check if determinization will succeed in less time than actually trying;
+    /// if you want to see if there will be any runtime errors, just determinize it.
     /// # Errors
-    /// When not well-formed (with a witness).
+    /// When ill-formed (with a witness).
     #[inline]
     pub fn check(&self) -> Result<(), IllFormed<I, S, O, C>> {
         let n_states = self.states.len();
@@ -96,21 +94,18 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     pub fn accept<In: IntoIterator<Item = I>>(
         &self,
         input: In,
-    ) -> Result<Option<O>, ParseError<I, S, O, C>> {
+    ) -> Result<O, ParseError<I, S, O, C>> {
         use crate::Run;
         let mut run = input.run(self);
         for r in &mut run {
             drop(r?);
         }
-        let output = run
-            .ctrl
-            .view()
-            .any(|i| get!(self.states, i).accepting)
-            .then(|| {
-                // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
-                unsafe { run.output.assume_init() }
-            });
-        Ok(output)
+        if run.ctrl.view().any(|i| get!(self.states, i).accepting) {
+            // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
+            Ok(unsafe { run.output.assume_init() })
+        } else {
+            Err(ParseError::BadInput(InputError::NotAccepting))
+        }
     }
 
     /// Subset construction algorithm for determinizing nondeterministic automata.
@@ -135,7 +130,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         ordering.sort_unstable();
         ordering.dedup();
 
-        Ok(Deterministic {
+        let output = Deterministic {
             initial: unwrap!(ordering.binary_search(&self.initial)),
             states: ordering
                 .iter()
@@ -150,7 +145,11 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
                     }
                 })
                 .collect(),
-        })
+        };
+        output
+            .check()
+            .map_err(IllFormed::convert_ctrl)
+            .map(|()| output)
     }
 
     /// Associate each subset of states with a merged state.
@@ -164,11 +163,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         let btree_map::Entry::Vacant(entry) = subsets_as_states.entry(subset.clone()) else {
             return Ok(());
         };
-
-        #[allow(clippy::print_stdout)]
-        {
-            println!("Merging {}", subset.to_src());
-        }
 
         // Merge this subset of states into one (most of the heavy lifting)
         let mega_state: State<I, S, O, C> =
@@ -203,108 +197,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         // Recurse on all destinations
         dsts.into_iter()
             .try_fold((), |(), dst| self.explore(subsets_as_states, &dst))
-    }
-
-    /// Chop off parts of the automaton until it's valid.
-    #[inline]
-    #[must_use]
-    #[allow(
-        clippy::arithmetic_side_effects,
-        clippy::missing_panics_doc,
-        clippy::transmute_undefined_repr,
-        unsafe_code
-    )]
-    #[allow(clippy::print_stdout, clippy::use_debug)] // <-- TODO
-    pub fn procrustes(mut self) -> Option<Self> {
-        'restart: loop {
-            let Some(size) = NonZeroUsize::new(self.states.len()) else {
-                return self.check().is_ok().then_some(self);
-            };
-            let mut reindexed: Vec<_> = self
-                .states
-                .into_iter()
-                .enumerate()
-                .map(|(i, s)| CmpFirst(s, i))
-                .collect();
-            reindexed.sort_unstable();
-            let (indices, orig_states): (Vec<_>, Vec<_>) =
-                reindexed.into_iter().map(|CmpFirst(s, i)| (i, s)).unzip();
-            let mut states = orig_states
-                .into_iter()
-                .map(|state| {
-                    MaybeUninit::new(
-                        state
-                            .map_indices(|i| {
-                                let r = i % size;
-                                unwrap!(indices.iter().position(|&j| r == j))
-                            })
-                            .procrustes(),
-                    )
-                })
-                .collect::<Vec<_>>();
-            let mut initial = MaybeUninit::new(self.initial.map_indices(|i| {
-                let r = i % size;
-                unwrap!(indices.iter().position(|&j| r == j))
-            }));
-            if !indices.iter().copied().eq(0..size.into()) {
-                // SAFETY: ABI guaranteed to be identical.
-                self.states = unsafe { transmute(states) };
-                // SAFETY: Never uninitialized except inside `dedup` above.
-                self.initial = unsafe { initial.assume_init() };
-                continue 'restart;
-            }
-            dedup(&mut states, &mut initial);
-            return Some(Self {
-                // SAFETY: ABI guaranteed to be identical.
-                states: unsafe { transmute(states) },
-                // SAFETY: Never uninitialized except inside `dedup` above.
-                initial: unsafe { initial.assume_init() },
-            });
-        }
-    }
-}
-
-/// Remove the first duplicate state, if any, AND adjust indices accordingly.
-#[inline]
-#[allow(unsafe_code, unused_unsafe)]
-fn dedup<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
-    states: &mut Vec<MaybeUninit<State<I, S, O, C>>>,
-    initial: &mut MaybeUninit<C>,
-) {
-    let mut i = 0;
-    while i < states.len().saturating_sub(1) {
-        match {
-            // SAFETY: Never uninitialized except below.
-            let curr = unsafe { get!(states, i).assume_init_ref() };
-            i = i.checked_add(1).expect("Absurdly huge number of states");
-            // SAFETY: Never uninitialized except below.
-            let next = unsafe { get!(states, i).assume_init_ref() };
-            curr.cmp(next)
-        } {
-            Ordering::Less => continue,
-            Ordering::Equal => {
-                let _ = states.remove(i);
-                for state in &mut *states {
-                    // SAFETY: Never uninitialized except right here.
-                    let _ = state.write(unsafe { state.assume_init_read() }.map_indices(|j| {
-                        if j < i {
-                            j
-                        } else {
-                            j.overflowing_sub(1).0
-                        }
-                    }));
-                }
-                // SAFETY: Never uninitialized except right here.
-                let _ = initial.write(unsafe { initial.assume_init_read() }.map_indices(|j| {
-                    if j < i {
-                        j
-                    } else {
-                        j.overflowing_sub(1).0
-                    }
-                }));
-            }
-            Ordering::Greater => never!(),
-        }
     }
 }
 
@@ -354,7 +246,7 @@ fn fix_indices_range_map<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
         entries: value
             .entries
             .into_iter()
-            .map(|CmpFirst(k, v)| CmpFirst(k, fix_indices_transition(v, ordering)))
+            .map(|(k, v)| (k, fix_indices_transition(v, ordering)))
             .collect(),
     }
 }
