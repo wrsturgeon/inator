@@ -223,7 +223,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
             accepting: bool::arbitrary(g),
-            tag: Option::arbitrary(g),
+            tag: Vec::arbitrary(g),
         }
     }
 }

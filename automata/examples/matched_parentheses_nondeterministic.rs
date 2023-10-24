@@ -57,7 +57,7 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
                 .collect(),
             },
             accepting: true,
-            tag: None,
+            tag: vec![],
         }],
         initial: iter::once(Ok(0)).collect(),
     }

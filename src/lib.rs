@@ -99,5 +99,44 @@
     clippy::wildcard_imports
 )]
 
-#[cfg(feature = "quickcheck")]
-use quickcheck as _; // <-- TODO: remove
+/*
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(any(debug_assertions, test))]
+macro_rules! get {
+    ($expr:expr, $index:expr) => {
+        $expr.get($index).unwrap()
+    };
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! get {
+    ($expr:expr, $index:expr) => {{
+        #[allow(unsafe_code)]
+        let result = unsafe { $expr.get_unchecked($index) };
+        result
+    }};
+}
+*/
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(any(debug_assertions, test))]
+macro_rules! get_mut {
+    ($expr:expr, $index:expr) => {
+        $expr.get_mut($index).unwrap()
+    };
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! get_mut {
+    ($expr:expr, $index:expr) => {{
+        #[allow(unsafe_code, unused_unsafe)]
+        let result = unsafe { $expr.get_unchecked_mut($index) };
+        result
+    }};
+}
+
+mod fixpoint;
+
+pub use fixpoint::{fixpoint, Fixpoint};

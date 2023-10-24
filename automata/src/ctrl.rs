@@ -28,7 +28,7 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
     Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
-    type View<'s>: Iterator<Item = Result<usize, &'s String>>
+    type View<'s>: Iterator<Item = Result<usize, &'s str>>
     where
         Self: 's;
     /// View each index in what may be a collection.
@@ -47,7 +47,7 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
 }
 
 impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
-    type View<'s> = iter::Once<Result<usize, &'s String>>;
+    type View<'s> = iter::Once<Result<usize, &'s str>>;
     #[inline]
     fn view(&self) -> Self::View<'_> {
         iter::once(Ok(*self))
@@ -72,7 +72,7 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
 impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<Result<usize, String>> {
     type View<'s> = iter::Map<
         btree_set::Iter<'s, Result<usize, String>>,
-        fn(&'s Result<usize, String>) -> Result<usize, &'s String>,
+        fn(&'s Result<usize, String>) -> Result<usize, &'s str>,
     >;
     #[inline]
     fn view(&self) -> Self::View<'_> {
