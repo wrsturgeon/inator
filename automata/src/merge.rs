@@ -70,7 +70,7 @@ impl Merge for usize {
     }
 }
 
-impl Merge for BTreeSet<usize> {
+impl Merge for BTreeSet<Result<usize, String>> {
     type Error = CtrlMergeConflict;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {

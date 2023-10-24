@@ -78,6 +78,8 @@ impl<I: Input, S: Stack, O: Output> IllFormed<I, S, O, usize> {
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
             IllFormed::DuplicateState => IllFormed::DuplicateState,
             IllFormed::UnsortedStates => IllFormed::UnsortedStates,
+            IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
+            IllFormed::DuplicateTag(s) => IllFormed::DuplicateTag(s),
         }
     }
 }
@@ -217,20 +219,5 @@ impl<I: Input, S: Stack, O: Output> Check<I, S, O, usize> for usize {
         } else {
             Ok(())
         }
-    }
-}
-
-impl<I: Input, S: Stack, O: Output> Check<I, S, O, BTreeSet<usize>> for BTreeSet<usize> {
-    #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, O, Self>> {
-        if self.is_empty() {
-            return Err(IllFormed::ProlongingDeath);
-        }
-        for &i in self {
-            if i >= n_states.into() {
-                return Err(IllFormed::OutOfBounds(i));
-            }
-        }
-        Ok(())
     }
 }

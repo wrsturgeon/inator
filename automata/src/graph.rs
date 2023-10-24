@@ -7,8 +7,8 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output, ParseError,
-    RangeMap, Stack, State, Transition,
+    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output,
+    ParseError, RangeMap, Stack, State, Transition,
 };
 use core::{cmp::Ordering, num::NonZeroUsize};
 use std::{
@@ -116,12 +116,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         for r in &mut run {
             drop(r?);
         }
-        if run.ctrl.view().any(|i| get!(self.states, i).accepting) {
-            // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
-            Ok(unsafe { run.output.assume_init() })
-        } else {
-            Err(ParseError::BadInput(InputError::NotAccepting))
-        }
         for r in run.ctrl.view() {
             if (match r {
                 Ok(i) => get!(self.states, i),
@@ -130,10 +124,10 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
             .accepting
             {
                 // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
-                return Ok(Some(unsafe { run.output.assume_init() }));
+                return Ok(unsafe { run.output.assume_init() });
             }
         }
-        Ok(None)
+        Err(ParseError::BadInput(InputError::NotAccepting))
     }
 
     /// Subset construction algorithm for determinizing nondeterministic automata.

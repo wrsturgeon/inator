@@ -91,7 +91,13 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<Result<usize, Str
             if set.is_empty() {
                 continue 'restart;
             }
-            return set.into_iter().map(|i| i % n_states).collect();
+            return set
+                .into_iter()
+                .map(|r| match r {
+                    Ok(i) => Ok(i % n_states),
+                    Err(s) => Err(s),
+                })
+                .collect();
         }
     }
     #[inline]
@@ -105,6 +111,6 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<Result<usize, Str
     }
     #[inline]
     fn from_usize(i: usize) -> Self {
-        iter::once(i).collect()
+        iter::once(Ok(i)).collect()
     }
 }
