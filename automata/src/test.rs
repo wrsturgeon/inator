@@ -399,7 +399,7 @@ mod reduced {
         union(
             &Graph {
                 states: vec![],
-                initial: iter::once(0).collect(),
+                initial: iter::once(Ok(0)).collect(),
             },
             &Graph {
                 states: vec![State {
@@ -409,6 +409,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
+                    tag: None,
                 }],
                 initial: BTreeSet::new(),
             },
@@ -427,12 +428,13 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
+                    tag: None,
                 }],
                 initial: BTreeSet::new(),
             },
             &Graph {
                 states: vec![],
-                initial: iter::once(0).collect(),
+                initial: iter::once(Ok(0)).collect(),
             },
             &[],
         );
@@ -457,12 +459,13 @@ mod reduced {
                         .collect(),
                     },
                     accepting: false,
+                    tag: None,
                 }],
                 initial: BTreeSet::new(),
             },
             &Graph {
                 states: vec![],
-                initial: iter::once(0).collect(),
+                initial: iter::once(Ok(0)).collect(),
             },
             &[],
         );

@@ -39,6 +39,7 @@ pub fn main() -> io::Result<()> {
                 .collect(),
             },
             accepting: true,
+            tag: None,
         }],
         initial: 0,
     };

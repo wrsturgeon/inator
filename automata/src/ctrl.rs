@@ -28,7 +28,7 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
     Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
-    type View<'s>: Iterator<Item = usize>
+    type View<'s>: Iterator<Item = Result<usize, &'s String>>
     where
         Self: 's;
     /// View each index in what may be a collection.
@@ -47,10 +47,10 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
 }
 
 impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
-    type View<'s> = iter::Once<usize>;
+    type View<'s> = iter::Once<Result<usize, &'s String>>;
     #[inline]
     fn view(&self) -> Self::View<'_> {
-        iter::once(*self)
+        iter::once(Ok(*self))
     }
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
@@ -69,11 +69,17 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<usize> {
-    type View<'s> = iter::Copied<btree_set::Iter<'s, usize>>;
+impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<Result<usize, String>> {
+    type View<'s> = iter::Map<
+        btree_set::Iter<'s, Result<usize, String>>,
+        fn(&'s Result<usize, String>) -> Result<usize, &'s String>,
+    >;
     #[inline]
     fn view(&self) -> Self::View<'_> {
-        self.iter().copied()
+        self.iter().map(|r| match *r {
+            Ok(i) => Ok(i),
+            Err(ref s) => Err(s),
+        })
     }
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
@@ -89,8 +95,13 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<usize> {
         }
     }
     #[inline]
-    fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
-        self.into_iter().map(f).collect()
+    fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
+        self.into_iter()
+            .map(|r| match r {
+                Ok(i) => Ok(f(i)),
+                Err(e) => Err(e),
+            })
+            .collect()
     }
     #[inline]
     fn from_usize(i: usize) -> Self {

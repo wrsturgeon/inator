@@ -105,6 +105,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for State<I, S, O, C
         Ok(Self {
             transitions: self.transitions.merge(other.transitions)?,
             accepting: self.accepting || other.accepting,
+            tag: None,
         })
     }
 }

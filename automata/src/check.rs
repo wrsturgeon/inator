@@ -46,6 +46,10 @@ pub enum IllFormed<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     DuplicateState,
     /// States out of sorted order in memory.
     UnsortedStates,
+    /// Reference to a tagged state, but no state has that tag.
+    TagDNE(String),
+    /// Two states have identical tags.
+    DuplicateTag(String),
 }
 
 impl<I: Input, S: Stack, O: Output> IllFormed<I, S, O, usize> {
@@ -89,6 +93,25 @@ pub trait Check<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Check<I, S, O, C> for Action<S> {
     #[inline]
     fn check(&self, _: NonZeroUsize) -> Result<(), IllFormed<I, S, O, C>> {
+        Ok(())
+    }
+}
+
+impl<I: Input, S: Stack, O: Output> Check<I, S, O, BTreeSet<Result<usize, String>>>
+    for BTreeSet<Result<usize, String>>
+{
+    #[inline]
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, O, Self>> {
+        if self.is_empty() {
+            return Err(IllFormed::ProlongingDeath);
+        }
+        for r in self {
+            if let &Ok(i) = r {
+                if i >= n_states.into() {
+                    return Err(IllFormed::OutOfBounds(i));
+                }
+            }
+        }
         Ok(())
     }
 }

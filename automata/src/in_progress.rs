@@ -114,14 +114,20 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
     stack: &mut Vec<S>,
     output: O,
 ) -> Result<(Option<C>, O), ParseError<I, S, O, C>> {
-    ctrl.view().try_fold((), |(), i| {
-        graph
-            .states
-            .get(i)
-            .map(|_| {})
-            .ok_or(ParseError::BadParser(IllFormed::OutOfBounds(i)))
+    ctrl.view().try_fold((), |(), r| match r {
+        Ok(i) => {
+            if graph.states.get(i).is_none() {
+                Err(ParseError::BadParser(IllFormed::OutOfBounds(i)))
+            } else {
+                Ok(())
+            }
+        }
+        Err(s) => graph.find_tag(s).map(|_| {}).map_err(ParseError::BadParser),
     })?;
-    let mut states = ctrl.view().map(|i| get!(graph.states, i));
+    let mut states = ctrl.view().map(|r| match r {
+        Ok(i) => get!(graph.states, i),
+        Err(s) => graph.find_tag(s).unwrap_or_else(|_| never!()),
+    });
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
             if states.any(|s| s.accepting) {

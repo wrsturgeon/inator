@@ -113,7 +113,36 @@ impl<T: ToSrc> ToSrc for Option<T> {
     }
 }
 
-impl<T: Input> ToSrc for Range<T> {
+impl<T: ToSrc, E: ToSrc> ToSrc for Result<T, E> {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        self.as_ref().map_or_else(
+            |e| format!("Err({})", e.to_src()),
+            |x| format!("Some({})", x.to_src()),
+        )
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        format!("Result::<{}, {}>", T::src_type(), E::src_type())
+    }
+}
+
+impl ToSrc for String {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("\"{self}\".to_owned()")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "String".to_owned()
+    }
+}
+
+impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
