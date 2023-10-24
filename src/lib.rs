@@ -138,5 +138,9 @@ macro_rules! get_mut {
 }
 
 mod fixpoint;
+mod recurse;
 
-pub use fixpoint::{fixpoint, Fixpoint};
+pub use {
+    fixpoint::{fixpoint, Fixpoint},
+    recurse::{recurse, Recurse},
+};

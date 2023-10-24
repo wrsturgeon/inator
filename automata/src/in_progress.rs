@@ -7,7 +7,7 @@
 //! Execute an automaton on an input sequence.
 
 use crate::{find_tag, try_merge, Ctrl, Graph, IllFormed, Input, Output, Stack};
-use core::{fmt, mem};
+use core::{fmt, iter, mem};
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
@@ -126,8 +126,8 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
             .map(|_| {})
             .map_err(ParseError::BadParser),
     })?;
-    let mut states = ctrl.view().map(|r| match r {
-        Ok(i) => get!(graph.states, i),
+    let mut states = ctrl.view().flat_map(|r| match r {
+        Ok(i) => iter::once(get!(graph.states, i)).collect(),
         Err(s) => find_tag(&graph.states, s).unwrap_or_else(|_| never!()),
     });
     let Some(token) = maybe_token else {

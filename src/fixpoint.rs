@@ -25,7 +25,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> ops::Shr<Graph<I, S, O, C>
         } = rhs;
         for r in initial.view() {
             match r {
-                Ok(i) => get_mut!(states, i),
+                Ok(i) => get_mut!(states, i).tag.push(self.0.clone()),
                 Err(tag) => find_tag_mut(&mut states, tag).map_or_else(
                     |_| {
                         panic!(
@@ -34,11 +34,13 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> ops::Shr<Graph<I, S, O, C>
                             but that name was nowhere to be found.",
                         )
                     },
-                    |s| s,
+                    |ss| {
+                        for s in ss {
+                            s.tag.push(self.0.clone());
+                        }
+                    },
                 ),
             }
-            .tag
-            .push(self.0.clone());
         }
         Graph { states, initial }
     }

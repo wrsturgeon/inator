@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output,
     ParseError, RangeMap, Stack, State, Transition,
 };
-use core::{cmp::Ordering, num::NonZeroUsize};
+use core::{cmp::Ordering, iter, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -100,10 +100,11 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         }
         for r in run.ctrl.view() {
             if (match r {
-                Ok(i) => get!(self.states, i),
+                Ok(i) => iter::once(get!(self.states, i)).collect(),
                 Err(s) => find_tag(&self.states, s).map_err(ParseError::BadParser)?,
             })
-            .accepting
+            .into_iter()
+            .any(|s| s.accepting)
             {
                 // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
                 return Ok(unsafe { run.output.assume_init() });
@@ -171,9 +172,12 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         };
 
         // Merge this subset of states into one (most of the heavy lifting)
-        let mega_state: State<I, S, O, C> = match try_merge(subset.view().map(|r| match r {
-            Ok(i) => Ok(get!(self.states, i).clone()),
-            Err(s) => find_tag(&self.states, s).map(Clone::clone),
+        let mega_state: State<I, S, O, C> = match try_merge(subset.view().flat_map(|r| match r {
+            Ok(i) => iter::once(Ok(get!(self.states, i).clone())).collect::<Vec<_>>(),
+            Err(s) => find_tag(&self.states, s).map_or_else(
+                |e| iter::once(Err(e)).collect(),
+                |x| x.into_iter().map(|st| Ok(st.clone())).collect(),
+            ),
         })) {
             // If no state follows, reject immediately.
             None => State {
@@ -217,38 +221,34 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
 pub fn find_tag<'s, I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
     states: &'s [State<I, S, O, C>],
     tag: &str,
-) -> Result<&'s State<I, S, O, C>, IllFormed<I, S, O, C>> {
-    let mut acc = None;
-    for state in states {
-        if state.tag.iter().any(|s| s == tag) {
-            match acc {
-                None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
-            }
-        }
+) -> Result<BTreeSet<&'s State<I, S, O, C>>, IllFormed<I, S, O, C>> {
+    let set: BTreeSet<_> = states
+        .iter()
+        .filter(|state| state.tag.iter().any(|s| s == tag))
+        .collect();
+    if set.is_empty() {
+        return Err(IllFormed::TagDNE(tag.to_owned()));
     }
-    acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
+    Ok(set)
 }
 
 /// Look up a tag and return the specific state tagged with it.
 /// # Errors
 /// If no state has this tag, or if multiple have this tag.
 #[inline]
-#[allow(clippy::type_complexity)]
+#[allow(clippy::mutable_key_type, clippy::type_complexity)]
 pub fn find_tag_mut<'s, I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
     states: &'s mut [State<I, S, O, C>],
     tag: &str,
-) -> Result<&'s mut State<I, S, O, C>, IllFormed<I, S, O, C>> {
-    let mut acc = None;
-    for state in states {
-        if state.tag.iter().any(|s| s == tag) {
-            match acc {
-                None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
-            }
-        }
+) -> Result<BTreeSet<&'s mut State<I, S, O, C>>, IllFormed<I, S, O, C>> {
+    let set: BTreeSet<_> = states
+        .iter_mut()
+        .filter(|state| state.tag.iter().any(|s| s == tag))
+        .collect();
+    if set.is_empty() {
+        return Err(IllFormed::TagDNE(tag.to_owned()));
     }
-    acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
+    Ok(set)
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.

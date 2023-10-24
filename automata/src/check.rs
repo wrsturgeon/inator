@@ -48,8 +48,6 @@ pub enum IllFormed<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     UnsortedStates,
     /// Reference to a tagged state, but no state has that tag.
     TagDNE(String),
-    /// Two states have identical tags.
-    DuplicateTag(String),
 }
 
 impl<I: Input, S: Stack, O: Output> IllFormed<I, S, O, usize> {
@@ -79,7 +77,6 @@ impl<I: Input, S: Stack, O: Output> IllFormed<I, S, O, usize> {
             IllFormed::DuplicateState => IllFormed::DuplicateState,
             IllFormed::UnsortedStates => IllFormed::UnsortedStates,
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
-            IllFormed::DuplicateTag(s) => IllFormed::DuplicateTag(s),
         }
     }
 }
