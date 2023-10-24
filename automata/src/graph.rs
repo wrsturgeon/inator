@@ -84,24 +84,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         })
     }
 
-    /// Look up a tag and return the specific state tagged with it.
-    /// # Errors
-    /// If no state has this tag, or if multiple have this tag.
-    #[inline]
-    #[allow(clippy::type_complexity)]
-    pub fn find_tag(&self, tag: &str) -> Result<&State<I, S, O, C>, IllFormed<I, S, O, C>> {
-        let mut acc = None;
-        for state in &self.states {
-            if state.tag.as_deref() == Some(tag) {
-                match acc {
-                    None => acc = Some(state),
-                    Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
-                }
-            }
-        }
-        acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
-    }
-
     /// Run this parser to completion and check the result.
     /// # Errors
     /// If the parser determines there should be an error.
@@ -119,7 +101,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         for r in run.ctrl.view() {
             if (match r {
                 Ok(i) => get!(self.states, i),
-                Err(s) => self.find_tag(s).map_err(ParseError::BadParser)?,
+                Err(s) => find_tag(&self.states, s).map_err(ParseError::BadParser)?,
             })
             .accepting
             {
@@ -191,7 +173,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         // Merge this subset of states into one (most of the heavy lifting)
         let mega_state: State<I, S, O, C> = match try_merge(subset.view().map(|r| match r {
             Ok(i) => Ok(get!(self.states, i).clone()),
-            Err(s) => self.find_tag(s).map(Clone::clone),
+            Err(s) => find_tag(&self.states, s).map(Clone::clone),
         })) {
             // If no state follows, reject immediately.
             None => State {
@@ -201,7 +183,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
                     map_some: BTreeMap::new(),
                 },
                 accepting: false,
-                tag: None,
+                tag: vec![],
             },
             // If they successfully merged, return the merged state
             Some(Ok(ok)) => ok,
@@ -225,6 +207,48 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         dsts.into_iter()
             .try_fold((), |(), dst| self.explore(subsets_as_states, &dst))
     }
+}
+
+/// Look up a tag and return the specific state tagged with it.
+/// # Errors
+/// If no state has this tag, or if multiple have this tag.
+#[inline]
+#[allow(clippy::type_complexity)]
+pub fn find_tag<'s, I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
+    states: &'s [State<I, S, O, C>],
+    tag: &str,
+) -> Result<&'s State<I, S, O, C>, IllFormed<I, S, O, C>> {
+    let mut acc = None;
+    for state in states {
+        if state.tag.iter().any(|s| s == tag) {
+            match acc {
+                None => acc = Some(state),
+                Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
+            }
+        }
+    }
+    acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
+}
+
+/// Look up a tag and return the specific state tagged with it.
+/// # Errors
+/// If no state has this tag, or if multiple have this tag.
+#[inline]
+#[allow(clippy::type_complexity)]
+pub fn find_tag_mut<'s, I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
+    states: &'s mut [State<I, S, O, C>],
+    tag: &str,
+) -> Result<&'s mut State<I, S, O, C>, IllFormed<I, S, O, C>> {
+    let mut acc = None;
+    for state in states {
+        if state.tag.iter().any(|s| s == tag) {
+            match acc {
+                None => acc = Some(state),
+                Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
+            }
+        }
+    }
+    acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.

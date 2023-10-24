@@ -9,10 +9,4 @@ repository = "https://github.com/wrsturgeon/inator"
 build = "build.rs"
 
 [dependencies]
-# none
-
-# Optional dependencies:
-quickcheck = { version = "1.0.3", optional = true }
-
-[features]
-quickcheck = ["dep:quickcheck"]
+inator-automata = { path = "automata" }

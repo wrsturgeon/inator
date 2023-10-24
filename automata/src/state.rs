@@ -18,7 +18,7 @@ pub struct State<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// If input ends while in this state, should we accept?
     pub accepting: bool,
     /// Optional name for this state.
-    pub tag: Option<String>,
+    pub tag: Vec<String>,
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for State<I, S, O, C> {
@@ -27,7 +27,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for State<I, S, O, C
         Self {
             transitions: self.transitions.clone(),
             accepting: self.accepting,
-            tag: None,
+            tag: self.tag.clone(),
         }
     }
 }
@@ -37,7 +37,9 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for State<I, S, O, C> {
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for State<I, S, O, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.accepting == other.accepting && self.transitions == other.transitions
+        self.accepting == other.accepting
+            && self.transitions == other.transitions
+            && self.tag == other.tag
     }
 }
 
@@ -47,6 +49,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for State<I, S, O, C> 
         self.transitions
             .cmp(&other.transitions)
             .then_with(|| self.accepting.cmp(&other.accepting))
+            .then_with(|| self.tag.cmp(&other.tag))
     }
 }
 

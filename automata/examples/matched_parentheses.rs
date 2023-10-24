@@ -57,7 +57,7 @@ fn parser() -> Deterministic<char, Symbol, ()> {
                 .collect(),
             },
             accepting: true,
-            tag: None,
+            tag: vec![],
         }],
         initial: 0,
     }

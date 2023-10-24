@@ -10,6 +10,7 @@ use crate::{
     Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Output, Range,
     RangeMap, Stack, State, Transition, Update,
 };
+use core::convert::Infallible;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 /// Trait to fallibly combine multiple values into one value with identical semantics.
@@ -101,12 +102,22 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for State<I, S, O, C> {
     type Error = IllFormed<I, S, O, C>;
     #[inline]
+    #[allow(clippy::unwrap_in_result)]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
             transitions: self.transitions.merge(other.transitions)?,
             accepting: self.accepting || other.accepting,
-            tag: None,
+            tag: unwrap!(self.tag.merge(other.tag)),
         })
+    }
+}
+
+impl<T> Merge for Vec<T> {
+    type Error = Infallible;
+    #[inline]
+    fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
+        self.extend(other);
+        Ok(self)
     }
 }
 
