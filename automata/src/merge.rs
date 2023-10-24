@@ -70,7 +70,7 @@ impl Merge for usize {
     }
 }
 
-impl Merge for BTreeSet<usize> {
+impl Merge for BTreeSet<Result<usize, String>> {
     type Error = CtrlMergeConflict;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
@@ -105,6 +105,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for State<I, S, O, C
         Ok(Self {
             transitions: self.transitions.merge(other.transitions)?,
             accepting: self.accepting || other.accepting,
+            tag: None,
         })
     }
 }

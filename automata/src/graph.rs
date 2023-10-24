@@ -7,8 +7,8 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output, ParseError,
-    RangeMap, Stack, State, Transition,
+    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output,
+    ParseError, RangeMap, Stack, State, Transition,
 };
 use core::{cmp::Ordering, num::NonZeroUsize};
 use std::{
@@ -24,7 +24,7 @@ pub type Deterministic<I, S, O> = Graph<I, S, O, usize>;
 
 /// One token corresponds to as many transitions as it would like;
 /// if any of these transitions eventually accept, the whole thing accepts.
-pub type Nondeterministic<I, S, O> = Graph<I, S, O, BTreeSet<usize>>;
+pub type Nondeterministic<I, S, O> = Graph<I, S, O, BTreeSet<Result<usize, String>>>;
 
 /// Automaton loosely based on visibly pushdown automata.
 #[allow(clippy::exhaustive_structs)]
@@ -64,11 +64,9 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     #[inline]
     pub fn check(&self) -> Result<(), IllFormed<I, S, O, C>> {
         let n_states = self.states.len();
-        if let Some(i) = self
-            .initial
-            .view()
-            .fold(None, |acc, i| acc.or_else(|| (i >= n_states).then_some(i)))
-        {
+        if let Some(i) = self.initial.view().fold(None, |acc, r| {
+            acc.or_else(|| r.map_or(None, |i| (i >= n_states).then_some(i)))
+        }) {
             return Err(IllFormed::OutOfBounds(i));
         }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
@@ -86,6 +84,24 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         })
     }
 
+    /// Look up a tag and return the specific state tagged with it.
+    /// # Errors
+    /// If no state has this tag, or if multiple have this tag.
+    #[inline]
+    #[allow(clippy::type_complexity)]
+    pub fn find_tag(&self, tag: &str) -> Result<&State<I, S, O, C>, IllFormed<I, S, O, C>> {
+        let mut acc = None;
+        for state in &self.states {
+            if state.tag.as_deref() == Some(tag) {
+                match acc {
+                    None => acc = Some(state),
+                    Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
+                }
+            }
+        }
+        acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
+    }
+
     /// Run this parser to completion and check the result.
     /// # Errors
     /// If the parser determines there should be an error.
@@ -100,12 +116,18 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         for r in &mut run {
             drop(r?);
         }
-        if run.ctrl.view().any(|i| get!(self.states, i).accepting) {
-            // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
-            Ok(unsafe { run.output.assume_init() })
-        } else {
-            Err(ParseError::BadInput(InputError::NotAccepting))
+        for r in run.ctrl.view() {
+            if (match r {
+                Ok(i) => get!(self.states, i),
+                Err(s) => self.find_tag(s).map_err(ParseError::BadParser)?,
+            })
+            .accepting
+            {
+                // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
+                return Ok(unsafe { run.output.assume_init() });
+            }
         }
+        Err(ParseError::BadInput(InputError::NotAccepting))
     }
 
     /// Subset construction algorithm for determinizing nondeterministic automata.
@@ -138,10 +160,12 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
                     let State {
                         transitions,
                         accepting,
+                        tag,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
                         transitions: fix_indices_curry_stack(transitions, &ordering),
                         accepting,
+                        tag,
                     }
                 })
                 .collect(),
@@ -165,22 +189,25 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         };
 
         // Merge this subset of states into one (most of the heavy lifting)
-        let mega_state: State<I, S, O, C> =
-            match merge(subset.view().map(|i| get!(self.states, i)).cloned()) {
-                // If no state follows, reject immediately.
-                None => State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    accepting: false,
+        let mega_state: State<I, S, O, C> = match try_merge(subset.view().map(|r| match r {
+            Ok(i) => Ok(get!(self.states, i).clone()),
+            Err(s) => self.find_tag(s).map(Clone::clone),
+        })) {
+            // If no state follows, reject immediately.
+            None => State {
+                transitions: CurryStack {
+                    wildcard: None,
+                    map_none: None,
+                    map_some: BTreeMap::new(),
                 },
-                // If they successfully merged, return the merged state
-                Some(Ok(ok)) => ok,
-                // If they didn't successfully merge, something's wrong with the original automaton
-                Some(Err(e)) => return Err(e),
-            };
+                accepting: false,
+                tag: None,
+            },
+            // If they successfully merged, return the merged state
+            Some(Ok(ok)) => ok,
+            // If they didn't successfully merge, something's wrong with the original automaton
+            Some(Err(e)) => return Err(e),
+        };
 
         // Cache all possible next states
         #[allow(clippy::needless_collect)] // <-- false positive: couldn't move `mega_state` below

@@ -57,6 +57,7 @@ fn parser() -> Deterministic<char, Symbol, ()> {
                 .collect(),
             },
             accepting: true,
+            tag: None,
         }],
         initial: 0,
     }

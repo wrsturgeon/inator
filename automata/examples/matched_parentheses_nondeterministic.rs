@@ -32,7 +32,7 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
                     entries: iter::once((
                         Range::unit('('),
                         Transition {
-                            dst: iter::once(0).collect(),
+                            dst: iter::once(Ok(0)).collect(),
                             update: update!(|(), _| ()),
                             act: Action::Push(Symbol::Paren),
                         },
@@ -46,7 +46,7 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
                         entries: iter::once((
                             Range::unit(')'),
                             Transition {
-                                dst: iter::once(0).collect(),
+                                dst: iter::once(Ok(0)).collect(),
                                 update: update!(|(), _| ()),
                                 act: Action::Pop,
                             },
@@ -57,8 +57,9 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
                 .collect(),
             },
             accepting: true,
+            tag: None,
         }],
-        initial: iter::once(0).collect(),
+        initial: iter::once(Ok(0)).collect(),
     }
 }
 

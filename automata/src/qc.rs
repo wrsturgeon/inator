@@ -172,14 +172,15 @@ macro_rules! shrink_only {
     };
 }
 
-shrink_only!(
-    |self: &State| Box::new((self.transitions.clone(), self.accepting).shrink().map(
-        |(transitions, accepting)| Self {
+shrink_only!(|self: &State| Box::new(
+    (self.transitions.clone(), self.accepting, self.tag.clone())
+        .shrink()
+        .map(|(transitions, accepting, tag)| Self {
             transitions,
-            accepting
-        }
-    ))
-);
+            accepting,
+            tag
+        })
+));
 
 shrink_only!(|self: &CurryStack| Box::new(
     (
@@ -222,6 +223,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
             accepting: bool::arbitrary(g),
+            tag: Option::arbitrary(g),
         }
     }
 }

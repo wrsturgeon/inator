@@ -17,6 +17,8 @@ pub struct State<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     pub transitions: CurryStack<I, S, O, C>,
     /// If input ends while in this state, should we accept?
     pub accepting: bool,
+    /// Optional name for this state.
+    pub tag: Option<String>,
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for State<I, S, O, C> {
@@ -25,6 +27,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for State<I, S, O, C
         Self {
             transitions: self.transitions.clone(),
             accepting: self.accepting,
+            tag: None,
         }
     }
 }
