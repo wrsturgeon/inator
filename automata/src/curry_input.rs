@@ -7,11 +7,12 @@
 //! Read the next input symbol and decide an action.
 
 use crate::{Ctrl, IllFormed, Input, Output, Range, RangeMap, Stack, Transition};
-use core::iter;
+use core::{cmp, iter};
+use std::collections::BTreeMap;
 
 /// Read the next input symbol and decide an action.
 #[allow(clippy::exhaustive_enums)]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum CurryInput<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Throw away the input (without looking at it) and do this.
     Wildcard(Transition<I, S, O, C>),
@@ -26,6 +27,39 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for CurryInput<I, S,
             Self::Wildcard(ref etc) => Self::Wildcard(etc.clone()),
             Self::Scrutinize(ref etc) => Self::Scrutinize(etc.clone()),
         }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for CurryInput<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for CurryInput<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => a == b,
+            (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a == b,
+            (&Self::Wildcard(..), &Self::Scrutinize(..))
+            | (&Self::Scrutinize(..), &Self::Wildcard(..)) => false, // unfortunately no general way to tell if a range covers a whole type
+        }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for CurryInput<I, S, O, C> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match (self, other) {
+            (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => a.cmp(b),
+            (&Self::Wildcard(..), &Self::Scrutinize(..)) => cmp::Ordering::Less,
+            (&Self::Scrutinize(..), &Self::Wildcard(..)) => cmp::Ordering::Greater,
+            (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a.cmp(b),
+        }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for CurryInput<I, S, O, C> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -63,21 +97,11 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
         ),
     > {
         match (self, other) {
-            (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => {
-                if a == b {
-                    Ok(())
-                } else {
-                    Err((None, a.clone(), b.clone()))
-                }
-            }
+            (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
             (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
             | (&Self::Scrutinize(ref s), &Self::Wildcard(ref w)) => {
-                s.entries.iter().try_fold((), |(), &(ref k, ref v)| {
-                    if w == v {
-                        Ok(())
-                    } else {
-                        Err((Some(k.clone()), w.clone(), v.clone()))
-                    }
+                s.entries.first_key_value().map_or(Ok(()), |(k, v)| {
+                    Err((Some(k.clone()), w.clone(), v.clone()))
                 })
             }
             (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a
@@ -93,5 +117,28 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
             Self::Wildcard(ref etc) => Box::new(iter::once(etc)),
             Self::Scrutinize(ref etc) => Box::new(etc.values()),
         }
+    }
+
+    /// Remove an entry by key.
+    /// # Panics
+    /// If we ask to remove a wildcard but it's a specific value, or vice-versa.
+    #[inline]
+    pub fn remove(&mut self, key: Option<Range<I>>) {
+        match *self {
+            Self::Wildcard(..) => {
+                // assert!(
+                //     key.is_none(),
+                //     "Asked to remove a specific value \
+                //     but the map took a wildcard",
+                // );
+                *self = Self::Scrutinize(RangeMap {
+                    entries: BTreeMap::new(),
+                });
+            }
+            Self::Scrutinize(ref mut etc) => etc.remove(&key.expect(
+                "Asked to remove a wildcard \
+                but the map took a specific value",
+            )),
+        };
     }
 }

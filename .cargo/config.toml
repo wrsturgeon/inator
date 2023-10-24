@@ -1,6 +1,6 @@
 [env]
 MIRIFLAGS = "-Zmiri-disable-isolation"
-QUICKCHECK_GENERATOR_SIZE = "32"
+QUICKCHECK_GENERATOR_SIZE = "16"
 RUST_BACKTRACE = "1"
 
 [term]

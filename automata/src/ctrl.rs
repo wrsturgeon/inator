@@ -37,10 +37,13 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
     /// Should fail occasionally but not often.
     #[must_use]
     #[cfg(feature = "quickcheck")]
-    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self;
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut quickcheck::Gen) -> Self;
     /// Apply a function to each index.
     #[must_use]
     fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self;
+    /// Turn a single index into its equivalent value in this type.
+    #[must_use]
+    fn from_usize(i: usize) -> Self;
 }
 
 impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
@@ -50,16 +53,19 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
         iter::once(*self)
     }
     #[inline]
-    #[allow(clippy::arithmetic_side_effects, unsafe_code)]
+    #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
     #[cfg(feature = "quickcheck")]
-    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut quickcheck::Gen) -> Self {
         use quickcheck::Arbitrary;
-        // SAFETY: Added one.
-        Self::arbitrary(g) % unsafe { NonZeroUsize::new_unchecked(n_states + 1) }
+        Self::arbitrary(g) % n_states
     }
     #[inline]
     fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
         f(self)
+    }
+    #[inline(always)]
+    fn from_usize(i: usize) -> Self {
+        i
     }
 }
 
@@ -70,17 +76,24 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<usize> {
         self.iter().copied()
     }
     #[inline]
-    #[allow(clippy::arithmetic_side_effects, unsafe_code)]
+    #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
     #[cfg(feature = "quickcheck")]
-    fn arbitrary_given(n_states: usize, g: &mut quickcheck::Gen) -> Self {
+    fn arbitrary_given(n_states: NonZeroUsize, g: &mut quickcheck::Gen) -> Self {
         use quickcheck::Arbitrary;
-        let collection = Self::arbitrary(g);
-        // SAFETY: Added one.
-        let nz = unsafe { NonZeroUsize::new_unchecked(n_states + 1) };
-        collection.into_iter().map(|i| i % nz).collect()
+        'restart: loop {
+            let set = Self::arbitrary(g);
+            if set.is_empty() {
+                continue 'restart;
+            }
+            return set.into_iter().map(|i| i % n_states).collect();
+        }
     }
     #[inline]
     fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
         self.into_iter().map(f).collect()
+    }
+    #[inline]
+    fn from_usize(i: usize) -> Self {
+        iter::once(i).collect()
     }
 }

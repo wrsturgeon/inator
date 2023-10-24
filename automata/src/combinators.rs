@@ -32,19 +32,10 @@ impl<I: Input, S: Stack, O: Output> ops::BitOr for Nondeterministic<I, S, O> {
 impl<I: Input, S: Stack, O: Output> ops::BitAnd for Nondeterministic<I, S, O> {
     type Output = Self;
     #[inline]
+    #[allow(clippy::todo, unused_mut, unused_variables)]
     fn bitand(mut self, other: Self) -> Self {
         // Note that intersection on pushdown automata is impossible;
         // we just reject a subset of automata that wouldn't work.
-        if self.check().is_err() {
-            return self;
-        }
-        let size = self.states.len();
-        let Self {
-            states: other_states,
-            initial: other_initial,
-        } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
-        self.states.extend(other_states);
-        self.initial.extend(other_initial);
-        self
+        todo!() // TODO
     }
 }

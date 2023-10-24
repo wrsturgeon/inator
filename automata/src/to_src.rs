@@ -113,7 +113,7 @@ impl<T: ToSrc> ToSrc for Option<T> {
     }
 }
 
-impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
+impl<T: Input> ToSrc for Range<T> {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
@@ -276,16 +276,14 @@ impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
             || "_".to_owned(),
             |sym| sym.map_or_else(|| "None".to_owned(), |x| format!("Some({x})")),
         );
-        self.entries
-            .iter()
-            .fold(String::new(), |acc, &(ref k, ref v)| {
-                format!(
-                    r#"{acc}
+        self.entries.iter().fold(String::new(), |acc, (k, v)| {
+            format!(
+                r#"{acc}
             (&{s}, &({})) => {},"#,
-                    k.to_src(),
-                    v.to_src(stack_symbol),
-                )
-            })
+                k.to_src(),
+                v.to_src(stack_symbol),
+            )
+        })
     }
 }
 

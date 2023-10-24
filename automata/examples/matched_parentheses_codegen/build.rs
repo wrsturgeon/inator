@@ -11,27 +11,29 @@ pub fn main() -> io::Result<()> {
         states: vec![State {
             transitions: CurryStack {
                 wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: vec![(
+                    entries: iter::once((
                         Range::unit('('),
                         Transition {
                             dst: 0,
                             update: update!(|(), _| ()),
                             act: Action::Push(Symbol::Paren),
                         },
-                    )],
+                    ))
+                    .collect(),
                 })),
                 map_none: None,
                 map_some: iter::once((
                     Symbol::Paren,
                     CurryInput::Scrutinize(RangeMap {
-                        entries: vec![(
+                        entries: iter::once((
                             Range::unit(')'),
                             Transition {
                                 dst: 0,
                                 update: update!(|(), _| ()),
                                 act: Action::Pop,
                             },
-                        )],
+                        ))
+                        .collect(),
                     }),
                 ))
                 .collect(),

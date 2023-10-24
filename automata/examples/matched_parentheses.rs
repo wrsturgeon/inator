@@ -29,27 +29,29 @@ fn parser() -> Deterministic<char, Symbol, ()> {
         states: vec![State {
             transitions: CurryStack {
                 wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: vec![(
+                    entries: iter::once((
                         Range::unit('('),
                         Transition {
                             dst: 0,
                             update: update!(|(), _| ()),
                             act: Action::Push(Symbol::Paren),
                         },
-                    )],
+                    ))
+                    .collect(),
                 })),
                 map_none: None,
                 map_some: iter::once((
                     Symbol::Paren,
                     CurryInput::Scrutinize(RangeMap {
-                        entries: vec![(
+                        entries: iter::once((
                             Range::unit(')'),
                             Transition {
                                 dst: 0,
                                 update: update!(|(), _| ()),
                                 act: Action::Pop,
                             },
-                        )],
+                        ))
+                        .collect(),
                     }),
                 ))
                 .collect(),
@@ -117,7 +119,7 @@ pub fn main() {
         let mut run = s.chars().run(&parser);
         println!("    {run:?}");
         while let Some(r) = run.next() {
-            let Ok(c) = r else { panic!() };
+            let Ok(c) = r else { panic!("{r:?}") };
             println!("{c:?} {run:?}");
         }
     }

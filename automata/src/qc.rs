@@ -12,6 +12,7 @@ use crate::{
 };
 use core::{iter, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
+use std::collections::BTreeMap;
 
 impl<S: Arbitrary + Stack> Arbitrary for Action<S> {
     #[inline]
@@ -41,23 +42,40 @@ impl<S: Arbitrary + Stack> Arbitrary for Action<S> {
 #[inline]
 #[allow(clippy::arithmetic_side_effects)]
 fn within_size(g: &mut Gen) -> usize {
-    NonZeroUsize::new(g.size()).map_or(0, |nz| usize::arbitrary(g) % nz)
+    usize::arbitrary(g) % NonZeroUsize::new(g.size()).expect("Zero-sized QuickCheck generator")
 }
 
 impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S, u8>> Arbitrary for Graph<u8, S, u8, C> {
     #[inline]
+    #[allow(clippy::arithmetic_side_effects)]
     fn arbitrary(g: &mut Gen) -> Self {
-        let size = within_size(g);
-        let initial = C::arbitrary_given(size, g);
-        if let Some(nz) = NonZeroUsize::new(size) {
-            Self {
-                states: (0..size).map(|_| State::arbitrary_given(nz, g)).collect(),
-                initial,
-            }
-        } else {
-            Self {
-                states: vec![],
-                initial,
+        'restart: loop {
+            let size = within_size(g);
+            let Some(nz) = NonZeroUsize::new(size) else {
+                continue 'restart;
+            };
+            let initial = C::arbitrary_given(nz, g);
+            let mut states: Vec<_> = (0..size).map(|_| State::arbitrary_given(nz, g)).collect();
+            'sort_again: loop {
+                states.sort_unstable();
+                states.dedup();
+                let Some(nz_post) = NonZeroUsize::new(states.len()) else {
+                    continue 'restart;
+                };
+                states = states
+                    .into_iter()
+                    .map(|s| s.map_indices(|i| i % nz_post))
+                    .collect();
+                // Check if `states` is still sorted
+                for i in 1..states.len() {
+                    if get!(states, i.overflowing_sub(1).0) >= get!(states, i) {
+                        continue 'sort_again;
+                    }
+                }
+                return Self {
+                    states,
+                    initial: initial.map_indices(|i| i % nz_post),
+                };
             }
         }
     }
@@ -66,7 +84,10 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S, u8>> Arbitrary for Graph<u
         Box::new(
             (self.states.clone(), self.initial.clone())
                 .shrink()
-                .map(|(states, initial)| Self { states, initial }),
+                .filter_map(|(states, initial)| {
+                    let s = Self { states, initial };
+                    (s.check() == Ok(())).then_some(s)
+                }),
         )
     }
 }
@@ -141,7 +162,7 @@ macro_rules! shrink_only {
         {
             #[inline(always)]
             fn arbitrary(_: &mut Gen) -> Self {
-                unreachable!()
+                never!()
             }
             #[inline]
             fn shrink(&$self) -> Box<dyn Iterator<Item = Self>> {
@@ -180,8 +201,8 @@ shrink_only!(|self: &CurryInput| match *self {
     Self::Wildcard(ref etc) => Box::new(etc.shrink().map(Self::Wildcard)),
     Self::Scrutinize(ref etc) => Box::new(
         etc.entries
-            .first()
-            .map(|&(_, ref transition)| Self::Wildcard(transition.clone()))
+            .first_key_value()
+            .map(|(_, transition)| Self::Wildcard(transition.clone()))
             .into_iter()
             .chain(etc.shrink().map(Self::Scrutinize))
     ),
@@ -197,7 +218,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
             accepting: bool::arbitrary(g),
@@ -209,13 +230,28 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryStack<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+        let wildcard = bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g));
+        let mut map_none = bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g));
+        let mut map_some: BTreeMap<_, _> = (0..within_size(g))
+            .map(|_| (S::arbitrary(g), CurryInput::arbitrary_given(n_states, g)))
+            .collect();
+        if let Some(ref wild) = wildcard {
+            for some in map_some.values_mut() {
+                while let Err((overlap, _, _)) = wild.disjoint(&*some) {
+                    some.remove(overlap);
+                }
+            }
+            if let Some(ref mut none) = map_none {
+                while let Err((overlap, _, _)) = wild.disjoint(none) {
+                    none.remove(overlap);
+                }
+            }
+        }
         Self {
-            wildcard: bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g)),
-            map_none: bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g)),
-            map_some: (0..within_size(g))
-                .map(|_| (S::arbitrary(g), CurryInput::arbitrary_given(n_states, g)))
-                .collect(),
+            wildcard,
+            map_none,
+            map_some,
         }
     }
 }
@@ -224,7 +260,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryInput<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
         if bool::arbitrary(g) {
             Self::Wildcard(Transition::arbitrary_given(n_states, g))
         } else {
@@ -237,17 +273,26 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> RangeMap<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
-        Self {
-            entries: (0..within_size(g))
-                .map(|_| {
-                    (
-                        Range::arbitrary(g),
-                        Transition::arbitrary_given(n_states, g),
-                    )
+    pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+        let mut entries: BTreeMap<_, _> = (0..within_size(g))
+            .map(|_| {
+                (
+                    Range::arbitrary(g),
+                    Transition::arbitrary_given(n_states, g),
+                )
+            })
+            .collect();
+        // Remove overlap
+        while let Some(key) = entries.keys().fold(None, |opt, k| {
+            opt.or_else(|| {
+                entries.range(..*k).fold(None, |acc, (range, _)| {
+                    acc.or_else(|| range.intersection(*k).is_some().then_some(*k))
                 })
-                .collect(),
+            })
+        }) {
+            drop(entries.remove(&key));
         }
+        Self { entries }
     }
 }
 
@@ -255,9 +300,9 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> Transition<u8, S, u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
-    fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+    pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
         Self {
-            dst: C::arbitrary_given(n_states.into(), g),
+            dst: C::arbitrary_given(n_states, g),
             act: Action::arbitrary(g),
             update: Update::arbitrary(g),
         }

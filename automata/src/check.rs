@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 
 /// Witness to an ill-formed automaton (or part thereof).
 #[non_exhaustive]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum IllFormed<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// An index points to a state greater than the total number of states.
     OutOfBounds(usize),
@@ -42,6 +42,40 @@ pub enum IllFormed<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     IncompatibleStackActions(Action<S>, Action<S>),
     /// Can't call two different functions on half-constructed outputs at the same time.
     IncompatibleCallbacks(Update<I, O>, Update<I, O>),
+    /// Two identical states at different indices.
+    DuplicateState,
+    /// States out of sorted order in memory.
+    UnsortedStates,
+}
+
+impl<I: Input, S: Stack, O: Output> IllFormed<I, S, O, usize> {
+    /// Convert the control parameter from `usize` to anything else.
+    #[inline]
+    #[must_use]
+    pub fn convert_ctrl<C: Ctrl<I, S, O>>(self) -> IllFormed<I, S, O, C> {
+        match self {
+            IllFormed::OutOfBounds(i) => IllFormed::OutOfBounds(i),
+            IllFormed::ProlongingDeath => IllFormed::ProlongingDeath,
+            IllFormed::InvertedRange(a, b) => IllFormed::InvertedRange(a, b),
+            IllFormed::RangeMapOverlap(range) => IllFormed::RangeMapOverlap(range),
+            IllFormed::WildcardMask {
+                arg_stack,
+                arg_token,
+                possibility_1,
+                possibility_2,
+            } => IllFormed::WildcardMask {
+                arg_stack,
+                arg_token,
+                possibility_1: possibility_1.convert_ctrl(),
+                possibility_2: possibility_2.convert_ctrl(),
+            },
+            IllFormed::Superposition(a, b) => IllFormed::Superposition(a, b),
+            IllFormed::IncompatibleStackActions(a, b) => IllFormed::IncompatibleStackActions(a, b),
+            IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
+            IllFormed::DuplicateState => IllFormed::DuplicateState,
+            IllFormed::UnsortedStates => IllFormed::UnsortedStates,
+        }
+    }
 }
 
 /// Check well-formedness.
@@ -55,21 +89,6 @@ pub trait Check<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Check<I, S, O, C> for Action<S> {
     #[inline]
     fn check(&self, _: NonZeroUsize) -> Result<(), IllFormed<I, S, O, C>> {
-        Ok(())
-    }
-}
-
-impl<I: Input, S: Stack, O: Output> Check<I, S, O, BTreeSet<usize>> for BTreeSet<usize> {
-    #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, O, Self>> {
-        if self.is_empty() {
-            return Err(IllFormed::ProlongingDeath);
-        }
-        for &i in self {
-            if i >= n_states.into() {
-                return Err(IllFormed::OutOfBounds(i));
-            }
-        }
         Ok(())
     }
 }
@@ -138,19 +157,17 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Check<I, S, O, C> for Rang
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Check<I, S, O, C> for RangeMap<I, S, O, C> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, O, C>> {
-        self.iter()
-            .enumerate()
-            .try_fold((), |(), (i, &(ref k, ref v))| {
-                get!(self.entries, ..i)
-                    .iter()
-                    .fold(None, |acc, &(ref range, _)| {
-                        acc.or_else(|| range.clone().intersection(k.clone()))
-                    })
-                    .map_or_else(
-                        || v.check(n_states),
-                        |overlap| Err(IllFormed::RangeMapOverlap(overlap)),
-                    )
-            })
+        self.iter().try_fold((), |(), (k, v)| {
+            self.entries
+                .range(..k.clone())
+                .fold(None, |acc, (range, _)| {
+                    acc.or_else(|| range.clone().intersection(k.clone()))
+                })
+                .map_or_else(
+                    || v.check(n_states),
+                    |overlap| Err(IllFormed::RangeMapOverlap(overlap)),
+                )
+        })
     }
 }
 
@@ -177,5 +194,20 @@ impl<I: Input, S: Stack, O: Output> Check<I, S, O, usize> for usize {
         } else {
             Ok(())
         }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output> Check<I, S, O, BTreeSet<usize>> for BTreeSet<usize> {
+    #[inline]
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, O, Self>> {
+        if self.is_empty() {
+            return Err(IllFormed::ProlongingDeath);
+        }
+        for &i in self {
+            if i >= n_states.into() {
+                return Err(IllFormed::OutOfBounds(i));
+            }
+        }
+        Ok(())
     }
 }

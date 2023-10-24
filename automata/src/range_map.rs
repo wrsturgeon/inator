@@ -7,15 +7,17 @@
 //! Map from ranges of keys to values.
 
 use crate::{Ctrl, IllFormed, Input, Output, Range, Stack, Transition};
+use core::cmp;
+use std::collections::BTreeMap;
 
 /// Map from ranges of keys to values.
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default)]
 pub struct RangeMap<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
-    pub entries: Vec<(Range<I>, Transition<I, S, O, C>)>,
+    pub entries: BTreeMap<Range<I>, Transition<I, S, O, C>>,
 }
 
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O, C> {
@@ -27,10 +29,33 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O
     }
 }
 
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for RangeMap<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for RangeMap<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for RangeMap<I, S, O, C> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.entries.cmp(&other.entries)
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for RangeMap<I, S, O, C> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     /// Iterate over references to keys and values without consuming anything.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &(Range<I>, Transition<I, S, O, C>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Range<I>, &Transition<I, S, O, C>)> {
         self.entries.iter()
     }
 
@@ -45,7 +70,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     )]
     pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, O, C>>, IllFormed<I, S, O, C>> {
         let mut acc = None;
-        for &(ref range, ref transition) in &self.entries {
+        for (range, transition) in &self.entries {
             if range.contains(key) {
                 match acc {
                     None => acc = Some((range, transition)),
@@ -69,15 +94,11 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
         &self,
         other: &Self,
     ) -> Result<(), (Range<I>, Transition<I, S, O, C>, Transition<I, S, O, C>)> {
-        self.entries.iter().try_fold((), |(), &(ref lk, ref lv)| {
-            other.entries.iter().try_fold((), |(), &(ref rk, ref rv)| {
-                rk.clone().intersection(lk.clone()).map_or(Ok(()), |range| {
-                    if lv == rv {
-                        Ok(())
-                    } else {
-                        Err((range, lv.clone(), rv.clone()))
-                    }
-                })
+        self.entries.iter().try_fold((), |(), (lk, lv)| {
+            other.entries.iter().try_fold((), |(), (rk, rv)| {
+                rk.clone()
+                    .intersection(lk.clone())
+                    .map_or(Ok(()), |range| Err((range, lv.clone(), rv.clone())))
             })
         })
     }
@@ -85,6 +106,13 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     /// All values in this collection, without their associated keys.
     #[inline]
     pub fn values(&self) -> impl Iterator<Item = &Transition<I, S, O, C>> {
-        self.entries.iter().map(|&(_, ref v)| v)
+        self.entries.values()
+    }
+
+    /// Remove an entry by key.
+    #[inline]
+    pub fn remove(&mut self, key: &Range<I>) {
+        self.entries
+            .retain(|k, _| key.clone().intersection(k.clone()).is_none());
     }
 }

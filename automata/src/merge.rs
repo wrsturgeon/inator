@@ -10,7 +10,7 @@ use crate::{
     Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Output, Range,
     RangeMap, Stack, State, Transition, Update,
 };
-use std::collections::{btree_map, BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 /// Trait to fallibly combine multiple values into one value with identical semantics.
 pub trait Merge: Sized {
@@ -70,7 +70,7 @@ impl Merge for usize {
     }
 }
 
-impl<T: Ord> Merge for BTreeSet<T> {
+impl Merge for BTreeSet<usize> {
     type Error = CtrlMergeConflict;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
@@ -79,17 +79,19 @@ impl<T: Ord> Merge for BTreeSet<T> {
     }
 }
 
-impl<K: Ord, V: Merge> Merge for BTreeMap<K, V> {
-    type Error = V::Error;
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
+    for BTreeMap<Range<I>, Transition<I, S, O, C>>
+{
+    type Error = IllFormed<I, S, O, C>;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
         for (k, v) in other {
             match self.entry(k) {
-                btree_map::Entry::Occupied(extant) => {
+                Entry::Occupied(extant) => {
                     let (lk, lv) = extant.remove_entry();
                     drop(self.insert(lk, lv.merge(v)?));
                 }
-                btree_map::Entry::Vacant(empty) => drop(empty.insert(v)),
+                Entry::Vacant(empty) => drop(empty.insert(v)),
             }
         }
         Ok(self)
@@ -128,19 +130,58 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryStack<I, S,
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryInput<I, S, O, C> {
     type Error = IllFormed<I, S, O, C>;
     #[inline]
-    #[allow(clippy::todo)] // <-- TODO
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         match (self, other) {
             (Self::Wildcard(lhs), Self::Wildcard(rhs)) => Ok(Self::Wildcard(lhs.merge(rhs)?)),
             (Self::Wildcard(w), Self::Scrutinize(s)) | (Self::Scrutinize(s), Self::Wildcard(w)) => {
-                if s.entries.is_empty() {
-                    Ok(Self::Wildcard(w))
-                } else {
-                    todo!()
+                match s.entries.first_key_value() {
+                    None => Ok(Self::Wildcard(w)),
+                    Some((k, v)) => Err(IllFormed::WildcardMask {
+                        arg_stack: None,
+                        arg_token: Some(k.clone()),
+                        possibility_1: w,
+                        possibility_2: v.clone(),
+                    }),
                 }
             }
             (Self::Scrutinize(lhs), Self::Scrutinize(rhs)) => Ok(Self::Scrutinize(lhs.merge(rhs)?)),
         }
+    }
+}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
+    for BTreeMap<S, CurryInput<I, S, O, C>>
+{
+    type Error = IllFormed<I, S, O, C>;
+    #[inline]
+    #[allow(clippy::wildcard_enum_match_arm)]
+    fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
+        for (k, v) in other {
+            match self.entry(k) {
+                Entry::Occupied(extant) => {
+                    let (lk, lv) = extant.remove_entry();
+                    drop(self.insert(
+                        lk.clone(),
+                        lv.merge(v).map_err(|e| match e {
+                            IllFormed::WildcardMask {
+                                arg_stack: None,
+                                arg_token,
+                                possibility_1,
+                                possibility_2,
+                            } => IllFormed::WildcardMask {
+                                arg_stack: Some(lk),
+                                arg_token,
+                                possibility_1,
+                                possibility_2,
+                            },
+                            anything_else => anything_else,
+                        })?,
+                    ));
+                }
+                Entry::Vacant(empty) => drop(empty.insert(v)),
+            }
+        }
+        Ok(self)
     }
 }
 
@@ -151,18 +192,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for RangeMap<I, S, O
         Ok(Self {
             entries: self.entries.merge(other.entries)?,
         })
-    }
-}
-
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
-    for Vec<(Range<I>, Transition<I, S, O, C>)>
-{
-    type Error = IllFormed<I, S, O, C>;
-    #[inline]
-    fn merge(self, other: Self) -> Result<Self, Self::Error> {
-        let a: BTreeMap<_, _> = self.into_iter().collect();
-        let b: BTreeMap<_, _> = other.into_iter().collect();
-        Ok(a.merge(b)?.into_iter().collect())
     }
 }
 

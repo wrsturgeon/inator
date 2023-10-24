@@ -7,10 +7,10 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, Output, ParseError, RangeMap,
-    Stack, State, Transition,
+    merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Output, ParseError,
+    RangeMap, Stack, State, Transition,
 };
-use core::num::NonZeroUsize;
+use core::{cmp::Ordering, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -28,7 +28,7 @@ pub type Nondeterministic<I, S, O> = Graph<I, S, O, BTreeSet<usize>>;
 
 /// Automaton loosely based on visibly pushdown automata.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Graph<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
     /// Every state, indexed.
     pub states: Vec<State<I, S, O, C>>,
@@ -46,10 +46,21 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for Graph<I, S, O, C
     }
 }
 
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for Graph<I, S, O, C> {}
+
+impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for Graph<I, S, O, C> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.initial == other.initial && self.states == other.states
+    }
+}
+
 impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     /// Check well-formedness.
+    /// Note that this can't check if determinization will succeed in less time than actually trying;
+    /// if you want to see if there will be any runtime errors, just determinize it.
     /// # Errors
-    /// When not well-formed (with a witness).
+    /// When ill-formed (with a witness).
     #[inline]
     pub fn check(&self) -> Result<(), IllFormed<I, S, O, C>> {
         let n_states = self.states.len();
@@ -61,6 +72,16 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
             return Err(IllFormed::OutOfBounds(i));
         }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
+            // Check sorted without duplicates
+            let _ = self.states.iter().try_fold(None, |mlast, curr| {
+                mlast.map_or(Ok(Some(curr)), |last: &State<I, S, O, C>| {
+                    match last.cmp(curr) {
+                        Ordering::Less => Ok(Some(curr)),
+                        Ordering::Equal => Err(IllFormed::DuplicateState),
+                        Ordering::Greater => Err(IllFormed::UnsortedStates),
+                    }
+                })
+            })?;
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
     }
@@ -73,21 +94,18 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     pub fn accept<In: IntoIterator<Item = I>>(
         &self,
         input: In,
-    ) -> Result<Option<O>, ParseError<I, S, O, C>> {
+    ) -> Result<O, ParseError<I, S, O, C>> {
         use crate::Run;
         let mut run = input.run(self);
         for r in &mut run {
             drop(r?);
         }
-        let output = run
-            .ctrl
-            .view()
-            .any(|i| get!(self.states, i).accepting)
-            .then(|| {
-                // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
-                unsafe { run.output.assume_init() }
-            });
-        Ok(output)
+        if run.ctrl.view().any(|i| get!(self.states, i).accepting) {
+            // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
+            Ok(unsafe { run.output.assume_init() })
+        } else {
+            Err(ParseError::BadInput(InputError::NotAccepting))
+        }
     }
 
     /// Subset construction algorithm for determinizing nondeterministic automata.
@@ -112,7 +130,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         ordering.sort_unstable();
         ordering.dedup();
 
-        Ok(Deterministic {
+        let output = Deterministic {
             initial: unwrap!(ordering.binary_search(&self.initial)),
             states: ordering
                 .iter()
@@ -127,10 +145,15 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
                     }
                 })
                 .collect(),
-        })
+        };
+        output
+            .check()
+            .map_err(IllFormed::convert_ctrl)
+            .map(|()| output)
     }
 
     /// Associate each subset of states with a merged state.
+    #[inline]
     fn explore(
         &self,
         subsets_as_states: &mut BTreeMap<C, State<I, S, O, C>>,
@@ -140,11 +163,6 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
         let btree_map::Entry::Vacant(entry) = subsets_as_states.entry(subset.clone()) else {
             return Ok(());
         };
-
-        #[allow(clippy::print_stdout)]
-        {
-            println!("Merging {}", subset.to_src());
-        }
 
         // Merge this subset of states into one (most of the heavy lifting)
         let mega_state: State<I, S, O, C> =

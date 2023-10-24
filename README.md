@@ -1,5 +1,5 @@
 # `inator`: An evil parsing library.
-## You supply the evil plan; we supply the _**inator**_.
+## You supply the evil plan; we build the _**inator**_.
 
 ![Portrait of the eminent Dr. Heinz Doofenshmirtz](http://images6.fanpop.com/image/polls/1198000/1198459_1364687083851_full.jpg)
 
@@ -7,8 +7,8 @@
 
 ## TL;DR
 
-We ask for a specification and turn it into a graph where we know exactly what might happen at each step.
-We then ruthlessly cut things that won't happen, combine identical things, and output the result as a Rust file.
+We ask for a specification and turn it into a graph that knows exactly what can happen at each step.
+We then ruthlessly cut things that won't happen, combine identical ones, and output the result as a Rust file.
 Compile this with the rest of your code and, _voila!_, you've got a hand-rolled zero-copy parser.
 
 ## The long explanation
@@ -32,9 +32,9 @@ There are a few relevant classes of automata that are less powerful than a Turin
 Each symbol is permanently and universally associated with either pushing to the stack, popping from it, or not touching it.
 However, partitioning input tokens causes some problems:
 e.g., we can't use `<` both to open angle brackets and to compute a less-than relation.
-(Also, shoutout to my professor Rajeev Alur, who co-invented these!)
+(Shoutout to my professor Rajeev Alur, who co-invented these!)
 
-In this library, we've gone totally opportunistic: just act like a pushdown automata until we hit an impossible intersection, then complain.
+In this library, we've gone fully opportunistic: just act like a pushdown automata until we hit an impossible intersection, then complain.
 Every case I know of in which intersection fails has nothing to do with parsing, but if it is a limitation in practice for you, please let me know.
 
 ## What does this whole process look like?
@@ -71,8 +71,8 @@ My primary goal was a personal tool, but it turned out much better than I expect
 
 ## Acknowledgments
 
-First off, to Haskell's parsing libraries (and UPenn's Haskell course) for showing me that parsers can even work this way. Most of the syntax is inspired by Haskell.
+Haskell's parsing libraries (and UPenn's Haskell course), for showing me that parsers can even work this way.
 
-Second, to Rajeev Alur and Penn's CIS 262 for formally introducing me to nondeterministic finite automata.
+Rajeev Alur (and UPenn's CIS 262), for formally introducing me to nondeterministic finite automata.
 
-Third, to Rust.
+Rust, for making this possible.

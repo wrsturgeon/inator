@@ -202,7 +202,7 @@ pub use {
     curry_input::CurryInput,
     curry_stack::CurryStack,
     graph::{Deterministic, Graph, Nondeterministic},
-    in_progress::{InProgress, ParseError},
+    in_progress::{InProgress, InputError, ParseError},
     input::Input,
     merge::{merge, try_merge, Merge},
     output::Output,
