@@ -6,10 +6,10 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-use crate::{Input, Nondeterministic, Output, Stack};
+use crate::{Input, Nondeterministic, Stack};
 use core::ops;
 
-impl<I: Input, S: Stack, O: Output> ops::BitOr for Nondeterministic<I, S, O> {
+impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
     fn bitor(mut self, other: Self) -> Self {
@@ -18,10 +18,14 @@ impl<I: Input, S: Stack, O: Output> ops::BitOr for Nondeterministic<I, S, O> {
         if self.check().is_err() {
             return self;
         }
+        if self.output_t != other.output_t {
+            self.output_t = "TYPE_ERROR".to_owned();
+        }
         let size = self.states.len();
         let Self {
             states: other_states,
             initial: other_initial,
+            output_t: _,
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
         self.states.extend(other_states);
         self.initial.extend(other_initial);
@@ -29,7 +33,7 @@ impl<I: Input, S: Stack, O: Output> ops::BitOr for Nondeterministic<I, S, O> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> ops::BitAnd for Nondeterministic<I, S, O> {
+impl<I: Input, S: Stack> ops::BitAnd for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
     #[allow(clippy::todo, unused_mut, unused_variables)]

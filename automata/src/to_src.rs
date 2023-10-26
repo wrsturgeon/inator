@@ -7,13 +7,13 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Graph, Input, Output, Range, RangeMap, Stack, State, Transition,
+    Action, CurryInput, CurryStack, Graph, Input, Range, RangeMap, Stack, State, Transition,
 };
 use core::borrow::Borrow;
 use std::collections::BTreeSet;
 
 /// Translate a value into Rust source code that reproduces it.
-pub trait ToSrc {
+pub trait ToSrc: 'static {
     /// Translate a value into Rust source code that reproduces it.
     #[must_use]
     fn to_src(&self) -> String;
@@ -155,14 +155,14 @@ impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> Graph<I, S, O, usize> {
+impl<I: Input, S: Stack> Graph<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
     #[allow(clippy::arithmetic_side_effects)] // <-- String concatenation with `+`
     pub fn to_src(&self) -> String {
         let input_t = I::src_type();
-        let output_t = O::src_type();
+        let output_t: &str = &self.output_t;
         let stack_t = S::src_type();
         format!(
             r#"/// Descriptive parsing error.
@@ -220,18 +220,18 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
     }
 }
 
-impl<I: Input, S: Stack, O: Output> State<I, S, O, usize> {
+impl<I: Input, S: Stack> State<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
     fn to_src(&self, i: usize) -> String {
-        let output_t = O::src_type();
+        let input_t: &str = &self.input_t;
         format!(
             r#"
 
 
 #[inline]
-fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>, acc: {output_t}) -> R<I> {{
+fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>, acc: {input_t}) -> R<I> {{
     match input.next() {{
         None => {},
         Some((index, token)) => {},
@@ -249,7 +249,7 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
     }
 }
 
-impl<I: Input, S: Stack, O: Output> CurryStack<I, S, O, usize> {
+impl<I: Input, S: Stack> CurryStack<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
@@ -276,7 +276,7 @@ impl<I: Input, S: Stack, O: Output> CurryStack<I, S, O, usize> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> CurryInput<I, S, O, usize> {
+impl<I: Input, S: Stack> CurryInput<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
@@ -296,7 +296,7 @@ impl<I: Input, S: Stack, O: Output> CurryInput<I, S, O, usize> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
+impl<I: Input, S: Stack> RangeMap<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
@@ -316,7 +316,7 @@ impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> Transition<I, S, O, usize> {
+impl<I: Input, S: Stack> Transition<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]

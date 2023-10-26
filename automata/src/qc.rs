@@ -118,36 +118,14 @@ impl<I: Arbitrary + Input> Arbitrary for Range<I> {
     }
 }
 
-/// Finite set of functions that add or subtract powers of two, up to the limits of a type.
-const UPDATE_CHOICES: [Update<u8, u8>; 17] = [
-    update!(|x, _| x),
-    update!(|x, _| x.saturating_add(1)),
-    update!(|x, _| x.saturating_sub(1)),
-    update!(|x, _| x.saturating_add(2)),
-    update!(|x, _| x.saturating_sub(2)),
-    update!(|x, _| x.saturating_add(4)),
-    update!(|x, _| x.saturating_sub(4)),
-    update!(|x, _| x.saturating_add(8)),
-    update!(|x, _| x.saturating_sub(8)),
-    update!(|x, _| x.saturating_add(16)),
-    update!(|x, _| x.saturating_sub(16)),
-    update!(|x, _| x.saturating_add(32)),
-    update!(|x, _| x.saturating_sub(32)),
-    update!(|x, _| x.saturating_add(64)),
-    update!(|x, _| x.saturating_sub(64)),
-    update!(|x, _| x.saturating_add(128)),
-    update!(|x, _| x.saturating_sub(128)),
-];
-
-impl Arbitrary for Update<u8, u8> {
+impl<I: Input> Arbitrary for Update<I> {
     #[inline(always)]
     fn arbitrary(g: &mut Gen) -> Self {
-        *unwrap!(g.choose(&UPDATE_CHOICES))
+        update!(|(), _| {})
     }
     #[inline]
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let i = unwrap!(UPDATE_CHOICES.iter().position(|u| u == self));
-        Box::new(get!(UPDATE_CHOICES, ..i).iter().copied())
+        Box::new(iter::empty())
     }
 }
 

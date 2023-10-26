@@ -6,7 +6,7 @@
 
 //! Necessary preconditions to function as an index.
 
-use crate::{Check, Input, Merge, Output, Stack, ToSrc};
+use crate::{Check, Input, Merge, Stack, ToSrc};
 use core::iter;
 use std::collections::{btree_set, BTreeSet};
 
@@ -24,8 +24,8 @@ pub enum CtrlMergeConflict {
 }
 
 /// Necessary preconditions to function as an index.
-pub trait Ctrl<I: Input, S: Stack, O: Output>:
-    Check<I, S, O, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
+pub trait Ctrl<I: Input, S: Stack>:
+    Check<I, S, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
     type View<'s>: Iterator<Item = Result<usize, &'s str>>
@@ -46,7 +46,7 @@ pub trait Ctrl<I: Input, S: Stack, O: Output>:
     fn from_usize(i: usize) -> Self;
 }
 
-impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
+impl<I: Input, S: Stack> Ctrl<I, S> for usize {
     type View<'s> = iter::Once<Result<usize, &'s str>>;
     #[inline]
     fn view(&self) -> Self::View<'_> {
@@ -69,7 +69,7 @@ impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for usize {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> Ctrl<I, S, O> for BTreeSet<Result<usize, String>> {
+impl<I: Input, S: Stack> Ctrl<I, S> for BTreeSet<Result<usize, String>> {
     type View<'s> = iter::Map<
         btree_set::Iter<'s, Result<usize, String>>,
         fn(&'s Result<usize, String>) -> Result<usize, &'s str>,

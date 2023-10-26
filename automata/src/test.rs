@@ -49,7 +49,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Deterministic::<u8, u8, u8>::arbitrary(&mut Gen::new(curved.into())).check(),
+                Deterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into())).check(),
                 Ok(())
             );
         }
@@ -62,7 +62,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Nondeterministic::<u8, u8, u8>::arbitrary(&mut Gen::new(curved.into())).check(),
+                Nondeterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into())).check(),
                 Ok(())
             );
         }
@@ -161,10 +161,7 @@ mod prop {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
                 <usize as Check<u8, u8, u8, usize>>::check(
-                    &<usize as Ctrl<u8, u8, u8>>::arbitrary_given(
-                        curved,
-                        &mut Gen::new(curved.into())
-                    ),
+                    &<usize as Ctrl<u8, u8>>::arbitrary_given(curved, &mut Gen::new(curved.into())),
                     curved
                 ),
                 Ok(())
@@ -185,7 +182,7 @@ mod prop {
                     u8,
                     BTreeSet<Result<usize, String>>,
                 >>::check(
-                    &<BTreeSet<Result<usize, String>> as Ctrl<u8, u8, u8>>::arbitrary_given(
+                    &<BTreeSet<Result<usize, String>> as Ctrl<u8, u8>>::arbitrary_given(
                         curved,
                         &mut Gen::new(curved.into())
                     ),
@@ -216,18 +213,18 @@ mod prop {
         // Determinization takes exactly as long as checking if determinzation will succeed,
         // and determinization is the only way to check a priori for runtime errors.
         // fn check_implies_no_runtime_errors(
-        //     nd: Nondeterministic<u8, u8, u8>,
+        //     nd: Nondeterministic<u8, u8, >,
         //     input: Vec<u8>
         // ) -> bool {
         //     !matches!(nd.accept(input), Err(ParseError::BadParser(..)))
         // }
         //
-        // fn check_implies_determinize(nd: Nondeterministic<u8, u8, u8>) -> bool {
+        // fn check_implies_determinize(nd: Nondeterministic<u8, u8, >) -> bool {
         //     nd.determinize().is_ok()
         // }
 
         fn determinize_implies_no_runtime_errors(
-            nd: Nondeterministic<u8, u8, u8>,
+            nd: Nondeterministic<u8, u8, >,
             input: Vec<u8>
         ) -> bool {
             let Ok(d) = nd.determinize() else {
@@ -237,19 +234,19 @@ mod prop {
         }
 
         fn deterministic_implies_no_runtime_errors(
-            d: Deterministic<u8, u8, u8>,
+            d: Deterministic<u8, u8, >,
             input: Vec<u8>
         ) -> bool {
             !matches!(d.accept(input), Err(ParseError::BadParser(..)))
         }
 
-        fn determinize_identity(d: Deterministic<u8, u8, u8>, input: Vec<u8>) -> bool {
+        fn determinize_identity(d: Deterministic<u8, u8, >, input: Vec<u8>) -> bool {
             d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
         }
 
         fn union(
-            lhs: Nondeterministic<u8, u8, u8>,
-            rhs: Nondeterministic<u8, u8, u8>,
+            lhs: Nondeterministic<u8, u8, >,
+            rhs: Nondeterministic<u8, u8, >,
             input: Vec<u8>
         ) -> bool {
             if lhs.determinize().is_err() {
@@ -295,7 +292,7 @@ mod reduced {
     use core::iter;
     use std::collections::{BTreeMap, BTreeSet};
 
-    fn determinize_implies_no_runtime_errors(nd: &Nondeterministic<u8, u8, u8>, input: &[u8]) {
+    fn determinize_implies_no_runtime_errors(nd: &Nondeterministic<u8, u8>, input: &[u8]) {
         if let Ok(d) = nd.determinize() {
             if let Err(ParseError::BadParser(e)) = d.accept(input.iter().copied()) {
                 panic!("{e:?}");
@@ -315,7 +312,8 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         accepting: false,
-                        tag: vec![],
+                        tag: BTreeSet::new(),
+                        input_t: "()".to_owned(),
                     },
                     State {
                         transitions: CurryStack {
@@ -323,34 +321,37 @@ mod reduced {
                             map_none: Some(CurryInput::Wildcard(Transition {
                                 dst: iter::once(Ok(0)).collect(),
                                 act: Action::Local,
-                                update: update!(|x, _| x),
+                                update: update!(|x: u8, _| x),
                             })),
                             map_some: BTreeMap::new(),
                         },
                         accepting: false,
-                        tag: vec![],
+                        tag: BTreeSet::new(),
+                        input_t: "()".to_owned(),
                     },
                     State {
                         transitions: CurryStack {
                             wildcard: Some(CurryInput::Wildcard(Transition {
                                 dst: iter::once(Ok(0)).collect(),
                                 act: Action::Local,
-                                update: update!(|x, _| x),
+                                update: update!(|x: u8, _| x),
                             })),
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
                         accepting: false,
-                        tag: vec![],
+                        tag: BTreeSet::new(),
+                        input_t: "()".to_owned(),
                     },
                 ],
                 initial: [Ok(1), Ok(2)].into_iter().collect(),
+                output_t: "()".to_owned(),
             },
             &[0],
         );
     }
 
-    fn union(lhs: &Nondeterministic<u8, u8, u8>, rhs: &Nondeterministic<u8, u8, u8>, input: &[u8]) {
+    fn union(lhs: &Nondeterministic<u8, u8>, rhs: &Nondeterministic<u8, u8>, input: &[u8]) {
         if lhs.determinize().is_err() {
             return;
         }
@@ -407,6 +408,7 @@ mod reduced {
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -416,9 +418,11 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: BTreeSet::new(),
+                output_t: "()".to_owned(),
             },
             &[],
         );
@@ -435,13 +439,16 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: BTreeSet::new(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &[],
         );
@@ -460,19 +467,22 @@ mod reduced {
                             CurryInput::Wildcard(Transition {
                                 dst: BTreeSet::new(),
                                 act: Action::Local,
-                                update: update!(|x, _| x),
+                                update: update!(|x: u8, _| x),
                             }),
                         ))
                         .collect(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: BTreeSet::new(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &[],
         );
@@ -488,18 +498,21 @@ mod reduced {
                         map_none: Some(CurryInput::Wildcard(Transition {
                             dst: iter::once(Ok(0)).collect(),
                             act: Action::Local,
-                            update: update!(|x, _| x),
+                            update: update!(|x: u8, _| x),
                         })),
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![],
                 initial: BTreeSet::new(),
+                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -516,9 +529,11 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: true,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -526,15 +541,17 @@ mod reduced {
                         wildcard: Some(CurryInput::Wildcard(Transition {
                             dst: iter::once(Ok(0)).collect(),
                             act: Action::Pop,
-                            update: update!(|x, _| x),
+                            update: update!(|x: u8, _| x),
                         })),
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -550,14 +567,16 @@ mod reduced {
                         map_none: Some(CurryInput::Wildcard(Transition {
                             dst: iter::once(Ok(0)).collect(),
                             act: Action::Local,
-                            update: update!(|x, _| x),
+                            update: update!(|x: u8, _| x),
                         })),
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -565,15 +584,17 @@ mod reduced {
                         wildcard: Some(CurryInput::Wildcard(Transition {
                             dst: iter::once(Ok(0)).collect(),
                             act: Action::Local,
-                            update: update!(|x, _| x.saturating_add(1)),
+                            update: update!(|x: u8, _| x.saturating_add(1)),
                         })),
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -591,7 +612,7 @@ mod reduced {
                                 Transition {
                                     dst: iter::once(Ok(0)).collect(),
                                     act: Action::Local,
-                                    update: update!(|x, _| x),
+                                    update: update!(|x: u8, _| x),
                                 },
                             ))
                             .collect(),
@@ -600,9 +621,11 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -622,9 +645,11 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     accepting: false,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -642,7 +667,8 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         accepting: false,
-                        tag: vec![],
+                        tag: BTreeSet::new(),
+                        input_t: "()".to_owned(),
                     },
                     State {
                         transitions: CurryStack {
@@ -653,13 +679,14 @@ mod reduced {
                                 CurryInput::Wildcard(Transition {
                                     dst: iter::once(Ok(0)).collect(),
                                     act: Action::Local,
-                                    update: update!(|x, _| x),
+                                    update: update!(|x: u8, _| x),
                                 }),
                             ))
                             .collect(),
                         },
                         accepting: false,
-                        tag: vec![],
+                        tag: BTreeSet::new(),
+                        input_t: "()".to_owned(),
                     },
                     State {
                         transitions: CurryStack {
@@ -667,15 +694,17 @@ mod reduced {
                             map_none: Some(CurryInput::Wildcard(Transition {
                                 dst: iter::once(Ok(0)).collect(),
                                 act: Action::Local,
-                                update: update!(|x, _| x),
+                                update: update!(|x: u8, _| x),
                             })),
                             map_some: BTreeMap::new(),
                         },
                         accepting: false,
-                        tag: vec![],
+                        tag: BTreeSet::new(),
+                        input_t: "()".to_owned(),
                     },
                 ],
                 initial: iter::once(Ok(2)).collect(),
+                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -683,15 +712,17 @@ mod reduced {
                         wildcard: Some(CurryInput::Wildcard(Transition {
                             dst: iter::once(Ok(0)).collect(),
                             act: Action::Local,
-                            update: update!(|x, _| x.saturating_add(1)),
+                            update: update!(|x: u8, _| x.saturating_add(1)),
                         })),
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
                     accepting: true,
-                    tag: vec![],
+                    tag: BTreeSet::new(),
+                    input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                output_t: "()".to_owned(),
             },
             &[0],
         );
