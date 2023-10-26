@@ -87,17 +87,11 @@ impl<I: Input, S: Stack> Ctrl<I, S> for BTreeSet<Result<usize, String>> {
     fn arbitrary_given(n_states: NonZeroUsize, g: &mut quickcheck::Gen) -> Self {
         use quickcheck::Arbitrary;
         'restart: loop {
-            let set = Self::arbitrary(g);
+            let set = BTreeSet::<usize>::arbitrary(g);
             if set.is_empty() {
                 continue 'restart;
             }
-            return set
-                .into_iter()
-                .map(|r| match r {
-                    Ok(i) => Ok(i % n_states),
-                    Err(s) => Err(s),
-                })
-                .collect();
+            return set.into_iter().map(|i| Ok(i % n_states)).collect();
         }
     }
     #[inline]

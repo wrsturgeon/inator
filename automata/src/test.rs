@@ -48,10 +48,8 @@ mod prop {
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            assert_eq!(
-                Deterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into())).check(),
-                Ok(())
-            );
+            let d = Deterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into()));
+            assert_eq!(d.check(), Ok(()), "{d:?}");
         }
     }
 
@@ -61,10 +59,8 @@ mod prop {
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            assert_eq!(
-                Nondeterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into())).check(),
-                Ok(())
-            );
+            let nd = Nondeterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into()));
+            assert_eq!(nd.check(), Ok(()), "{nd:?}");
         }
     }
 

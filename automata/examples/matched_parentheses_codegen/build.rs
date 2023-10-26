@@ -2,7 +2,7 @@ use core::iter;
 use inator_automata::{
     update, Action, CurryInput, CurryStack, Deterministic, Range, RangeMap, State, Transition,
 };
-use std::io;
+use std::{collections::BTreeSet, io};
 use symbols::Symbol;
 
 pub fn main() -> io::Result<()> {
@@ -39,9 +39,11 @@ pub fn main() -> io::Result<()> {
                 .collect(),
             },
             accepting: true,
-            tag: vec![],
+            tag: BTreeSet::new(),
+            input_t: "()".to_owned(),
         }],
         initial: 0,
+        output_t: "()".to_owned(),
     };
 
     parser.to_file("src/parser.rs")
