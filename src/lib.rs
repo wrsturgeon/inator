@@ -137,6 +137,40 @@ macro_rules! get_mut {
     }};
 }
 
+// TODO: derive ToSrc
+
 mod fixpoint;
 
-pub use fixpoint::{fixpoint, Fixpoint};
+#[cfg(test)]
+mod test;
+
+pub use {
+    fixpoint::{fixpoint, Fixpoint},
+    inator_automata::*,
+};
+
+use core::iter;
+use std::collections::{BTreeMap, BTreeSet};
+
+#[cfg(feature = "quickcheck")]
+use quickcheck as _; // <-- TODO: remove if we write some implementations
+
+/// Parser that accepts only the empty string.
+#[inline]
+#[must_use]
+pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
+    Graph {
+        states: vec![State {
+            transitions: CurryStack {
+                wildcard: None,
+                map_none: None,
+                map_some: BTreeMap::new(),
+            },
+            accepting: true,
+            tag: BTreeSet::new(),
+            input_t: "()".to_owned(),
+        }],
+        initial: iter::once(Ok(0)).collect(),
+        output_t: "OUTPUT".to_owned(),
+    }
+}
