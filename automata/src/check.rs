@@ -53,6 +53,8 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
     InitialNotUnit(String),
     /// Tried to merge two states who need different output types.
     TypeMismatch(String, String),
+    /// An accepting state returns the wrong type.
+    WrongReturnType(String, String),
 }
 
 impl<I: Input, S: Stack> IllFormed<I, S, usize> {
@@ -85,6 +87,7 @@ impl<I: Input, S: Stack> IllFormed<I, S, usize> {
             IllFormed::DuplicateTag(s) => IllFormed::DuplicateTag(s),
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
+            IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
         }
     }
 }

@@ -89,6 +89,14 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 }
             }
         }
+        for state in &self.states {
+            if state.accepting && state.input_t != self.output_t {
+                return Err(IllFormed::WrongReturnType(
+                    self.output_t.clone(),
+                    state.input_t.clone(),
+                ));
+            }
+        }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             // Check sorted without duplicates
             let _ = self.states.iter().try_fold(None, |mlast, curr| {
