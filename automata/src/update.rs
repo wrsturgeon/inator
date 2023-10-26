@@ -7,8 +7,7 @@
 //! A single-argument Rust function callable both in `build.rs` and in a source file.
 
 use crate::{Input, ToSrc};
-use core::{cmp, fmt};
-use std::any::Any;
+use core::{cmp, fmt, marker::PhantomData};
 
 /// A single-argument Rust function callable both in `build.rs` and in a source file.
 #[allow(clippy::exhaustive_structs)]
@@ -17,26 +16,22 @@ pub struct Update<I: Input> {
     pub input_t: String,
     /// Source-code representation of the input type.
     pub output_t: String,
+    /// Representation of the type of tokens.
+    pub ghost: PhantomData<I>,
     /// Source-code representation that's promised to compile to a call operationally identical to `ptr`.
     pub src: &'static str,
-    /// Dynamically typed function to compute the update function.
-    pub run: Box<dyn Fn(Box<dyn Any>, I) -> Box<dyn Any>>,
 }
 
 impl<I: Input> Update<I> {
+    /// Internals of the `update!` macro.
     #[inline]
     #[must_use]
-    pub fn _update_macro<T: ToSrc, U: ToSrc>(src: &'static str, ptr: fn(T, I) -> U) -> Self {
-        let run = Box::new(move |dyn_acc: Box<dyn Any>, tok: I| -> Box<dyn Any> {
-            let acc: T = *dyn_acc.downcast().expect("Type mismatch");
-            let out: U = ptr(acc, tok);
-            Box::new(out)
-        });
+    pub fn _update_macro<T: ToSrc, U: ToSrc>(src: &'static str, _: fn(T, I) -> U) -> Self {
         Self {
             input_t: T::src_type(),
             output_t: U::src_type(),
+            ghost: PhantomData,
             src,
-            run,
         }
     }
 }
@@ -77,8 +72,8 @@ impl<I: Input> Clone for Update<I> {
         Self {
             input_t: self.input_t.clone(),
             output_t: self.output_t.clone(),
+            ghost: self.ghost,
             src: self.src,
-            run: self.run,
         }
     }
 }

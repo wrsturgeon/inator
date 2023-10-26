@@ -37,7 +37,7 @@ where
             input: self.into_iter(),
             stack: vec![],
             ctrl: graph.initial.clone(),
-            output: Some(Box::new(())),
+            output_t: "()".to_owned(),
         }
     }
 }

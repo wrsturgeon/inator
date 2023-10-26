@@ -8,7 +8,6 @@
 
 use crate::{find_tag, try_merge, Ctrl, Graph, IllFormed, Input, Stack};
 use core::fmt;
-use std::any::Any;
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
@@ -21,8 +20,8 @@ pub struct InProgress<'graph, I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<It
     pub stack: Vec<S>,
     /// Internal state.
     pub ctrl: C,
-    /// Output accumulator.
-    pub output: Option<Box<dyn Any>>,
+    /// Output type as we go.
+    pub output_t: String,
 }
 
 impl<I: Input, S: fmt::Debug + Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> fmt::Debug
@@ -36,7 +35,7 @@ impl<I: Input, S: fmt::Debug + Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> fmt
             "In progress: {:?} @ {:?} -> {:?}",
             self.stack,
             self.ctrl.view().collect::<Vec<_>>(),
-            self.output.as_ref().unwrap(),
+            self.output_t,
         )
     }
 }
@@ -77,13 +76,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> Iterator
             &self.ctrl,
             maybe_token.clone(),
             &mut self.stack,
-            #[allow(unsafe_code)]
-            self.output.take().unwrap(),
+            &self.output_t,
         ) {
             Ok(ok) => ok,
             Err(e) => return Some(Err(e)),
         };
-        let _ = self.output.insert(o);
+        self.output_t = o;
         self.ctrl = c?;
         maybe_token.map(Ok) // <-- Propagate the iterator's input
     }
@@ -97,8 +95,8 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
     ctrl: &C,
     maybe_token: Option<I>,
     stack: &mut Vec<S>,
-    output: Box<dyn Any>,
-) -> Result<(Option<C>, Box<dyn Any>), ParseError<I, S, C>> {
+    output_t: &str,
+) -> Result<(Option<C>, String), ParseError<I, S, C>> {
     ctrl.view().try_fold((), |(), r| match r {
         Ok(i) => {
             if graph.states.get(i).is_none() {
@@ -118,7 +116,7 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
             if states.any(|s| s.accepting) {
-                Ok((None, output))
+                Ok((None, output_t.to_owned()))
             } else {
                 Err(ParseError::BadInput(InputError::NotAccepting))
             }
@@ -135,10 +133,13 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
         r.map_or_else(
             |e| Err(ParseError::BadParser(e)),
             |mega_transition| {
-                mega_transition.invoke(token, stack, output).map_or(
-                    Err(ParseError::BadInput(InputError::Unopened)),
-                    |(c, out)| Ok((Some(c), out)),
-                )
+                mega_transition
+                    .invoke(stack, output_t)
+                    .map_err(ParseError::BadParser)?
+                    .map_or(
+                        Err(ParseError::BadInput(InputError::Unopened)),
+                        |(c, out)| Ok((Some(c), out)),
+                    )
             },
         )
     })

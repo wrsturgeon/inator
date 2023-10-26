@@ -13,7 +13,7 @@ use core::borrow::Borrow;
 use std::collections::BTreeSet;
 
 /// Translate a value into Rust source code that reproduces it.
-pub trait ToSrc: 'static {
+pub trait ToSrc {
     /// Translate a value into Rust source code that reproduces it.
     #[must_use]
     fn to_src(&self) -> String;

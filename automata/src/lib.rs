@@ -88,6 +88,7 @@
     clippy::wildcard_imports,
     unused_macros, // <-- TODO: keep checking if we've used them <3
 )]
+#![allow(clippy::result_large_err)] // <-- TODO: this error actually makes sense; fix it
 
 /// Call a function that will also be available to the compiled parser.
 #[macro_export]

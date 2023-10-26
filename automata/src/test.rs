@@ -75,7 +75,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                State::<u8, u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                State::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -92,7 +92,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                CurryStack::<u8, u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                CurryStack::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -109,7 +109,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                CurryInput::<u8, u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                CurryInput::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -126,7 +126,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                RangeMap::<u8, u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                RangeMap::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -143,7 +143,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Transition::<u8, u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                Transition::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -160,7 +160,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                <usize as Check<u8, u8, u8, usize>>::check(
+                <usize as Check<u8, u8, usize>>::check(
                     &<usize as Ctrl<u8, u8>>::arbitrary_given(curved, &mut Gen::new(curved.into())),
                     curved
                 ),
@@ -177,7 +177,6 @@ mod prop {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
                 <BTreeSet<Result<usize, String>> as Check<
-                    u8,
                     u8,
                     u8,
                     BTreeSet<Result<usize, String>>,

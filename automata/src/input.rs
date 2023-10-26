@@ -9,6 +9,6 @@
 use crate::ToSrc;
 
 /// Typing convenience: trait satisfying everything required for an input token.
-pub trait Input: 'static + Clone + Ord + ToSrc {}
+pub trait Input: Clone + Ord + ToSrc {}
 
-impl<I: 'static + Clone + Ord + ToSrc> Input for I {}
+impl<I: Clone + Ord + ToSrc> Input for I {}

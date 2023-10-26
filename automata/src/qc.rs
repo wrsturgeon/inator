@@ -12,7 +12,7 @@ use crate::{
 };
 use core::{iter, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 impl<S: Arbitrary + Stack> Arbitrary for Action<S> {
     #[inline]
@@ -45,7 +45,7 @@ fn within_size(g: &mut Gen) -> usize {
     usize::arbitrary(g) % NonZeroUsize::new(g.size()).expect("Zero-sized QuickCheck generator")
 }
 
-impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S, u8>> Arbitrary for Graph<u8, S, u8, C> {
+impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S, C> {
     #[inline]
     #[allow(clippy::arithmetic_side_effects)]
     fn arbitrary(g: &mut Gen) -> Self {
@@ -75,6 +75,7 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S, u8>> Arbitrary for Graph<u
                 return Self {
                     states,
                     initial: initial.map_indices(|i| i % nz_post),
+                    output_t: "()".to_owned(),
                 };
             }
         }
@@ -85,7 +86,11 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S, u8>> Arbitrary for Graph<u
             (self.states.clone(), self.initial.clone())
                 .shrink()
                 .filter_map(|(states, initial)| {
-                    let s = Self { states, initial };
+                    let s = Self {
+                        states,
+                        initial,
+                        output_t: "()".to_owned(),
+                    };
                     (s.check() == Ok(())).then_some(s)
                 }),
         )
@@ -118,9 +123,9 @@ impl<I: Arbitrary + Input> Arbitrary for Range<I> {
     }
 }
 
-impl<I: Input> Arbitrary for Update<I> {
+impl<I: 'static + Input> Arbitrary for Update<I> {
     #[inline(always)]
-    fn arbitrary(g: &mut Gen) -> Self {
+    fn arbitrary(_: &mut Gen) -> Self {
         update!(|(), _| {})
     }
     #[inline]
@@ -135,8 +140,8 @@ macro_rules! shrink_only {
     (|$self:ident: &$t:ident| $body:expr) => {
         impl<
                 S: Arbitrary + Stack,
-                C: Arbitrary + Ctrl<u8, S, u8>,
-            > Arbitrary for $t<u8, S, u8, C>
+                C: Arbitrary + Ctrl<u8, S>,
+            > Arbitrary for $t<u8, S, C>
         {
             #[inline(always)]
             fn arbitrary(_: &mut Gen) -> Self {
@@ -156,7 +161,8 @@ shrink_only!(|self: &State| Box::new(
         .map(|(transitions, accepting, tag)| Self {
             transitions,
             accepting,
-            tag
+            tag,
+            input_t: "()".to_owned()
         })
 ));
 
@@ -188,12 +194,12 @@ shrink_only!(|self: &CurryInput| match *self {
 });
 
 shrink_only!(|self: &Transition| Box::new(
-    (self.dst.clone(), self.act.clone(), self.update)
+    (self.dst.clone(), self.act.clone(), self.update.clone())
         .shrink()
         .map(|(dst, act, update)| Self { dst, act, update })
 ));
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
+impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
@@ -201,12 +207,13 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> State<u8, S, u8, C> {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
             accepting: bool::arbitrary(g),
-            tag: Vec::arbitrary(g),
+            tag: BTreeSet::arbitrary(g),
+            input_t: "()".to_owned(),
         }
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryStack<u8, S, u8, C> {
+impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> CurryStack<u8, S, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
@@ -236,7 +243,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryStack<u8, S, u8, C> {
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryInput<u8, S, u8, C> {
+impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> CurryInput<u8, S, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
@@ -249,7 +256,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> CurryInput<u8, S, u8, C> {
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> RangeMap<u8, S, u8, C> {
+impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> RangeMap<u8, S, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
@@ -276,7 +283,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> RangeMap<u8, S, u8, C> {
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S, u8>> Transition<u8, S, u8, C> {
+impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> Transition<u8, S, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]

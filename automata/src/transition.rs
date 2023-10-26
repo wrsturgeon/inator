@@ -6,9 +6,8 @@
 
 //! Transition in an automaton: an action and a destination state.
 
-use crate::{Action, Ctrl, Input, Stack, Update};
+use crate::{Action, Ctrl, IllFormed, Input, Stack, Update};
 use core::cmp;
-use std::any::Any;
 
 /// Transition in an automaton: an action and a destination state.
 #[allow(clippy::exhaustive_structs)]
@@ -66,13 +65,18 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Transition<I, S, C> {
     #[inline]
     pub fn invoke(
         &self,
-        token: I,
         stack: &mut Vec<S>,
-        output: Box<dyn Any>,
-    ) -> Option<(C, Box<dyn Any>)> {
-        self.act
-            .invoke(stack)
-            .map(|()| (self.dst.clone(), (self.update.run)(output, token)))
+        output_t: &str,
+    ) -> Result<Option<(C, String)>, IllFormed<I, S, C>> {
+        (output_t == self.update.input_t)
+            .then(|| {
+                self.act.invoke(stack)?;
+                Some((self.dst.clone(), self.update.output_t.clone()))
+            })
+            .ok_or(IllFormed::TypeMismatch(
+                output_t.to_owned(),
+                self.update.input_t.clone(),
+            ))
     }
 }
 

@@ -4,6 +4,7 @@ use inator_automata::{
     ToSrc, Transition,
 };
 use rand::{thread_rng, RngCore};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Symbol {
@@ -24,7 +25,7 @@ impl ToSrc for Symbol {
 }
 
 /// Very manually constructed parser recognizing only valid parentheses.
-fn parser() -> Nondeterministic<char, Symbol, ()> {
+fn parser() -> Nondeterministic<char, Symbol> {
     Graph {
         states: vec![State {
             transitions: CurryStack {
@@ -57,9 +58,11 @@ fn parser() -> Nondeterministic<char, Symbol, ()> {
                 .collect(),
             },
             accepting: true,
-            tag: vec![],
+            tag: BTreeSet::new(),
+            input_t: "()".to_owned(),
         }],
         initial: iter::once(Ok(0)).collect(),
+        output_t: "()".to_owned(),
     }
 }
 

@@ -12,7 +12,6 @@ use crate::{
 };
 use core::{cmp::Ordering, num::NonZeroUsize};
 use std::{
-    any::Any,
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
     fs, io,
@@ -105,7 +104,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         })
     }
 
-    /// Run this parser to completion and check the result.
+    /// Run this parser to completion and check types along the way.
     /// # Errors
     /// If the parser determines there should be an error.
     #[inline]
@@ -113,7 +112,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     pub fn accept<In: IntoIterator<Item = I>>(
         &self,
         input: In,
-    ) -> Result<Box<dyn Any>, ParseError<I, S, C>> {
+    ) -> Result<String, ParseError<I, S, C>> {
         use crate::Run;
         let mut run = input.run(self);
         for r in &mut run {
@@ -126,7 +125,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             })
             .accepting
             {
-                return Ok(run.output.unwrap());
+                return Ok(run.output_t);
             }
         }
         Err(ParseError::BadInput(InputError::NotAccepting))
