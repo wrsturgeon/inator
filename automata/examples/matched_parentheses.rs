@@ -62,7 +62,6 @@ fn parser() -> Deterministic<char, Symbol> {
             input_t: "()".to_owned(),
         }],
         initial: 0,
-        output_t: "()".to_owned(),
     }
 }
 
@@ -146,5 +145,5 @@ pub fn main() {
     }
 
     // Print the Rust source representation of this parser
-    println!("{}", parser.to_src());
+    println!("{}", parser.to_src().unwrap());
 }

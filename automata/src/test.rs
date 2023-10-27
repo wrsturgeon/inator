@@ -340,7 +340,6 @@ mod reduced {
                     },
                 ],
                 initial: [Ok(1), Ok(2)].into_iter().collect(),
-                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -403,7 +402,6 @@ mod reduced {
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -417,7 +415,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: BTreeSet::new(),
-                output_t: "()".to_owned(),
             },
             &[],
         );
@@ -438,12 +435,10 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: BTreeSet::new(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &[],
         );
@@ -472,12 +467,10 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: BTreeSet::new(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &[],
         );
@@ -502,12 +495,10 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![],
                 initial: BTreeSet::new(),
-                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -528,7 +519,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -546,7 +536,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -571,7 +560,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -589,7 +577,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -620,7 +607,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -644,7 +630,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &[0],
         );
@@ -699,7 +684,6 @@ mod reduced {
                     },
                 ],
                 initial: iter::once(Ok(2)).collect(),
-                output_t: "()".to_owned(),
             },
             &Graph {
                 states: vec![State {
@@ -717,7 +701,6 @@ mod reduced {
                     input_t: "()".to_owned(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
-                output_t: "()".to_owned(),
             },
             &[0],
         );

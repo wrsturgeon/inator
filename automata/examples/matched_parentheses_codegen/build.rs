@@ -1,11 +1,12 @@
 use core::iter;
 use inator_automata::{
-    update, Action, CurryInput, CurryStack, Deterministic, Range, RangeMap, State, Transition,
+    update, Action, CurryInput, CurryStack, Deterministic, IllFormed, Range, RangeMap, State,
+    Transition,
 };
 use std::{collections::BTreeSet, io};
 use symbols::Symbol;
 
-pub fn main() -> io::Result<()> {
+pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
     // Very manually constructed parser recognizing only valid parentheses.
     let parser = Deterministic {
         states: vec![State {
@@ -43,7 +44,6 @@ pub fn main() -> io::Result<()> {
             input_t: "()".to_owned(),
         }],
         initial: 0,
-        output_t: "()".to_owned(),
     };
 
     parser.to_file("src/parser.rs")

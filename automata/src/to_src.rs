@@ -7,7 +7,8 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Graph, Input, Range, RangeMap, Stack, State, Transition,
+    Action, CurryInput, CurryStack, Graph, IllFormed, Input, Range, RangeMap, Stack, State,
+    Transition,
 };
 use core::borrow::Borrow;
 use std::collections::BTreeSet;
@@ -157,14 +158,15 @@ impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
 
 impl<I: Input, S: Stack> Graph<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
+    /// # Errors
+    /// If this automaton is ill-formed.
     #[inline]
-    #[must_use]
     #[allow(clippy::arithmetic_side_effects)] // <-- String concatenation with `+`
-    pub fn to_src(&self) -> String {
+    pub fn to_src(&self) -> Result<String, IllFormed<I, S, usize>> {
         let input_t = I::src_type();
-        let output_t: &str = &self.output_t;
+        let output_t = self.output_type()?;
         let stack_t = S::src_type();
-        format!(
+        Ok(format!(
             r#"/// Descriptive parsing error.
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
@@ -216,7 +218,7 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
                 .iter()
                 .enumerate()
                 .fold(String::new(), |acc, (i, s)| acc + &s.to_src(i)),
-        )
+        ))
     }
 }
 

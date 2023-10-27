@@ -75,7 +75,6 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S
                 return Self {
                     states,
                     initial: initial.map_indices(|i| i % nz_post),
-                    output_t: "()".to_owned(),
                 };
             }
         }
@@ -86,11 +85,7 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S
             (self.states.clone(), self.initial.clone())
                 .shrink()
                 .filter_map(|(states, initial)| {
-                    let s = Self {
-                        states,
-                        initial,
-                        output_t: "()".to_owned(),
-                    };
+                    let s = Self { states, initial };
                     (s.check() == Ok(())).then_some(s)
                 }),
         )

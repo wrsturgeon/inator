@@ -18,14 +18,10 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         if self.check().is_err() {
             return self;
         }
-        if self.output_t != other.output_t {
-            self.output_t = "TYPE_ERROR".to_owned();
-        }
         let size = self.states.len();
         let Self {
             states: other_states,
             initial: other_initial,
-            output_t: _,
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
         self.states.extend(other_states);
         self.initial.extend(other_initial);

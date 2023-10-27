@@ -62,7 +62,6 @@ fn parser() -> Nondeterministic<char, Symbol> {
             input_t: "()".to_owned(),
         }],
         initial: iter::once(Ok(0)).collect(),
-        output_t: "()".to_owned(),
     }
 }
 

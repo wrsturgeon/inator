@@ -34,8 +34,6 @@ pub struct Graph<I: Input, S: Stack, C: Ctrl<I, S>> {
     pub states: Vec<State<I, S, C>>,
     /// Initial state of the machine (before reading input).
     pub initial: C,
-    /// Type of output after any successful run.
-    pub output_t: String,
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for Graph<I, S, C> {
@@ -44,7 +42,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for Graph<I, S, C> {
         Self {
             states: self.states.clone(),
             initial: self.initial.clone(),
-            output_t: self.output_t.clone(),
         }
     }
 }
@@ -89,14 +86,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 }
             }
         }
-        for state in &self.states {
-            if state.accepting && state.input_t != self.output_t {
-                return Err(IllFormed::WrongReturnType(
-                    self.output_t.clone(),
-                    state.input_t.clone(),
-                ));
-            }
-        }
+        drop(self.output_type()?);
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             // Check sorted without duplicates
             let _ = self.states.iter().try_fold(None, |mlast, curr| {
@@ -180,7 +170,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     }
                 })
                 .collect(),
-            output_t: self.output_t.clone(),
         };
         output
             .check()
@@ -240,6 +229,32 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         dsts.into_iter().try_fold((), |(), dst| {
             self.explore(subsets_as_states, &dst, &next_input_t)
         })
+    }
+
+    /// Compute the output type of any successful run.
+    /// # Errors
+    /// If multiple accepting states attempt to return different types.
+    #[inline]
+    pub fn output_type(&self) -> Result<String, IllFormed<I, S, C>> {
+        self.states
+            .iter()
+            .try_fold(None, |acc, state| {
+                if state.accepting {
+                    acc.map_or_else(
+                        || Ok(Some(state.input_t.clone())),
+                        |t| {
+                            if state.input_t == t {
+                                Ok(Some(t))
+                            } else {
+                                Err(IllFormed::WrongReturnType(t, state.input_t.clone()))
+                            }
+                        },
+                    )
+                } else {
+                    Ok(acc)
+                }
+            })
+            .map(|s| s.unwrap_or_else(|| "core::convert::Infallible".to_owned()))
     }
 }
 
@@ -355,8 +370,13 @@ impl<I: Input, S: Stack> Graph<I, S, usize> {
     /// # Errors
     /// If file creation or formatting fails.
     #[inline]
-    pub fn to_file<P: AsRef<OsStr> + AsRef<Path>>(&self, path: P) -> io::Result<()> {
-        fs::write(&path, self.to_src())?;
-        Command::new("rustfmt").arg(path).output().map(|_| {})
+    pub fn to_file<P: AsRef<OsStr> + AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> Result<io::Result<()>, IllFormed<I, S, usize>> {
+        self.to_src().map(|src| {
+            fs::write(&path, src)?;
+            Command::new("rustfmt").arg(path).output().map(|_| {})
+        })
     }
 }
