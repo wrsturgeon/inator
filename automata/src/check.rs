@@ -12,6 +12,11 @@ use crate::{
 use core::num::NonZeroUsize;
 use std::collections::BTreeSet;
 
+/// Maximum size we're willing to tolerate in an `Err` variant (for performance reasons).
+const _MAX_ILL_FORMED_SIZE: usize = 8;
+/// Check that the above holds by throwing a compile-time out-of-bounds error if it doesn't.
+const _: () = [(); _MAX_ILL_FORMED_SIZE][core::mem::size_of::<IllFormed<(), (), usize>>()];
+
 /// Witness to an ill-formed automaton (or part thereof).
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -31,9 +36,9 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
         /// Input token (or range thereof) that could be ambiguous.
         arg_token: Option<Range<I>>,
         /// First output possibility.
-        possibility_1: Transition<I, S, C>,
+        possibility_1: Box<Transition<I, S, C>>,
         /// Second output possibility.
-        possibility_2: Transition<I, S, C>,
+        possibility_2: Box<Transition<I, S, C>>,
     },
     /// Can't go to two different (deterministic) states at the same time.
     Superposition(usize, usize),
@@ -136,8 +141,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryStack<I, S, C> {
                         IllFormed::WildcardMask {
                             arg_stack: Some(key.clone()),
                             arg_token,
-                            possibility_1,
-                            possibility_2,
+                            possibility_1: Box::new(possibility_1),
+                            possibility_2: Box::new(possibility_2),
                         }
                     })?;
             }
@@ -147,8 +152,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryStack<I, S, C> {
                         IllFormed::WildcardMask {
                             arg_stack: None,
                             arg_token,
-                            possibility_1,
-                            possibility_2,
+                            possibility_1: Box::new(possibility_1),
+                            possibility_2: Box::new(possibility_2),
                         }
                     })?;
             }
