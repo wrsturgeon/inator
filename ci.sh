@@ -52,6 +52,7 @@ do
   then
     cd examples/$dir
     cargo +nightly miri run
+    cargo test
     cd ../..
   fi
 done
@@ -69,7 +70,7 @@ then
 fi
 
 # Check for remaining `FIXME`s
-grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
+grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
 
 # Print remaining `TODO`s
-grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude=ci.sh -e TODO || :
+grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e TODO || :
