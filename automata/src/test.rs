@@ -361,9 +361,9 @@ mod reduced {
         println!("{rhs:?}");
         println!("yields");
         let union = lhs.clone() | rhs.clone();
-        assert_eq!(union.check(), Ok(()));
         println!("{union:?}");
         println!();
+        assert_eq!(union.check(), Ok(()));
         if union.determinize().is_err() {
             return;
         }
@@ -752,6 +752,56 @@ mod reduced {
                     accepting: false,
                     tag: BTreeSet::new(),
                 }],
+                initial: BTreeSet::new(),
+            },
+            &[],
+        );
+    }
+
+    #[test]
+    fn union_11() {
+        union(
+            &Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    accepting: false,
+                    tag: BTreeSet::new(),
+                }],
+                initial: BTreeSet::new(),
+            },
+            &Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                ],
                 initial: BTreeSet::new(),
             },
             &[],
