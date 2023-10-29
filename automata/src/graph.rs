@@ -272,6 +272,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     #[inline]
     #[allow(clippy::missing_panics_doc)]
     pub fn sort(mut self) -> Nondeterministic<I, S> {
+        // Remove all tags but retain their associations
+        // (in case two otherwise identical states have different tags)
         let mut tag_map = BTreeMap::new();
         for state in &mut self.states {
             let untagged = State {
@@ -279,13 +281,16 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 accepting: state.accepting,
                 tag: BTreeSet::new(),
             };
-            let tags = mem::replace(&mut state.tag, BTreeSet::new());
+            let tags = mem::take(&mut state.tag);
             tag_map
                 .entry(untagged)
                 .or_insert(BTreeSet::new())
-                .extend(tags)
+                .extend(tags);
         }
-        debug_assert!(self.states.iter().all(|s| s.tag.is_empty()));
+        #[cfg(any(test, debug))]
+        for state in &self.states {
+            assert_eq!(state.tag, BTreeSet::new(), "Should have emptied tags");
+        }
 
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
@@ -305,7 +310,10 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         let states = self
             .states
             .iter()
-            .map(|s| s.reindex(&self.states, &index_map))
+            .map(|s| State {
+                tag: unwrap!(tag_map.remove(s)),
+                ..s.reindex(&self.states, &index_map)
+            })
             .collect();
         Graph { states, initial }.resort()
     }

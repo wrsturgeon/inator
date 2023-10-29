@@ -284,7 +284,15 @@ mod prop {
         }
 
         fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
-            parser.accept(input.iter().copied()) == parser.sort().accept(input.iter().copied())
+            let pre = parser.accept(input.iter().copied());
+            let post = parser.sort().accept(input);
+            match pre {
+                Ok(out) => Ok(out) == post,
+                Err(ParseError::BadInput(_)) => {
+                    matches!(post, Err(ParseError::BadInput(_)))
+                }
+                Err(ParseError::BadParser(_)) => true
+            }
         }
     }
 }
@@ -398,6 +406,18 @@ mod reduced {
                 );
             }
         }
+    }
+
+    fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) {
+        let pre = parser.accept(input.iter().copied());
+        let post = parser.sort().accept(input);
+        match pre {
+            Ok(out) => assert_eq!(Ok(out), post),
+            Err(ParseError::BadInput(_)) => {
+                assert!(matches!(post, Err(ParseError::BadInput(_)),));
+            }
+            Err(ParseError::BadParser(_)) => {}
+        };
     }
 
     #[test]
@@ -805,6 +825,159 @@ mod reduced {
                 initial: BTreeSet::new(),
             },
             &[],
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn sort_1() {
+        sort(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        accepting: true,
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        accepting: true,
+                        tag: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                0,
+                                CurryInput::Scrutinize(RangeMap {
+                                    entries: BTreeMap::new(),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Local,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Local,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        accepting: false,
+                        tag: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Local,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        accepting: false,
+                        tag: iter::once("\0".to_owned()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Scrutinize(RangeMap {
+                                    entries: BTreeMap::new(),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Scrutinize(RangeMap {
+                                    entries: BTreeMap::new(),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        accepting: false,
+                        tag: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: [Ok(0), Ok(8), Ok(9)].into_iter().collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(1)).collect(),
+                                act: Action::Pop,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        accepting: false,
+                        tag: BTreeSet::new(),
+                    },
+                ],
+                initial: iter::once(Ok(8)).collect(),
+            },
+            vec![0, 0],
         );
     }
 }
