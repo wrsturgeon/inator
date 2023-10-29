@@ -125,7 +125,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 Ok(i) => get!(self.states, i),
                 Err(s) => find_tag(&self.states, s).map_err(ParseError::BadParser)?,
             })
-            .accepting
+            .non_accepting
+            .is_none()
             {
                 return Ok(run.output_t);
             }
@@ -162,12 +163,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 .map(|set| {
                     let State {
                         transitions,
-                        accepting,
+                        non_accepting,
                         tag,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
                         transitions: fix_indices_curry_stack(transitions, &ordering),
-                        accepting,
+                        non_accepting,
                         tag,
                     }
                 })
@@ -203,7 +204,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                accepting: false,
+                non_accepting: Some("Unexpected token".to_owned()),
                 tag: BTreeSet::new(),
             },
             // If they successfully merged, return the merged state
@@ -237,7 +238,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         self.states
             .iter()
             .try_fold(None, |acc: Option<String>, state| {
-                if state.accepting {
+                if state.non_accepting.is_none() {
                     acc.map_or_else(
                         || state.input_type(),
                         |t| {
