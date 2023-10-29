@@ -20,7 +20,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     ) -> State<I, S, BTreeSet<Result<usize, String>>> {
         State {
             transitions: self.transitions.reindex(states, index_map),
-            accepting: self.accepting,
+            non_accepting: self.non_accepting.clone(),
             tag: self.tag.clone(),
         }
     }
