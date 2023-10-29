@@ -23,10 +23,13 @@ then
 fi
 
 # Update our workbench
-rustup update || :
-rustup toolchain install nightly || :
-rustup component add miri --toolchain nightly
-git submodule update --init --recursive --remote
+if [ -z "${GITHUB_REF}" ]
+then
+  rustup update || :
+  rustup toolchain install nightly || :
+  rustup component add miri --toolchain nightly
+  git submodule update --init --recursive --remote
+fi
 
 # Housekeeping
 cargo fmt --check
@@ -78,4 +81,7 @@ nix build
 grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
 
 # Print remaining `TODO`s
-grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e TODO || :
+if [ -z "${GITHUB_REF}" ]
+then
+  grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e TODO && exit 1 || :
+fi
