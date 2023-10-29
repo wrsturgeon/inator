@@ -41,7 +41,6 @@ pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
             },
             accepting: true,
             tag: BTreeSet::new(),
-            input_t: "()".to_owned(),
         }],
         initial: 0,
     };
