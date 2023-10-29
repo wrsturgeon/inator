@@ -15,7 +15,7 @@ impl ToSrc for Stack {
     }
 }
 
-pub fn main() -> io::Result<()> {
+fn main() -> Result<io::Result<()>, IllFormed<char, Stack, usize>> {
     let parser = empty::<char, Stack>();
 
     parser.determinize().unwrap().to_file("src/parser.rs")
