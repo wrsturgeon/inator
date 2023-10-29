@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{cmp::Ordering, num::NonZeroUsize};
+use core::{cmp::Ordering, mem, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -272,7 +272,20 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     #[inline]
     #[allow(clippy::missing_panics_doc)]
     pub fn sort(mut self) -> Nondeterministic<I, S> {
-        // FIXME: Remove all tags, associate them with the actual states, then sort and add back in later
+        let mut tag_map = BTreeMap::new();
+        for state in &mut self.states {
+            let untagged = State {
+                transitions: state.transitions.clone(),
+                accepting: state.accepting,
+                tag: BTreeSet::new(),
+            };
+            let tags = mem::replace(&mut state.tag, BTreeSet::new());
+            tag_map
+                .entry(untagged)
+                .or_insert(BTreeSet::new())
+                .extend(tags)
+        }
+        debug_assert!(self.states.iter().all(|s| s.tag.is_empty()));
 
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
