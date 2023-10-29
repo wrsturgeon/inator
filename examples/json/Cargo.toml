@@ -3,5 +3,9 @@ name = "json-inator"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+types = { path = "types" }
+
 [build-dependencies]
 inator = { path = "../.." }
+types = { path = "types" }

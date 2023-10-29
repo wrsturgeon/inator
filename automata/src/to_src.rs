@@ -164,12 +164,15 @@ impl<I: Input, S: Stack> Graph<I, S, usize> {
     #[allow(clippy::arithmetic_side_effects)] // <-- String concatenation with `+`
     pub fn to_src(&self) -> Result<String, IllFormed<I, S, usize>> {
         let input_t = I::src_type();
-        let output_t = self
-            .output_type()?
-            .unwrap_or_else(|| "::core::convert::Infallible".to_owned());
+        let output_t = self.output_type()?.unwrap_or_else(|| {
+            /* "core::convert::Infallible" */
+            "()".to_owned()
+        });
         let stack_t = S::src_type();
         Ok(format!(
-            r#"/// Descriptive parsing error.
+            r#"#![allow(dead_code, unused_variables)]
+
+/// Descriptive parsing error.
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {{
@@ -228,9 +231,10 @@ impl<I: Input, S: Stack> State<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     fn to_src(&self, i: usize) -> Result<String, IllFormed<I, S, usize>> {
-        let input_t = self
-            .input_type()?
-            .unwrap_or_else(|| "::core::convert::Infallible".to_owned());
+        let input_t = self.input_type()?.unwrap_or_else(|| {
+            /* "core::convert::Infallible" */
+            "()".to_owned()
+        });
         Ok(format!(
             r#"
 

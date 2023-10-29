@@ -3,21 +3,7 @@
 use inator::*;
 use std::io;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-enum Stack {}
-
-impl ToSrc for Stack {
-    #[inline]
-    fn to_src(&self) -> String {
-        todo!()
-    }
-    #[inline]
-    fn src_type() -> String {
-        "Stack".to_owned()
-    }
-}
-
-fn main() -> Result<io::Result<()>, IllFormed<char, Stack, usize>> {
+fn main() -> Result<io::Result<()>, IllFormed<char, types::Stack, usize>> {
     /*
     let ws = fixpoint("ws")
         >> (empty()
@@ -36,7 +22,7 @@ fn main() -> Result<io::Result<()>, IllFormed<char, Stack, usize>> {
         empty() | ((call('E', "start_exponent") | call('e', "start_exponent")) >> sign >> digits);
     */
 
-    let parser = empty::<char, Stack>();
+    let parser = empty::<char, types::Stack>();
 
     parser.determinize().unwrap().to_file("src/parser.rs")
 }
