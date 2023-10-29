@@ -83,19 +83,18 @@
     clippy::single_char_lifetime_names,
     clippy::std_instead_of_alloc,
     clippy::string_add,
+    clippy::unneeded_field_pattern,
     clippy::use_self,
     clippy::wildcard_imports,
     unused_macros, // <-- TODO: keep checking if we've used them <3
 )]
+#![allow(clippy::result_large_err)] // <-- TODO: this error actually makes sense; fix it
 
 /// Call a function that will also be available to the compiled parser.
 #[macro_export]
 macro_rules! update {
     ($ex:expr) => {
-        $crate::Update {
-            ptr: $ex,
-            src: stringify!($ex),
-        }
+        $crate::Update::_update_macro(stringify!($ex), $ex)
     };
 }
 
@@ -185,7 +184,6 @@ mod in_progress;
 mod input;
 mod map_indices;
 mod merge;
-mod output;
 mod range;
 mod range_map;
 mod run;
@@ -205,7 +203,6 @@ pub use {
     in_progress::{InProgress, InputError, ParseError},
     input::Input,
     merge::{merge, try_merge, Merge},
-    output::Output,
     range::Range,
     range_map::RangeMap,
     run::Run,

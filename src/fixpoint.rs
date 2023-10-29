@@ -14,17 +14,17 @@ use inator_automata::*;
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Fixpoint(String);
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> ops::Shr<Graph<I, S, O, C>> for Fixpoint {
-    type Output = Graph<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
+    type Output = Graph<I, S, C>;
     #[inline]
     #[allow(clippy::panic)]
-    fn shr(self, rhs: Graph<I, S, O, C>) -> Self::Output {
+    fn shr(self, rhs: Graph<I, S, C>) -> Self::Output {
         let Graph {
             mut states,
             initial,
         } = rhs;
         for r in initial.view() {
-            match r {
+            let _ = match r {
                 Ok(i) => get_mut!(states, i),
                 Err(tag) => find_tag_mut(&mut states, tag).map_or_else(
                     |_| {
@@ -38,7 +38,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> ops::Shr<Graph<I, S, O, C>
                 ),
             }
             .tag
-            .push(self.0.clone());
+            .insert(self.0.clone());
         }
         Graph { states, initial }
     }

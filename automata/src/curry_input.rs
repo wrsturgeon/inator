@@ -6,21 +6,21 @@
 
 //! Read the next input symbol and decide an action.
 
-use crate::{Ctrl, IllFormed, Input, Output, Range, RangeMap, Stack, Transition};
+use crate::{Ctrl, IllFormed, Input, Range, RangeMap, Stack, Transition};
 use core::{cmp, iter};
 use std::collections::BTreeMap;
 
 /// Read the next input symbol and decide an action.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Debug)]
-pub enum CurryInput<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
+pub enum CurryInput<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Throw away the input (without looking at it) and do this.
-    Wildcard(Transition<I, S, O, C>),
+    Wildcard(Transition<I, S, C>),
     /// Map specific ranges of inputs to actions.
-    Scrutinize(RangeMap<I, S, O, C>),
+    Scrutinize(RangeMap<I, S, C>),
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for CurryInput<I, S, C> {
     #[inline]
     fn clone(&self) -> Self {
         match *self {
@@ -30,9 +30,9 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for CurryInput<I, S,
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for CurryInput<I, S, O, C> {}
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for CurryInput<I, S, C> {}
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for CurryInput<I, S, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -44,7 +44,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for CurryInput<I
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for CurryInput<I, S, C> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
@@ -56,20 +56,20 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for CurryInput<I, S, O
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialOrd for CurryInput<I, S, C> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
     /// Look up a transition based on an input token.
     /// # Errors
     /// If multiple ranges fit an argument.
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, O, C>>, IllFormed<I, S, O, C>> {
+    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, C>>, IllFormed<I, S, C>> {
         match *self {
             Self::Wildcard(ref transition) => Ok(Some(transition)),
             Self::Scrutinize(ref range_map) => range_map.get(key),
@@ -88,14 +88,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
     pub fn disjoint(
         &self,
         other: &Self,
-    ) -> Result<
-        (),
-        (
-            Option<Range<I>>,
-            Transition<I, S, O, C>,
-            Transition<I, S, O, C>,
-        ),
-    > {
+    ) -> Result<(), (Option<Range<I>>, Transition<I, S, C>, Transition<I, S, C>)> {
         match (self, other) {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
             (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
@@ -112,7 +105,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, S, O, C>>> {
+    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, S, C>>> {
         match *self {
             Self::Wildcard(ref etc) => Box::new(iter::once(etc)),
             Self::Scrutinize(ref etc) => Box::new(etc.values()),

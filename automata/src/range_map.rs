@@ -6,7 +6,7 @@
 
 //! Map from ranges of keys to values.
 
-use crate::{Ctrl, IllFormed, Input, Output, Range, Stack, Transition};
+use crate::{Ctrl, IllFormed, Input, Range, Stack, Transition};
 use core::cmp;
 use std::collections::BTreeMap;
 
@@ -14,13 +14,13 @@ use std::collections::BTreeMap;
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
 #[derive(Debug, Default)]
-pub struct RangeMap<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
+pub struct RangeMap<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
-    pub entries: BTreeMap<Range<I>, Transition<I, S, O, C>>,
+    pub entries: BTreeMap<Range<I>, Transition<I, S, C>>,
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for RangeMap<I, S, C> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -29,33 +29,33 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Clone for RangeMap<I, S, O
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Eq for RangeMap<I, S, O, C> {}
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for RangeMap<I, S, C> {}
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialEq for RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for RangeMap<I, S, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.entries == other.entries
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Ord for RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for RangeMap<I, S, C> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.entries.cmp(&other.entries)
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> PartialOrd for RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialOrd for RangeMap<I, S, C> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
     /// Iterate over references to keys and values without consuming anything.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&Range<I>, &Transition<I, S, O, C>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Range<I>, &Transition<I, S, C>)> {
         self.entries.iter()
     }
 
@@ -68,7 +68,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
         clippy::unwrap_in_result,
         clippy::type_complexity
     )]
-    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, O, C>>, IllFormed<I, S, O, C>> {
+    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, C>>, IllFormed<I, S, C>> {
         let mut acc = None;
         for (range, transition) in &self.entries {
             if range.contains(key) {
@@ -93,7 +93,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     pub fn disjoint(
         &self,
         other: &Self,
-    ) -> Result<(), (Range<I>, Transition<I, S, O, C>, Transition<I, S, O, C>)> {
+    ) -> Result<(), (Range<I>, Transition<I, S, C>, Transition<I, S, C>)> {
         self.entries.iter().try_fold((), |(), (lk, lv)| {
             other.entries.iter().try_fold((), |(), (rk, rv)| {
                 rk.clone()
@@ -105,7 +105,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values(&self) -> impl Iterator<Item = &Transition<I, S, O, C>> {
+    pub fn values(&self) -> impl Iterator<Item = &Transition<I, S, C>> {
         self.entries.values()
     }
 
