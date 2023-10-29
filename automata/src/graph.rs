@@ -279,7 +279,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         for state in &mut self.states {
             let untagged = State {
                 transitions: state.transitions.clone(),
-                accepting: state.accepting,
+                non_accepting: state.non_accepting.clone(),
                 tag: BTreeSet::new(),
             };
             let tags = mem::take(&mut state.tag);

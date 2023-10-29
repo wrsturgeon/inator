@@ -792,7 +792,7 @@ mod reduced {
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
-                    accepting: false,
+                    non_accepting: Some(String::new()),
                     tag: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
@@ -805,7 +805,7 @@ mod reduced {
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                     State {
@@ -818,7 +818,7 @@ mod reduced {
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                 ],
@@ -840,7 +840,7 @@ mod reduced {
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
-                        accepting: true,
+                        non_accepting: None,
                         tag: BTreeSet::new(),
                     },
                     State {
@@ -849,7 +849,7 @@ mod reduced {
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
-                        accepting: true,
+                        non_accepting: None,
                         tag: iter::once(String::new()).collect(),
                     },
                     State {
@@ -864,7 +864,7 @@ mod reduced {
                             ))
                             .collect(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                     State {
@@ -881,7 +881,7 @@ mod reduced {
                             ))
                             .collect(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                     State {
@@ -898,7 +898,7 @@ mod reduced {
                             ))
                             .collect(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: iter::once(String::new()).collect(),
                     },
                     State {
@@ -915,7 +915,7 @@ mod reduced {
                             ))
                             .collect(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: iter::once("\0".to_owned()).collect(),
                     },
                     State {
@@ -930,7 +930,7 @@ mod reduced {
                             ))
                             .collect(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                     State {
@@ -945,7 +945,7 @@ mod reduced {
                             ))
                             .collect(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: iter::once(String::new()).collect(),
                     },
                     State {
@@ -958,7 +958,7 @@ mod reduced {
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                     State {
@@ -971,7 +971,7 @@ mod reduced {
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
-                        accepting: false,
+                        non_accepting: Some(String::new()),
                         tag: BTreeSet::new(),
                     },
                 ],
