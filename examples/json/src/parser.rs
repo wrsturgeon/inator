@@ -9,7 +9,7 @@ pub enum Error {
         /// Index of the token that caused this error.
         index: usize,
         /// Particular token that didn't correspond to a rule.
-        token: char,
+        token: u8,
     },
     /// Token that would have closed a delimiter, but the delimiter wasn't open.
     Unopened {
@@ -35,7 +35,7 @@ type R<I> = Result<(Option<(usize, types::Stack, Option<F<I>>)>, ()), Error>;
 struct F<I>(fn(&mut I, Option<types::Stack>, ()) -> R<I>);
 
 #[inline]
-pub fn parse<I: IntoIterator<Item = char>>(input: I) -> Result<(), Error> {
+pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
     match state_0(
         &mut input.into_iter().enumerate(),
         None,
@@ -52,7 +52,7 @@ pub fn parse<I: IntoIterator<Item = char>>(input: I) -> Result<(), Error> {
 }
 
 #[inline]
-fn state_0<I: Iterator<Item = (usize, char)>>(
+fn state_0<I: Iterator<Item = (usize, u8)>>(
     input: &mut I,
     context: Option<types::Stack>,
     acc: (),

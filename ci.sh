@@ -13,6 +13,7 @@ fi
 rustup update || :
 rustup toolchain install nightly || :
 rustup component add miri --toolchain nightly
+git submodule update --init --recursive --remote
 
 # Housekeeping
 cargo fmt --check
