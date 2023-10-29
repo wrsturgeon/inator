@@ -6,10 +6,10 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-use crate::{Input, Nondeterministic, Output, Stack};
+use crate::{Input, Nondeterministic, Stack};
 use core::ops;
 
-impl<I: Input, S: Stack, O: Output> ops::BitOr for Nondeterministic<I, S, O> {
+impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
     fn bitor(mut self, other: Self) -> Self {
@@ -29,7 +29,7 @@ impl<I: Input, S: Stack, O: Output> ops::BitOr for Nondeterministic<I, S, O> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> ops::BitAnd for Nondeterministic<I, S, O> {
+impl<I: Input, S: Stack> ops::BitAnd for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
     #[allow(clippy::todo, unused_mut, unused_variables)]

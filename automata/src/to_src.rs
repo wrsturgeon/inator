@@ -7,7 +7,8 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Graph, Input, Output, Range, RangeMap, Stack, State, Transition,
+    Action, CurryInput, CurryStack, Graph, IllFormed, Input, Range, RangeMap, Stack, State,
+    Transition,
 };
 use core::borrow::Borrow;
 use std::collections::BTreeSet;
@@ -155,16 +156,19 @@ impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> Graph<I, S, O, usize> {
+impl<I: Input, S: Stack> Graph<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
+    /// # Errors
+    /// If this automaton is ill-formed.
     #[inline]
-    #[must_use]
     #[allow(clippy::arithmetic_side_effects)] // <-- String concatenation with `+`
-    pub fn to_src(&self) -> String {
+    pub fn to_src(&self) -> Result<String, IllFormed<I, S, usize>> {
         let input_t = I::src_type();
-        let output_t = O::src_type();
+        let output_t = self
+            .output_type()?
+            .unwrap_or_else(|| "::core::convert::Infallible".to_owned());
         let stack_t = S::src_type();
-        format!(
+        Ok(format!(
             r#"/// Descriptive parsing error.
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
@@ -215,23 +219,24 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
             self.states
                 .iter()
                 .enumerate()
-                .fold(String::new(), |acc, (i, s)| acc + &s.to_src(i)),
-        )
+                .try_fold(String::new(), |acc, (i, s)| Ok(acc + &s.to_src(i)?))?,
+        ))
     }
 }
 
-impl<I: Input, S: Stack, O: Output> State<I, S, O, usize> {
+impl<I: Input, S: Stack> State<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
-    #[must_use]
-    fn to_src(&self, i: usize) -> String {
-        let output_t = O::src_type();
-        format!(
+    fn to_src(&self, i: usize) -> Result<String, IllFormed<I, S, usize>> {
+        let input_t = self
+            .input_type()?
+            .unwrap_or_else(|| "::core::convert::Infallible".to_owned());
+        Ok(format!(
             r#"
 
 
 #[inline]
-fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>, acc: {output_t}) -> R<I> {{
+fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>, acc: {input_t}) -> R<I> {{
     match input.next() {{
         None => {},
         Some((index, token)) => {},
@@ -245,11 +250,11 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
                 "Err(TODO_IMPLEMENTATION_DEFINED)"
             },
             self.transitions.to_src(),
-        )
+        ))
     }
 }
 
-impl<I: Input, S: Stack, O: Output> CurryStack<I, S, O, usize> {
+impl<I: Input, S: Stack> CurryStack<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
@@ -276,7 +281,7 @@ impl<I: Input, S: Stack, O: Output> CurryStack<I, S, O, usize> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> CurryInput<I, S, O, usize> {
+impl<I: Input, S: Stack> CurryInput<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
@@ -296,7 +301,7 @@ impl<I: Input, S: Stack, O: Output> CurryInput<I, S, O, usize> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
+impl<I: Input, S: Stack> RangeMap<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
@@ -316,7 +321,7 @@ impl<I: Input, S: Stack, O: Output> RangeMap<I, S, O, usize> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output> Transition<I, S, O, usize> {
+impl<I: Input, S: Stack> Transition<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]

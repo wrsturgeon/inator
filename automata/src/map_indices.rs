@@ -6,11 +6,9 @@
 
 //! Apply a function to each index in a structure.
 
-use crate::{
-    Ctrl, CurryInput, CurryStack, Graph, Input, Output, RangeMap, Stack, State, Transition,
-};
+use crate::{Ctrl, CurryInput, CurryStack, Graph, Input, RangeMap, Stack, State, Transition};
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -26,7 +24,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Graph<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> State<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -38,7 +36,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> State<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -55,7 +53,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryStack<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -67,7 +65,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> CurryInput<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -82,7 +80,7 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> RangeMap<I, S, O, C> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Transition<I, S, O, C> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Transition<I, S, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]

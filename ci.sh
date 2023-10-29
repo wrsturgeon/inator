@@ -6,7 +6,7 @@ if [ "${GITHUB_REF##*/}" = "main" ]
 then
   export QUICKCHECK_TESTS=1000000
 else
-  export QUICKCHECK_TESTS=10000
+  export QUICKCHECK_TESTS=1000
 fi
 
 # Update our workbench

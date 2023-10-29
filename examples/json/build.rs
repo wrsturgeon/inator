@@ -1,8 +1,23 @@
 //! Matches the specification from <https://www.json.org/json-en.html> almost word-for-word.
 
+use inator::*;
 use std::io;
 
-fn main() -> io::Result<()> {
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum Stack {}
+
+impl ToSrc for Stack {
+    #[inline]
+    fn to_src(&self) -> String {
+        todo!()
+    }
+    #[inline]
+    fn src_type() -> String {
+        "Stack".to_owned()
+    }
+}
+
+fn main() -> Result<io::Result<()>, IllFormed<char, Stack, usize>> {
     /*
     let ws = fixpoint("ws")
         >> (empty()
@@ -21,5 +36,7 @@ fn main() -> io::Result<()> {
         empty() | ((call('E', "start_exponent") | call('e', "start_exponent")) >> sign >> digits);
     */
 
-    Ok(())
+    let parser = empty::<char, Stack>();
+
+    parser.determinize().unwrap().to_file("src/parser.rs")
 }

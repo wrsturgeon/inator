@@ -11,33 +11,21 @@ use core::{fmt, iter, mem};
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
-pub struct InProgress<
-    'graph,
-    I: Input,
-    S: Stack,
-    O: Output,
-    C: Ctrl<I, S, O>,
-    In: Iterator<Item = I>,
-> {
+pub struct InProgress<'graph, I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> {
     /// Reference to the graph we're riding.
-    pub graph: &'graph Graph<I, S, O, C>,
+    pub graph: &'graph Graph<I, S, C>,
     /// Iterator over input tokens.
     pub input: In,
     /// Internal stack.
     pub stack: Vec<S>,
     /// Internal state.
     pub ctrl: C,
-    /// Output accumulator.
-    pub output: mem::MaybeUninit<O>,
+    /// Output type as we go.
+    pub output_t: String,
 }
 
-impl<
-        I: Input,
-        S: fmt::Debug + Stack,
-        O: fmt::Debug + Output,
-        C: Ctrl<I, S, O>,
-        In: Iterator<Item = I>,
-    > fmt::Debug for InProgress<'_, I, S, O, C, In>
+impl<I: Input, S: fmt::Debug + Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> fmt::Debug
+    for InProgress<'_, I, S, C, In>
 {
     #[inline]
     #[allow(unsafe_code)]
@@ -47,8 +35,7 @@ impl<
             "In progress: {:?} @ {:?} -> {:?}",
             self.stack,
             self.ctrl.view().collect::<Vec<_>>(),
-            // SAFETY: Never uninitialized except inside one function (and initialized before it exits).
-            unsafe { self.output.assume_init_ref() },
+            self.output_t,
         )
     }
 }
@@ -70,35 +57,31 @@ pub enum InputError {
 /// Either the parser intentionally rejected the input or the parser was broken.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ParseError<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> {
+pub enum ParseError<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Input intentionally rejected by a parser without anything going wrong internally.
     BadInput(InputError),
     /// Parser was broken.
-    BadParser(IllFormed<I, S, O, C>),
+    BadParser(IllFormed<I, S, C>),
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>, In: Iterator<Item = I>> Iterator
-    for InProgress<'_, I, S, O, C, In>
+impl<I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> Iterator
+    for InProgress<'_, I, S, C, In>
 {
-    type Item = Result<I, ParseError<I, S, O, C>>;
+    type Item = Result<I, ParseError<I, S, C>>;
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let maybe_token = self.input.next();
         let (c, o) = match step(
             self.graph,
             &self.ctrl,
-            maybe_token.as_ref(),
+            maybe_token.clone(),
             &mut self.stack,
-            #[allow(unsafe_code)]
-            // SAFETY: All good: nowhere else uninitialized and initialized later in this function.
-            unsafe {
-                mem::replace(&mut self.output, mem::MaybeUninit::uninit()).assume_init()
-            },
+            &self.output_t,
         ) {
             Ok(ok) => ok,
             Err(e) => return Some(Err(e)),
         };
-        let _ = self.output.write(o);
+        self.output_t = o;
         self.ctrl = c?;
         maybe_token.map(Ok) // <-- Propagate the iterator's input
     }
@@ -107,13 +90,13 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>, In: Iterator<Item = I>> It
 /// Act on the automaton graph in response to one input token.
 #[inline]
 #[allow(clippy::type_complexity)]
-fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
-    graph: &Graph<I, S, O, C>,
+fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
+    graph: &Graph<I, S, C>,
     ctrl: &C,
-    maybe_token: Option<&I>,
+    maybe_token: Option<I>,
     stack: &mut Vec<S>,
-    output: O,
-) -> Result<(Option<C>, O), ParseError<I, S, O, C>> {
+    output_t: &str,
+) -> Result<(Option<C>, String), ParseError<I, S, C>> {
     ctrl.view().try_fold((), |(), r| match r {
         Ok(i) => {
             if graph.states.get(i).is_none() {
@@ -133,7 +116,7 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
             if states.any(|s| s.accepting) {
-                Ok((None, output))
+                Ok((None, output_t.to_owned()))
             } else {
                 Err(ParseError::BadInput(InputError::NotAccepting))
             }
@@ -142,7 +125,7 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
         };
     };
     let maybe_stack_top = stack.last();
-    let transitions = states.filter_map(|s| match s.transitions.get(maybe_stack_top, token) {
+    let transitions = states.filter_map(|s| match s.transitions.get(maybe_stack_top, &token) {
         Err(e) => Some(Err(e)),
         Ok(opt) => opt.map(Ok),
     });
@@ -150,10 +133,13 @@ fn step<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>>(
         r.map_or_else(
             |e| Err(ParseError::BadParser(e)),
             |mega_transition| {
-                mega_transition.invoke(token, stack, output).map_or(
-                    Err(ParseError::BadInput(InputError::Unopened)),
-                    |(c, out)| Ok((Some(c), out)),
-                )
+                mega_transition
+                    .invoke(stack, output_t)
+                    .map_err(ParseError::BadParser)?
+                    .map_or(
+                        Err(ParseError::BadInput(InputError::Unopened)),
+                        |(c, out)| Ok((Some(c), out)),
+                    )
             },
         )
     })

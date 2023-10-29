@@ -4,6 +4,7 @@ use inator_automata::{
     ToSrc, Transition,
 };
 use rand::{thread_rng, RngCore};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Symbol {
@@ -24,7 +25,7 @@ impl ToSrc for Symbol {
 }
 
 /// Very manually constructed parser recognizing only valid parentheses.
-fn parser() -> Deterministic<char, Symbol, ()> {
+fn parser() -> Deterministic<char, Symbol> {
     Graph {
         states: vec![State {
             transitions: CurryStack {
@@ -57,7 +58,7 @@ fn parser() -> Deterministic<char, Symbol, ()> {
                 .collect(),
             },
             accepting: true,
-            tag: vec![],
+            tag: BTreeSet::new(),
         }],
         initial: 0,
     }
@@ -143,5 +144,5 @@ pub fn main() {
     }
 
     // Print the Rust source representation of this parser
-    println!("{}", parser.to_src());
+    println!("{}", parser.to_src().unwrap());
 }

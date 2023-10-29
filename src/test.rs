@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use inator_automata::*;
+use crate::*;
 
 mod unit {
     use super::*;
@@ -13,5 +13,17 @@ mod unit {
     fn simple_recursion() {
         let nd = fixpoint("start") >> (empty() | (toss('a') >> recurse("start")));
         let d = nd.determinize().unwrap();
+    }
+}
+
+#[cfg(feature = "quickcheck")]
+mod prop {
+    use super::*;
+    use quickcheck::*;
+
+    quickcheck! {
+        fn prop_empty(input: Vec<u8>) -> bool {
+            input.is_empty() == empty::<u8, u8>().accept(input).is_ok()
+        }
     }
 }

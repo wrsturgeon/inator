@@ -7,8 +7,8 @@
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
 use crate::{
-    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Output, Range,
-    RangeMap, Stack, State, Transition, Update,
+    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Range, RangeMap,
+    Stack, State, Transition, Update,
 };
 use core::convert::Infallible;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
@@ -71,7 +71,7 @@ impl Merge for usize {
     }
 }
 
-impl Merge for BTreeSet<Result<usize, String>> {
+impl<T: Ord> Merge for BTreeSet<T> {
     type Error = CtrlMergeConflict;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
@@ -80,10 +80,8 @@ impl Merge for BTreeSet<Result<usize, String>> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
-    for BTreeMap<Range<I>, Transition<I, S, O, C>>
-{
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for BTreeMap<Range<I>, Transition<I, S, C>> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
         for (k, v) in other {
@@ -99,8 +97,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for State<I, S, O, C> {
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     #[allow(clippy::unwrap_in_result)]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
@@ -121,8 +119,8 @@ impl<T> Merge for Vec<T> {
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryStack<I, S, O, C> {
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryStack<I, S, C> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -139,8 +137,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryStack<I, S,
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryInput<I, S, O, C> {
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryInput<I, S, C> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         match (self, other) {
@@ -161,10 +159,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for CurryInput<I, S,
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
-    for BTreeMap<S, CurryInput<I, S, O, C>>
-{
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for BTreeMap<S, CurryInput<I, S, C>> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     #[allow(clippy::wildcard_enum_match_arm)]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
@@ -197,8 +193,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for RangeMap<I, S, O, C> {
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for RangeMap<I, S, C> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -207,8 +203,8 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for RangeMap<I, S, O
     }
 }
 
-impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for Transition<I, S, O, C> {
-    type Error = IllFormed<I, S, O, C>;
+impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for Transition<I, S, C> {
+    type Error = IllFormed<I, S, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -224,14 +220,15 @@ impl<I: Input, S: Stack, O: Output, C: Ctrl<I, S, O>> Merge for Transition<I, S,
                 .map_err(|(a, b): (Action<S>, Action<S>)| {
                     IllFormed::IncompatibleStackActions(a, b)
                 })?,
-            update: self.update.merge(other.update).map_err(
-                |(a, b): (Update<I, O>, Update<I, O>)| IllFormed::IncompatibleCallbacks(a, b),
-            )?,
+            update: self
+                .update
+                .merge(other.update)
+                .map_err(|(a, b): (Update<I>, Update<I>)| IllFormed::IncompatibleCallbacks(a, b))?,
         })
     }
 }
 
-impl<I: Input, O: Output> Merge for Update<I, O> {
+impl<I: Input> Merge for Update<I> {
     type Error = (Self, Self);
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
