@@ -166,7 +166,7 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
                 map_none: None,
                 map_some: BTreeMap::new(),
             },
-            non_accepting: None,
+            non_accepting: vec![],
             tag: BTreeSet::new(),
         }],
         initial: iter::once(Ok(0)).collect(),

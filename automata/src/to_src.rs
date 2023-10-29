@@ -256,9 +256,14 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
 }}"#,
             I::src_type(),
             S::src_type(),
-            self.non_accepting.as_ref().map_or_else(
+            self.non_accepting.first().map_or_else(
                 || "Ok((None, acc))".to_owned(),
-                |msg| format!("Err(Error::UserDefined {{ message: \"{msg}\" }})")
+                |fst| {
+                    get!(self.non_accepting, 1..).iter().fold(
+                        format!("Err(Error::UserDefined {{ messages: vec![{fst}"),
+                        |acc, msg| format!("{acc}, {msg}"),
+                    ) + "] }})"
+                }
             ),
             self.transitions.to_src(),
         ))

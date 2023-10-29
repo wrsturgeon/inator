@@ -101,10 +101,15 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
     type Error = IllFormed<I, S, C>;
     #[inline]
     #[allow(clippy::unwrap_in_result)]
-    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+    fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
             transitions: self.transitions.merge(other.transitions)?,
-            non_accepting: other.non_accepting.and(self.non_accepting),
+            non_accepting: if self.non_accepting.is_empty() || other.non_accepting.is_empty() {
+                vec![]
+            } else {
+                self.non_accepting.extend(other.non_accepting);
+                self.non_accepting
+            },
             tag: unwrap!(self.tag.merge(other.tag)),
         })
     }
