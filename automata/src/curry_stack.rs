@@ -94,8 +94,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
                     |(possibility_1, possibility_2)| IllFormed::WildcardMask {
                         arg_stack: stack.cloned(),
                         arg_token: Some(Range::unit(token.clone())),
-                        possibility_1,
-                        possibility_2,
+                        possibility_1: Box::new(possibility_1),
+                        possibility_2: Box::new(possibility_2),
                     },
                 )
             })

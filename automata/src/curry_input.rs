@@ -84,7 +84,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
     /// - `Some(range)`: Conflict on at least this range of values,
     ///   which is an intersection of two offending ranges.
     #[inline]
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::result_large_err, clippy::type_complexity)]
     pub fn disjoint(
         &self,
         other: &Self,

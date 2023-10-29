@@ -84,11 +84,11 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
     /// Convert the control parameter from `usize` to anything else.
     #[inline]
     #[must_use]
-    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> Transition<I, S, C> {
-        Transition {
+    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> Box<Transition<I, S, C>> {
+        Box::new(Transition {
             dst: C::from_usize(self.dst),
             act: self.act,
             update: self.update,
-        }
+        })
     }
 }

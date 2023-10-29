@@ -9,8 +9,64 @@
 use crate::{
     Action, Ctrl, CurryInput, CurryStack, Input, Range, RangeMap, Stack, State, Transition, Update,
 };
-use core::num::NonZeroUsize;
+use core::{mem, num::NonZeroUsize};
 use std::collections::BTreeSet;
+
+/// Maximum size we're willing to tolerate in an `Err` variant (for performance reasons).
+const _MAX_ILL_FORMED_BYTES: usize = 64;
+/// Check that the above holds by throwing a compile-time out-of-bounds error if it doesn't.
+#[allow(clippy::indexing_slicing)] // <-- that's the point
+const _: () = [(); _MAX_ILL_FORMED_BYTES][mem::size_of::<IllFormed<(), (), usize>>()];
+
+/*
+print-type-size type: `check::IllFormed<(), (), usize>`: 136 bytes, alignment: 8 bytes
+print-type-size     discriminant: 1 bytes
+print-type-size     variant `IncompatibleCallbacks`: 135 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 64 bytes, alignment: 8 bytes
+print-type-size         field `.1`: 64 bytes
+print-type-size     variant `TypeMismatch`: 55 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
+print-type-size         field `.1`: 24 bytes
+print-type-size     variant `WrongReturnType`: 55 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
+print-type-size         field `.1`: 24 bytes
+print-type-size     variant `TagDNE`: 31 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
+print-type-size     variant `DuplicateTag`: 31 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
+print-type-size     variant `InitialNotUnit`: 31 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
+print-type-size     variant `WildcardMask`: 23 bytes
+print-type-size         field `.arg_stack`: 1 bytes
+print-type-size         field `.arg_token`: 1 bytes
+print-type-size         padding: 5 bytes
+print-type-size         field `.possibility_1`: 8 bytes, alignment: 8 bytes
+print-type-size         field `.possibility_2`: 8 bytes
+print-type-size     variant `Superposition`: 23 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 8 bytes, alignment: 8 bytes
+print-type-size         field `.1`: 8 bytes
+print-type-size     variant `OutOfBounds`: 15 bytes
+print-type-size         padding: 7 bytes
+print-type-size         field `.0`: 8 bytes, alignment: 8 bytes
+print-type-size     variant `IncompatibleStackActions`: 2 bytes
+print-type-size         field `.0`: 1 bytes
+print-type-size         field `.1`: 1 bytes
+print-type-size     variant `ProlongingDeath`: 0 bytes
+print-type-size     variant `InvertedRange`: 0 bytes
+print-type-size         field `.0`: 0 bytes
+print-type-size         field `.1`: 0 bytes
+print-type-size     variant `RangeMapOverlap`: 0 bytes
+print-type-size         field `.0`: 0 bytes
+print-type-size     variant `DuplicateState`: 0 bytes
+print-type-size     variant `UnsortedStates`: 0 bytes
+*/
 
 /// Witness to an ill-formed automaton (or part thereof).
 #[non_exhaustive]
@@ -31,16 +87,16 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
         /// Input token (or range thereof) that could be ambiguous.
         arg_token: Option<Range<I>>,
         /// First output possibility.
-        possibility_1: Transition<I, S, C>,
+        possibility_1: Box<Transition<I, S, C>>,
         /// Second output possibility.
-        possibility_2: Transition<I, S, C>,
+        possibility_2: Box<Transition<I, S, C>>,
     },
     /// Can't go to two different (deterministic) states at the same time.
     Superposition(usize, usize),
     /// Can't e.g. push and pop from the stack at the same time.
     IncompatibleStackActions(Action<S>, Action<S>),
     /// Can't call two different functions on half-constructed outputs at the same time.
-    IncompatibleCallbacks(Update<I>, Update<I>),
+    IncompatibleCallbacks(Box<Update<I>>, Box<Update<I>>),
     /// Two identical states at different indices.
     DuplicateState,
     /// States out of sorted order in memory.
@@ -136,8 +192,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryStack<I, S, C> {
                         IllFormed::WildcardMask {
                             arg_stack: Some(key.clone()),
                             arg_token,
-                            possibility_1,
-                            possibility_2,
+                            possibility_1: Box::new(possibility_1),
+                            possibility_2: Box::new(possibility_2),
                         }
                     })?;
             }
@@ -147,8 +203,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryStack<I, S, C> {
                         IllFormed::WildcardMask {
                             arg_stack: None,
                             arg_token,
-                            possibility_1,
-                            possibility_2,
+                            possibility_1: Box::new(possibility_1),
+                            possibility_2: Box::new(possibility_2),
                         }
                     })?;
             }

@@ -89,7 +89,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
     /// # Errors
     /// If there are keys in common, don't panic: instead, return them.
     #[inline]
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::result_large_err, clippy::type_complexity)]
     pub fn disjoint(
         &self,
         other: &Self,
