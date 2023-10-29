@@ -315,18 +315,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 ..s.reindex(&self.states, &index_map)
             })
             .collect();
-        Graph { states, initial }.resort()
-    }
-}
-
-impl<I: Input, S: Stack> Nondeterministic<I, S> {
-    /// Change nothing about the semantics but sort the internal vector of states.
-    #[inline]
-    fn resort(self) -> Self {
-        if self.check_sorted().is_ok() {
-            return self;
+        let mut out = Graph { states, initial };
+        while out.check_sorted().is_err() {
+            out = out.sort();
         }
-        self.sort()
+        out
     }
 }
 
