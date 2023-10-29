@@ -185,15 +185,15 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                non_accepting: None,
+                non_accepting: vec![],
                 tag: BTreeSet::new(),
             },
             State {
-                non_accepting: Some(format!(
+                non_accepting: vec![format!(
                     "Expected only a single token on [{}..={}] but got another token after it",
                     range.first.to_src(),
                     range.last.to_src(),
-                )),
+                )],
                 transitions: CurryStack {
                     wildcard: Some(CurryInput::Scrutinize(RangeMap {
                         entries: iter::once((
