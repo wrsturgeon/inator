@@ -171,7 +171,9 @@ impl<I: Input, S: Stack> Graph<I, S, usize> {
         });
         let stack_t = S::src_type();
         Ok(format!(
-            r#"#![allow(dead_code, unused_variables)]
+            r#"//! Automatically generated with [inator](https://crates.io/crates/inator).
+
+#![allow(dead_code, unused_variables)]
 
 /// Descriptive parsing error.
 #[allow(dead_code)]
@@ -212,7 +214,7 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
     match state_{}(
         &mut input.into_iter().enumerate(),
         None,
-        <{output_t} as Default>::default(),
+        Default::default(),
     )? {{
         (None, out) => Ok(out),
         (Some((index, context, None)), out) => panic!("Some(({{index:?}}, {{context:?}}, None))"),

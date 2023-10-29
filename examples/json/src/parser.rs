@@ -1,3 +1,5 @@
+//! Automatically generated with [inator](https://crates.io/crates/inator).
+
 #![allow(dead_code, unused_variables)]
 
 /// Descriptive parsing error.
@@ -36,11 +38,7 @@ struct F<I>(fn(&mut I, Option<types::Stack>, ()) -> R<I>);
 
 #[inline]
 pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
-    match state_0(
-        &mut input.into_iter().enumerate(),
-        None,
-        <() as Default>::default(),
-    )? {
+    match state_1(&mut input.into_iter().enumerate(), None, Default::default())? {
         (None, out) => Ok(out),
         (Some((index, context, None)), out) => panic!("Some(({index:?}, {context:?}, None))"),
         (Some((index, delimiter, Some(F(_)))), _) => Err(Error::Unopened {
@@ -60,6 +58,40 @@ fn state_0<I: Iterator<Item = (usize, u8)>>(
     match input.next() {
         None => Ok((None, acc)),
         Some((index, token)) => match (&context, &token) {
+            _ => Err(Error::Absurd { index, token }),
+        },
+    }
+}
+
+#[inline]
+fn state_1<I: Iterator<Item = (usize, u8)>>(
+    input: &mut I,
+    context: Option<types::Stack>,
+    acc: (),
+) -> R<I> {
+    match input.next() {
+        None => Err(TODO_IMPLEMENTATION_DEFINED),
+        Some((index, token)) => match (&context, &token) {
+            (&_, &(b'\t'..=b'\t')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (Some((_, _, None)), acc) => Ok(acc),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
+            (&_, &(b'\n'..=b'\n')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (Some((_, _, None)), acc) => Ok(acc),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
+            (&_, &(b'\r'..=b'\r')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (Some((_, _, None)), acc) => Ok(acc),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
+            (&_, &(b' '..=b' ')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (Some((_, _, None)), acc) => Ok(acc),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
             _ => Err(Error::Absurd { index, token }),
         },
     }
