@@ -26,6 +26,8 @@ pub type Deterministic<I, S> = Graph<I, S, usize>;
 /// if any of these transitions eventually accept, the whole thing accepts.
 pub type Nondeterministic<I, S> = Graph<I, S, BTreeSet<Result<usize, String>>>;
 
+// TODO: make `states` a `BTreeSet`.
+
 /// Automaton loosely based on visibly pushdown automata.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Debug)]

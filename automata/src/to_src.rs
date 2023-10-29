@@ -53,7 +53,8 @@ impl ToSrc for u8 {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        format!("{self}")
+        // format!("{self}")
+        format!("b'{}'", self.escape_ascii())
     }
     #[inline]
     #[must_use]

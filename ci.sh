@@ -1,12 +1,25 @@
 #!/usr/bin/env sh
 
-set -eux
+set -ex # `-u` set below
 
-if [ "${GITHUB_REF##*/}" = "main" ]
+if [ -z "${QUICKCHECK_TESTS}" ]
+  then
+  if [ "${GITHUB_REF##*/}" = "main" ]
+  then
+    export QUICKCHECK_TESTS=1000000
+  else
+    export QUICKCHECK_TESTS=1000
+  fi
+fi
+
+set -u
+
+# Recurse on the automata library
+if [ -d automata ]
 then
-  export QUICKCHECK_TESTS=1000000
-else
-  export QUICKCHECK_TESTS=1000
+  cd automata
+  ../ci.sh
+  cd ..
 fi
 
 # Update our workbench
@@ -60,14 +73,6 @@ done
 # Nix build status
 git add -A
 nix build
-
-# Recurse on the automata library
-if [ -d automata ]
-then
-  cd automata
-  ../ci.sh
-  cd ..
-fi
 
 # Check for remaining `FIXME`s
 grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
