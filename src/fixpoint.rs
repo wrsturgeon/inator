@@ -41,11 +41,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
                     },
                 ),
             }
-// <<<<<<< dev
-// =======
-//             .tag
-//             .insert(self.0.clone());
-// >>>>>>> main
+            // <<<<<<< dev
+            // =======
+            //             .tag
+            //             .insert(self.0.clone());
+            // >>>>>>> main
         }
         Graph { states, initial }
     }

@@ -147,8 +147,8 @@ mod test;
 
 pub use {
     fixpoint::{fixpoint, Fixpoint},
-    recurse::{recurse, Recurse},
     inator_automata::*,
+    recurse::{recurse, Recurse},
 };
 
 use core::iter;
