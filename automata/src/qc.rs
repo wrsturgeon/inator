@@ -151,11 +151,15 @@ macro_rules! shrink_only {
 }
 
 shrink_only!(|self: &State| Box::new(
-    (self.transitions.clone(), self.accepting, self.tag.clone())
+    (
+        self.transitions.clone(),
+        self.non_accepting.clone(),
+        self.tag.clone()
+    )
         .shrink()
-        .map(|(transitions, accepting, tag)| Self {
+        .map(|(transitions, non_accepting, tag)| Self {
             transitions,
-            accepting,
+            non_accepting,
             tag,
         })
 ));
@@ -200,7 +204,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
     pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
-            accepting: bool::arbitrary(g),
+            non_accepting: Option::arbitrary(g),
             tag: BTreeSet::arbitrary(g),
         }
     }

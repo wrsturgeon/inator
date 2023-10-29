@@ -17,7 +17,7 @@ pub struct State<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Map from input tokens to actions.
     pub transitions: CurryStack<I, S, C>,
     /// If input ends while in this state, should we accept?
-    pub accepting: bool,
+    pub non_accepting: Option<String>,
     /// Optional name for this state.
     pub tag: BTreeSet<String>,
 }
@@ -51,7 +51,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for State<I, S, C> {
     fn clone(&self) -> Self {
         Self {
             transitions: self.transitions.clone(),
-            accepting: self.accepting,
+            non_accepting: self.non_accepting.clone(),
             tag: self.tag.clone(),
         }
     }
@@ -62,7 +62,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for State<I, S, C> {}
 impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for State<I, S, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.accepting == other.accepting
+        self.non_accepting == other.non_accepting
             && self.transitions == other.transitions
             && self.tag == other.tag
     }
@@ -73,7 +73,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for State<I, S, C> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.transitions
             .cmp(&other.transitions)
-            .then_with(|| self.accepting.cmp(&other.accepting))
+            .then_with(|| self.non_accepting.cmp(&other.non_accepting))
             .then_with(|| self.tag.cmp(&other.tag))
     }
 }

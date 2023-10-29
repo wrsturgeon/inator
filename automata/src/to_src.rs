@@ -251,11 +251,9 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
 }}"#,
             I::src_type(),
             S::src_type(),
-            if self.accepting {
-                "Ok((None, acc))"
-            } else {
-                "Err(TODO_IMPLEMENTATION_DEFINED)"
-            },
+            self.non_accepting
+                .as_ref()
+                .map_or_else(|| "Ok((None, acc))".to_owned(), |msg| format!("Err({msg})")),
             self.transitions.to_src(),
         ))
     }

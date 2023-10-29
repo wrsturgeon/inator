@@ -115,7 +115,7 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
     });
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
-            if states.any(|s| s.accepting) {
+            if states.any(|s| s.non_accepting.is_none()) {
                 Ok((None, output_t.to_owned()))
             } else {
                 Err(ParseError::BadInput(InputError::NotAccepting))
