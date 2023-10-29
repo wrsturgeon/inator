@@ -85,10 +85,8 @@
     clippy::string_add,
     clippy::unneeded_field_pattern,
     clippy::use_self,
-    clippy::wildcard_imports,
-    unused_macros, // <-- TODO: keep checking if we've used them <3
+    clippy::wildcard_imports
 )]
-#![allow(clippy::result_large_err)] // <-- TODO: this error actually makes sense; fix it
 
 /// Call a function that will also be available to the compiled parser.
 #[macro_export]
@@ -152,26 +150,6 @@ macro_rules! get {
         result
     }};
 }
-
-/*
-/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
-#[cfg(any(debug_assertions, test))]
-macro_rules! get_mut {
-    ($expr:expr, $index:expr) => {
-        $expr.get_mut($index).unwrap()
-    };
-}
-
-/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
-#[cfg(not(any(debug_assertions, test)))]
-macro_rules! get_mut {
-    ($expr:expr, $index:expr) => {{
-        #[allow(unsafe_code, unused_unsafe)]
-        let result = unsafe { $expr.get_unchecked_mut($index) };
-        result
-    }};
-}
-*/
 
 mod action;
 mod check;

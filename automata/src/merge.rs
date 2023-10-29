@@ -223,7 +223,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for Transition<I, S, C> {
             update: self
                 .update
                 .merge(other.update)
-                .map_err(|(a, b): (Update<I>, Update<I>)| IllFormed::IncompatibleCallbacks(a, b))?,
+                .map_err(|(a, b): (Update<I>, Update<I>)| {
+                    IllFormed::IncompatibleCallbacks(Box::new(a), Box::new(b))
+                })?,
         })
     }
 }
