@@ -203,7 +203,7 @@ pub enum Error {{
         delimiter: {stack_t},
     }},
     /// Ended on a user-defined non-accepting state.
-    NonAcceptingState {{
+    UserDefined {{
         /// User-defined error message.
         message: &'static str,
     }},
@@ -258,7 +258,7 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
             S::src_type(),
             self.non_accepting.as_ref().map_or_else(
                 || "Ok((None, acc))".to_owned(),
-                |msg| format!("Err(Error::NonAcceptingState {{ message: \"{msg}\" }})")
+                |msg| format!("Err(Error::UserDefined {{ message: \"{msg}\" }})")
             ),
             self.transitions.to_src(),
         ))

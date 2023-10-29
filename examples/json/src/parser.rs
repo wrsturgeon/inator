@@ -30,7 +30,7 @@ pub enum Error {
         delimiter: types::Stack,
     },
     /// Ended on a user-defined non-accepting state.
-    NonAcceptingState {
+    UserDefined {
         /// User-defined error message.
         message: &'static str,
     },
@@ -75,7 +75,7 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
     acc: (),
 ) -> R<I> {
     match input.next() {
-        None => Err(Error::NonAcceptingState {
+        None => Err(Error::UserDefined {
             message:
                 "Expected only a single token on [b'\t'..=b'\t'] but got another token after it",
         }),

@@ -29,6 +29,11 @@ pub enum Error {
         /// Type of thing that wasn't closed (e.g. parentheses).
         delimiter: symbols::Symbol,
     },
+    /// Ended on a user-defined non-accepting state.
+    UserDefined {
+        /// User-defined error message.
+        message: &'static str,
+    },
 }
 
 type R<I> = Result<(Option<(usize, symbols::Symbol, Option<F<I>>)>, ()), Error>;
