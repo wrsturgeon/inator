@@ -23,16 +23,10 @@ then
 fi
 
 # Update our workbench
-set +u
-if [ -z "${GITHUB_REF}" ]
-then
-  set -u
-  rustup update || :
-  rustup toolchain install nightly || :
-  rustup component add miri --toolchain nightly
-  git submodule update --init --recursive --remote
-fi
-set -u
+rustup update || :
+rustup toolchain install nightly || :
+rustup component add miri --toolchain nightly
+git submodule update --init --recursive --remote
 
 # Housekeeping
 cargo fmt --check
