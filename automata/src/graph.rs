@@ -121,12 +121,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             drop(r?);
         }
         for r in run.ctrl.view() {
-            if (match r {
+            if match r {
                 Ok(i) => get!(self.states, i),
                 Err(s) => find_tag(&self.states, s).map_err(ParseError::BadParser)?,
-            })
+            }
             .non_accepting
-            .is_none()
+            .is_empty()
             {
                 return Ok(run.output_t);
             }
@@ -204,7 +204,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                non_accepting: Some("Unexpected token".to_owned()),
+                non_accepting: vec!["Unexpected token".to_owned()],
                 tag: BTreeSet::new(),
             },
             // If they successfully merged, return the merged state
@@ -238,7 +238,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         self.states
             .iter()
             .try_fold(None, |acc: Option<String>, state| {
-                if state.non_accepting.is_none() {
+                if state.non_accepting.is_empty() {
                     acc.map_or_else(
                         || state.input_type(),
                         |t| {

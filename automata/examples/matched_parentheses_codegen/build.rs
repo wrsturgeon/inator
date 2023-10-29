@@ -39,7 +39,7 @@ pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
                 ))
                 .collect(),
             },
-            non_accepting: None,
+            non_accepting: vec![],
             tag: BTreeSet::new(),
         }],
         initial: 0,
