@@ -186,6 +186,7 @@ mod map_indices;
 mod merge;
 mod range;
 mod range_map;
+mod reindex;
 mod run;
 mod stack;
 mod state;

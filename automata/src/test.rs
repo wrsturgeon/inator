@@ -208,18 +208,18 @@ mod prop {
         // Determinization takes exactly as long as checking if determinzation will succeed,
         // and determinization is the only way to check a priori for runtime errors.
         // fn check_implies_no_runtime_errors(
-        //     nd: Nondeterministic<u8, u8, >,
+        //     nd: Nondeterministic<u8, u8>,
         //     input: Vec<u8>
         // ) -> bool {
         //     !matches!(nd.accept(input), Err(ParseError::BadParser(..)))
         // }
         //
-        // fn check_implies_determinize(nd: Nondeterministic<u8, u8, >) -> bool {
+        // fn check_implies_determinize(nd: Nondeterministic<u8, u8>) -> bool {
         //     nd.determinize().is_ok()
         // }
 
         fn determinize_implies_no_runtime_errors(
-            nd: Nondeterministic<u8, u8, >,
+            nd: Nondeterministic<u8, u8>,
             input: Vec<u8>
         ) -> bool {
             let Ok(d) = nd.determinize() else {
@@ -229,19 +229,19 @@ mod prop {
         }
 
         fn deterministic_implies_no_runtime_errors(
-            d: Deterministic<u8, u8, >,
+            d: Deterministic<u8, u8>,
             input: Vec<u8>
         ) -> bool {
             !matches!(d.accept(input), Err(ParseError::BadParser(..)))
         }
 
-        fn determinize_identity(d: Deterministic<u8, u8, >, input: Vec<u8>) -> bool {
+        fn determinize_identity(d: Deterministic<u8, u8>, input: Vec<u8>) -> bool {
             d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
         }
 
         fn union(
-            lhs: Nondeterministic<u8, u8, >,
-            rhs: Nondeterministic<u8, u8, >,
+            lhs: Nondeterministic<u8, u8>,
+            rhs: Nondeterministic<u8, u8>,
             input: Vec<u8>
         ) -> bool {
             if lhs.determinize().is_err() {
@@ -251,6 +251,9 @@ mod prop {
                 return true;
             }
             let union = lhs.clone() | rhs.clone();
+            if union.check().is_err() {
+                return false;
+            }
             if union.determinize().is_err() {
                 return true;
             }
@@ -278,6 +281,10 @@ mod prop {
                     union_accept.is_err()
                 }
             }
+        }
+
+        fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
+            parser.accept(input.iter().copied()) == parser.sort().accept(input.iter().copied())
         }
     }
 }
@@ -394,7 +401,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_1() {
+    fn union_01() {
         union(
             &Graph {
                 states: vec![],
@@ -417,7 +424,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_2() {
+    fn union_02() {
         union(
             &Graph {
                 states: vec![State {
@@ -440,7 +447,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_3() {
+    fn union_03() {
         union(
             &Graph {
                 states: vec![State {
@@ -471,7 +478,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_4() {
+    fn union_04() {
         union(
             &Graph {
                 states: vec![State {
@@ -498,7 +505,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_5() {
+    fn union_05() {
         union(
             &Graph {
                 states: vec![State {
@@ -533,7 +540,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_6() {
+    fn union_06() {
         union(
             &Graph {
                 states: vec![State {
@@ -572,7 +579,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_7() {
+    fn union_07() {
         union(
             &Graph {
                 states: vec![State {
@@ -623,7 +630,7 @@ mod reduced {
     }
 
     #[test]
-    fn union_8() {
+    fn union_08() {
         union(
             &Graph {
                 states: vec![
@@ -686,6 +693,68 @@ mod reduced {
                 initial: iter::once(Ok(0)).collect(),
             },
             &[0],
+        );
+    }
+
+    #[test]
+    fn union_09() {
+        union(
+            &Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    accepting: false,
+                    tag: BTreeSet::new(),
+                }],
+                initial: BTreeSet::new(),
+            },
+            &Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    accepting: false,
+                    tag: BTreeSet::new(),
+                }],
+                initial: BTreeSet::new(),
+            },
+            &[],
+        );
+    }
+
+    #[test]
+    fn union_10() {
+        union(
+            &Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    accepting: true,
+                    tag: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+            },
+            &Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    accepting: false,
+                    tag: BTreeSet::new(),
+                }],
+                initial: BTreeSet::new(),
+            },
+            &[],
         );
     }
 }
