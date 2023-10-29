@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)]
+
 /// Descriptive parsing error.
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
