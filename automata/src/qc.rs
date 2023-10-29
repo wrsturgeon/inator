@@ -157,7 +157,6 @@ shrink_only!(|self: &State| Box::new(
             transitions,
             accepting,
             tag,
-            input_t: "()".to_owned()
         })
 ));
 
@@ -203,7 +202,6 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
             transitions: CurryStack::arbitrary_given(n_states, g),
             accepting: bool::arbitrary(g),
             tag: BTreeSet::arbitrary(g),
-            input_t: "()".to_owned(),
         }
     }
 }

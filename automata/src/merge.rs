@@ -106,11 +106,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
             transitions: self.transitions.merge(other.transitions)?,
             accepting: self.accepting || other.accepting,
             tag: unwrap!(self.tag.merge(other.tag)),
-            input_t: if self.input_t == other.input_t {
-                self.input_t
-            } else {
-                return Err(IllFormed::TypeMismatch(self.input_t, other.input_t));
-            },
         })
     }
 }

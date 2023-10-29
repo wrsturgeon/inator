@@ -168,9 +168,7 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
             },
             accepting: true,
             tag: BTreeSet::new(),
-            input_t: "()".to_owned(),
         }],
         initial: iter::once(Ok(0)).collect(),
-        output_t: "OUTPUT".to_owned(),
     }
 }

@@ -22,7 +22,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
         let Graph {
             mut states,
             initial,
-            output_t,
         } = rhs;
         for r in initial.view() {
             let _ = match r {
@@ -41,11 +40,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
             .tag
             .insert(self.0.clone());
         }
-        Graph {
-            states,
-            initial,
-            output_t,
-        }
+        Graph { states, initial }
     }
 }
 

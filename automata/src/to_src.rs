@@ -164,7 +164,9 @@ impl<I: Input, S: Stack> Graph<I, S, usize> {
     #[allow(clippy::arithmetic_side_effects)] // <-- String concatenation with `+`
     pub fn to_src(&self) -> Result<String, IllFormed<I, S, usize>> {
         let input_t = I::src_type();
-        let output_t = self.output_type()?;
+        let output_t = self
+            .output_type()?
+            .unwrap_or_else(|| "::core::convert::Infallible".to_owned());
         let stack_t = S::src_type();
         Ok(format!(
             r#"/// Descriptive parsing error.
@@ -217,7 +219,7 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
             self.states
                 .iter()
                 .enumerate()
-                .fold(String::new(), |acc, (i, s)| acc + &s.to_src(i)),
+                .try_fold(String::new(), |acc, (i, s)| Ok(acc + &s.to_src(i)?))?,
         ))
     }
 }
@@ -225,10 +227,11 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
 impl<I: Input, S: Stack> State<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
-    #[must_use]
-    fn to_src(&self, i: usize) -> String {
-        let input_t: &str = &self.input_t;
-        format!(
+    fn to_src(&self, i: usize) -> Result<String, IllFormed<I, S, usize>> {
+        let input_t = self
+            .input_type()?
+            .unwrap_or_else(|| "::core::convert::Infallible".to_owned());
+        Ok(format!(
             r#"
 
 
@@ -247,7 +250,7 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
                 "Err(TODO_IMPLEMENTATION_DEFINED)"
             },
             self.transitions.to_src(),
-        )
+        ))
     }
 }
 

@@ -6,7 +6,7 @@
 
 //! State, i.e. a node in an automaton graph.
 
-use crate::{Ctrl, CurryStack, Input, Stack};
+use crate::{Ctrl, CurryStack, IllFormed, Input, Stack};
 use core::cmp;
 use std::collections::BTreeSet;
 
@@ -20,8 +20,30 @@ pub struct State<I: Input, S: Stack, C: Ctrl<I, S>> {
     pub accepting: bool,
     /// Optional name for this state.
     pub tag: BTreeSet<String>,
-    /// Type of any run that reaches this state.
-    pub input_t: String,
+}
+
+impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
+    /// Compute the input type of any run that reaches this state.
+    /// # Errors
+    /// If multiple transitions expect different types.
+    #[inline]
+    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
+        self.transitions
+            .values()
+            .flat_map(|c| c.values())
+            .try_fold(None, |acc, t| {
+                acc.map_or_else(
+                    || Ok(Some(t.update.input_t.clone())),
+                    |other| {
+                        if t.update.input_t == other {
+                            Ok(Some(other))
+                        } else {
+                            Err(IllFormed::TypeMismatch(other, t.update.input_t.clone()))
+                        }
+                    },
+                )
+            })
+    }
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for State<I, S, C> {
@@ -31,7 +53,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for State<I, S, C> {
             transitions: self.transitions.clone(),
             accepting: self.accepting,
             tag: self.tag.clone(),
-            input_t: self.input_t.clone(),
         }
     }
 }

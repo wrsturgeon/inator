@@ -75,8 +75,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 }
                 Err(tag) => find_tag(&self.states, tag)?,
             };
-            if state.input_t != "()" {
-                return Err(IllFormed::InitialNotUnit(state.input_t.clone()));
+            let input_t = state.input_type()?;
+            #[allow(clippy::match_same_arms)] // TBD
+            match input_t {
+                None /* core::convert::Infallible */ => {} // return Err(IllFormed::NoEntryPoints),
+                Some(t) if t == "()" => {}
+                Some(other) => return Err(IllFormed::InitialNotUnit(other)),
             }
             for curry in state.transitions.values() {
                 for transition in curry.values() {
@@ -144,7 +148,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 
         // Associate each subset of states with a merged state
         let mut subsets_as_states = BTreeMap::new();
-        self.explore(&mut subsets_as_states, &self.initial, "()")?;
+        self.explore(&mut subsets_as_states, &self.initial)?;
 
         // Fix an ordering on those subsets
         let mut ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
@@ -160,13 +164,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                         transitions,
                         accepting,
                         tag,
-                        input_t,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
                         transitions: fix_indices_curry_stack(transitions, &ordering),
                         accepting,
                         tag,
-                        input_t,
                     }
                 })
                 .collect(),
@@ -183,7 +185,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         &self,
         subsets_as_states: &mut BTreeMap<C, State<I, S, C>>,
         subset: &C,
-        input_t: &str,
     ) -> Result<(), IllFormed<I, S, C>> {
         // Check if we've seen this subset already
         let btree_map::Entry::Vacant(entry) = subsets_as_states.entry(subset.clone()) else {
@@ -204,7 +205,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 },
                 accepting: false,
                 tag: BTreeSet::new(),
-                input_t: input_t.to_owned(),
             },
             // If they successfully merged, return the merged state
             Some(Ok(ok)) => ok,
@@ -220,41 +220,39 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             .flat_map(CurryInput::values)
             .map(|transition| transition.dst.clone())
             .collect();
-        let next_input_t = mega_state.input_t.clone();
 
         // Associate this subset of states with the merged state
         let _ = entry.insert(mega_state);
 
         // Recurse on all destinations
-        dsts.into_iter().try_fold((), |(), dst| {
-            self.explore(subsets_as_states, &dst, &next_input_t)
-        })
+        dsts.into_iter()
+            .try_fold((), |(), dst| self.explore(subsets_as_states, &dst))
     }
 
     /// Compute the output type of any successful run.
     /// # Errors
     /// If multiple accepting states attempt to return different types.
     #[inline]
-    pub fn output_type(&self) -> Result<String, IllFormed<I, S, C>> {
+    pub fn output_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
         self.states
             .iter()
-            .try_fold(None, |acc, state| {
+            .try_fold(None, |acc: Option<String>, state| {
                 if state.accepting {
                     acc.map_or_else(
-                        || Ok(Some(state.input_t.clone())),
+                        || state.input_type(),
                         |t| {
-                            if state.input_t == t {
-                                Ok(Some(t))
-                            } else {
-                                Err(IllFormed::WrongReturnType(t, state.input_t.clone()))
+                            if let Some(input_t) = state.input_type()? {
+                                if input_t != t {
+                                    return Err(IllFormed::WrongReturnType(t, input_t));
+                                }
                             }
+                            Ok(Some(t))
                         },
                     )
                 } else {
                     Ok(acc)
                 }
             })
-            .map(|s| s.unwrap_or_else(|| "core::convert::Infallible".to_owned()))
     }
 }
 
