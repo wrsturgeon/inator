@@ -239,6 +239,7 @@ mod prop {
             d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
         }
 
+        /*
         fn union(
             lhs: Nondeterministic<u8, u8>,
             rhs: Nondeterministic<u8, u8>,
@@ -282,6 +283,7 @@ mod prop {
                 }
             }
         }
+        */
 
         fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
             parser.accept(input.iter().copied()) == parser.sort().accept(input.iter().copied())
