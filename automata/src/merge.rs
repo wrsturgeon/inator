@@ -149,8 +149,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryInput<I, S, C> {
                     Some((k, v)) => Err(IllFormed::WildcardMask {
                         arg_stack: None,
                         arg_token: Some(k.clone()),
-                        possibility_1: w,
-                        possibility_2: v.clone(),
+                        possibility_1: Box::new(w),
+                        possibility_2: Box::new(v.clone()),
                     }),
                 }
             }
@@ -223,7 +223,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for Transition<I, S, C> {
             update: self
                 .update
                 .merge(other.update)
-                .map_err(|(a, b): (Update<I>, Update<I>)| IllFormed::IncompatibleCallbacks(a, b))?,
+                .map_err(|(a, b): (Update<I>, Update<I>)| {
+                    IllFormed::IncompatibleCallbacks(Box::new(a), Box::new(b))
+                })?,
         })
     }
 }
