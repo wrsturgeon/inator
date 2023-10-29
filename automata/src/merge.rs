@@ -104,7 +104,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
             transitions: self.transitions.merge(other.transitions)?,
-            non_accepting: self.non_accepting.and(other.non_accepting),
+            non_accepting: other.non_accepting.and(self.non_accepting),
             tag: unwrap!(self.tag.merge(other.tag)),
         })
     }

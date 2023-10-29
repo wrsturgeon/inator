@@ -1,3 +1,5 @@
+//! Automatically generated with [inator](https://crates.io/crates/inator).
+
 #![allow(dead_code, unused_variables)]
 
 /// Descriptive parsing error.
@@ -36,11 +38,7 @@ struct F<I>(fn(&mut I, Option<symbols::Symbol>, ()) -> R<I>);
 
 #[inline]
 pub fn parse<I: IntoIterator<Item = char>>(input: I) -> Result<(), Error> {
-    match state_0(
-        &mut input.into_iter().enumerate(),
-        None,
-        <() as Default>::default(),
-    )? {
+    match state_0(&mut input.into_iter().enumerate(), None, Default::default())? {
         (None, out) => Ok(out),
         (Some((index, context, None)), out) => panic!("Some(({index:?}, {context:?}, None))"),
         (Some((index, delimiter, Some(F(_)))), _) => Err(Error::Unopened {
