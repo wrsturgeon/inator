@@ -202,6 +202,11 @@ pub enum Error {{
         /// Type of thing that wasn't closed (e.g. parentheses).
         delimiter: {stack_t},
     }},
+    /// Ended on a user-defined non-accepting state.
+    NonAcceptingState {{
+        /// User-defined error message.
+        message: &'static str,
+    }},
 }}
 
 type R<I> = Result<(Option<(usize, {stack_t}, Option<F<I>>)>, {output_t}), Error>;
@@ -251,9 +256,10 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
 }}"#,
             I::src_type(),
             S::src_type(),
-            self.non_accepting
-                .as_ref()
-                .map_or_else(|| "Ok((None, acc))".to_owned(), |msg| format!("Err({msg})")),
+            self.non_accepting.as_ref().map_or_else(
+                || "Ok((None, acc))".to_owned(),
+                |msg| format!("Err(Error::NonAcceptingState {{ message: \"{msg}\" }})")
+            ),
             self.transitions.to_src(),
         ))
     }
