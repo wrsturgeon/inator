@@ -315,11 +315,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 ..s.reindex(&self.states, &index_map)
             })
             .collect();
-        let mut out = Graph { states, initial };
-        while out.check_sorted().is_err() {
-            out = out.sort();
-        }
-        out
+        Graph { states, initial }
     }
 }
 
