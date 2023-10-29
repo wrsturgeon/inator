@@ -15,7 +15,6 @@ build = "build.rs"
 quickcheck = { version = "1.0.3", optional = true }
 
 [dev-dependencies]
-backtrace-on-stack-overflow = "0.3.0"
 rand = "0.8.5"
 
 [features]

@@ -199,4 +199,4 @@ pub use {
 mod test;
 
 #[cfg(test)]
-use {backtrace_on_stack_overflow as _, rand as _}; // <-- needed in examples
+use rand as _; // <-- needed in examples
