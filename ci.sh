@@ -14,14 +14,6 @@ fi
 
 set -u
 
-# Recurse on the automata library
-if [ -d automata ]
-then
-  cd automata
-  ../ci.sh
-  cd ..
-fi
-
 # Update our workbench
 rustup update || :
 rustup toolchain install nightly || :
@@ -73,6 +65,14 @@ done
 # Nix build status
 git add -A
 nix build
+
+# Recurse on the automata library
+if [ -d automata ]
+then
+  cd automata
+  ../ci.sh
+  cd ..
+fi
 
 # Check for remaining `FIXME`s
 grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir='*JSONTestSuite*' --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
