@@ -12,9 +12,20 @@
     clippy::use_debug
 )]
 
+use crate::*;
+
+/// Check if we can split this input into a bunch of non-zero-sized slices
+/// that are all individually accepted by a given parser.
+#[inline]
+fn sliceable<I: Input, S: Stack, C: Ctrl<I, S>>(parser: &Graph<I, S, C>, input: &[I]) -> bool {
+    (1..=input.len()).rev().any(|i| {
+        parser.accept(input[..i].iter().cloned()).is_ok() && sliceable(parser, &input[i..])
+    })
+}
+
 #[cfg(feature = "quickcheck")]
 mod prop {
-    use crate::*;
+    use super::*;
     use quickcheck::*;
 
     quickcheck! {
@@ -41,57 +52,25 @@ mod prop {
             if parser.accept(iter::empty()).is_err() {
                 return true;
             }
-            // Find an index such that, if we look only at input before that index,
-            // we can split that subset of input into two further subsets such that
-            // the original parser accepts each individual subset.
-            let splittable = (0..=both.len()).fold(None, |acc, i| {
-                acc.or_else(|| {
-                    (i..=both.len()).fold(None, |accc, k| {
-                        accc.or_else(|| {
-                            (parser.accept(both[..i].iter().copied()).is_ok()
-                                && parser.accept(both[i..k].iter().copied()).is_ok())
-                            .then_some(k)
-                        })
-                    })
-                })
-            });
+            let sliceable = sliceable(&parser, &both);
             let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
             if repeated.check().is_err() {
                 return false;
             }
-            if let Some(endpoint) = splittable {
-                let output = repeated.accept(both[..endpoint].iter().copied());
-                output.is_ok()
-            } else {
-                let output = repeated.accept(both);
-                output.is_err()
-            }
+            repeated.accept(both).is_ok() == sliceable
         }
     }
 }
 
 mod reduced {
-    use crate::*;
+    use super::*;
 
     fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {
         parser.check().unwrap();
         if parser.accept(iter::empty()).is_err() {
             return;
         }
-        // Find an index such that, if we look only at input before that index,
-        // we can split that subset of input into two further subsets such that
-        // the original parser accepts each individual subset.
-        let splittable = (0..=both.len()).fold(None, |acc, i| {
-            acc.or_else(|| {
-                (i..=both.len()).fold(None, |accc, k| {
-                    accc.or_else(|| {
-                        (parser.accept(both[..i].iter().copied()).is_ok()
-                            && parser.accept(both[i..k].iter().copied()).is_ok())
-                        .then_some(k)
-                    })
-                })
-            })
-        });
+        let sliceable = sliceable(&parser, &both);
         let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
         println!("Repeated: {repeated:#?}");
         repeated.check().unwrap();
@@ -100,13 +79,8 @@ mod reduced {
         while let Some(r) = run.next() {
             println!("{r:?} {run:?}");
         }
-        if let Some(endpoint) = splittable {
-            let output = repeated.accept(both[..endpoint].iter().copied());
-            assert!(output.is_ok(), "{output:?}");
-        } else {
-            let output = repeated.accept(both);
-            assert!(output.is_err(), "{output:?}");
-        }
+        let output = repeated.accept(both);
+        assert_eq!(output.is_ok(), sliceable, "{output:?}");
     }
 
     #[test]
