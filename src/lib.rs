@@ -167,7 +167,7 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
                 map_some: BTreeMap::new(),
             },
             non_accepting: vec![],
-            tag: BTreeSet::new(),
+            tags: BTreeSet::new(),
         }],
         initial: iter::once(Ok(0)).collect(),
     }
@@ -186,7 +186,7 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                     map_some: BTreeMap::new(),
                 },
                 non_accepting: vec![],
-                tag: BTreeSet::new(),
+                tags: BTreeSet::new(),
             },
             State {
                 non_accepting: vec![format!(
@@ -209,7 +209,7 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                tag: BTreeSet::new(),
+                tags: BTreeSet::new(),
             },
         ],
         initial: iter::once(Ok(1)).collect(),

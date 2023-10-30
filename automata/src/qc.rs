@@ -154,13 +154,13 @@ shrink_only!(|self: &State| Box::new(
     (
         self.transitions.clone(),
         self.non_accepting.clone(),
-        self.tag.clone()
+        self.tags.clone()
     )
         .shrink()
-        .map(|(transitions, non_accepting, tag)| Self {
+        .map(|(transitions, non_accepting, tags)| Self {
             transitions,
             non_accepting,
-            tag,
+            tags,
         })
 ));
 
@@ -205,7 +205,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
             non_accepting: Vec::arbitrary(g),
-            tag: BTreeSet::arbitrary(g),
+            tags: BTreeSet::arbitrary(g),
         }
     }
 }
