@@ -41,14 +41,31 @@ mod prop {
             if parser.accept(iter::empty()).is_err() {
                 return true;
             }
-            let splittable = (0..=both.len()).any(|i| {
-                parser.accept(both[..i].iter().copied()).is_ok() && parser.accept(both[i..].iter().copied()).is_ok()
+            // Find an index such that, if we look only at input before that index,
+            // we can split that subset of input into two further subsets such that
+            // the original parser accepts each individual subset.
+            let splittable = (0..=both.len()).fold(None, |acc, i| {
+                acc.or_else(|| {
+                    (i..=both.len()).fold(None, |accc, k| {
+                        accc.or_else(|| {
+                            (parser.accept(both[..i].iter().copied()).is_ok()
+                                && parser.accept(both[i..k].iter().copied()).is_ok())
+                            .then_some(k)
+                        })
+                    })
+                })
             });
             let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
             if repeated.check().is_err() {
                 return false;
             }
-            repeated.accept(both).is_ok() == splittable
+            if let Some(endpoint) = splittable {
+                let output = repeated.accept(both[..endpoint].iter().copied());
+                output.is_ok()
+            } else {
+                let output = repeated.accept(both);
+                output.is_err()
+            }
         }
     }
 }
@@ -61,9 +78,19 @@ mod reduced {
         if parser.accept(iter::empty()).is_err() {
             return;
         }
-        let splittable = (0..=both.len()).any(|i| {
-            parser.accept(both[..i].iter().copied()).is_ok()
-                && parser.accept(both[i..].iter().copied()).is_ok()
+        // Find an index such that, if we look only at input before that index,
+        // we can split that subset of input into two further subsets such that
+        // the original parser accepts each individual subset.
+        let splittable = (0..=both.len()).fold(None, |acc, i| {
+            acc.or_else(|| {
+                (i..=both.len()).fold(None, |accc, k| {
+                    accc.or_else(|| {
+                        (parser.accept(both[..i].iter().copied()).is_ok()
+                            && parser.accept(both[i..k].iter().copied()).is_ok())
+                        .then_some(k)
+                    })
+                })
+            })
         });
         let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
         println!("Repeated: {repeated:#?}");
@@ -71,9 +98,15 @@ mod reduced {
         let mut run = both.iter().copied().run(&repeated);
         println!("    {run:?}");
         while let Some(r) = run.next() {
-            println!("{:?} {run:?}", r.unwrap());
+            println!("{r:?} {run:?}");
         }
-        assert_eq!(repeated.accept(both).is_ok(), splittable);
+        if let Some(endpoint) = splittable {
+            let output = repeated.accept(both[..endpoint].iter().copied());
+            assert!(output.is_ok(), "{output:?}");
+        } else {
+            let output = repeated.accept(both);
+            assert!(output.is_err(), "{output:?}");
+        }
     }
 
     #[test]
@@ -105,6 +138,89 @@ mod reduced {
                     },
                 ],
                 initial: [Ok(0), Ok(1)].into_iter().collect(),
+            },
+            vec![0],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_2() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![],
+                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![],
+                        tags: iter::once(String::new()).collect(),
+                    },
+                ],
+                initial: iter::once(Ok(0)).collect(),
+            },
+            vec![],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_3() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![],
+                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![],
+                        tags: BTreeSet::new(),
+                    },
+                ],
+                initial: iter::once(Ok(1)).collect(),
+            },
+            vec![0, 0, 0],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_4() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: vec![],
+                    tags: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
             },
             vec![0],
         );
