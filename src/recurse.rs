@@ -38,7 +38,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
             |(mut acc_i, mut acc_t), (i, s)| {
                 if s.non_accepting.is_empty() {
                     let _ = acc_i.insert(i);
-                    acc_t.extend(s.tag.iter().cloned());
+                    acc_t.extend(s.tags.iter().cloned());
                 }
                 (acc_i, acc_t)
             },
@@ -70,7 +70,7 @@ fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
     State {
         transitions: add_tail_call_curry_stack(s.transitions, r, accepting_indices, accepting_tags),
         non_accepting: s.non_accepting,
-        tag: s.tag,
+        tags: s.tags,
     }
 }
 

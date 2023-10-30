@@ -83,7 +83,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -96,7 +96,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: [Ok(0), Ok(1)].into_iter().collect(),
