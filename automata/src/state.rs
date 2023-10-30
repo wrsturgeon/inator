@@ -20,7 +20,7 @@ pub struct State<I: Input, S: Stack, C: Ctrl<I, S>> {
     // TODO: use a `BTreeSet`.
     pub non_accepting: Vec<String>,
     /// Optional name for this state.
-    pub tag: BTreeSet<String>,
+    pub tags: BTreeSet<String>,
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
@@ -53,7 +53,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for State<I, S, C> {
         Self {
             transitions: self.transitions.clone(),
             non_accepting: self.non_accepting.clone(),
-            tag: self.tag.clone(),
+            tags: self.tags.clone(),
         }
     }
 }
@@ -65,7 +65,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for State<I, S, C> {
     fn eq(&self, other: &Self) -> bool {
         self.non_accepting == other.non_accepting
             && self.transitions == other.transitions
-            && self.tag == other.tag
+            && self.tags == other.tags
     }
 }
 
@@ -75,7 +75,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for State<I, S, C> {
         self.transitions
             .cmp(&other.transitions)
             .then_with(|| self.non_accepting.cmp(&other.non_accepting))
-            .then_with(|| self.tag.cmp(&other.tag))
+            .then_with(|| self.tags.cmp(&other.tags))
     }
 }
 

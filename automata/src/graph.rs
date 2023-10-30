@@ -75,7 +75,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                         return Err(IllFormed::OutOfBounds(i));
                     }
                 }
-                Err(tag) => find_tag(&self.states, tag)?,
+                Err(tags) => find_tag(&self.states, tags)?,
             };
             let input_t = state.input_type()?;
             #[allow(clippy::match_same_arms)] // TBD
@@ -158,12 +158,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     let State {
                         transitions,
                         non_accepting,
-                        tag,
+                        tags,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
                         transitions: fix_indices_curry_stack(transitions, &ordering),
                         non_accepting,
-                        tag,
+                        tags,
                     }
                 })
                 .collect(),
@@ -199,7 +199,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     map_some: BTreeMap::new(),
                 },
                 non_accepting: vec!["Unexpected token".to_owned()],
-                tag: BTreeSet::new(),
+                tags: BTreeSet::new(),
             },
             // If they successfully merged, return the merged state
             Some(Ok(ok)) => ok,
@@ -280,9 +280,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             let untagged = State {
                 transitions: state.transitions.clone(),
                 non_accepting: state.non_accepting.clone(),
-                tag: BTreeSet::new(),
+                tags: BTreeSet::new(),
             };
-            let tags = mem::take(&mut state.tag);
+            let tags = mem::take(&mut state.tags);
             tag_map
                 .entry(untagged)
                 .or_insert(BTreeSet::new())
@@ -290,7 +290,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         }
         #[cfg(any(test, debug))]
         for state in &self.states {
-            assert_eq!(state.tag, BTreeSet::new(), "Should have emptied tags");
+            assert_eq!(state.tags, BTreeSet::new(), "Should have emptied tags");
         }
 
         // Associate each original index with a concrete state instead of just an index,
@@ -312,7 +312,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             .states
             .iter()
             .map(|s| State {
-                tag: unwrap!(tag_map.remove(s)),
+                tags: unwrap!(tag_map.remove(s)),
                 ..s.reindex(&self.states, &index_map)
             })
             .collect();
@@ -322,44 +322,44 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 
 /// Look up a tag and return the specific state tagged with it.
 /// # Errors
-/// If no state has this tag, or if multiple have this tag.
+/// If no state has this tags, or if multiple have this tags.
 #[inline]
 #[allow(clippy::type_complexity)]
 pub fn find_tag<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
     states: &'s [State<I, S, C>],
-    tag: &str,
+    tags: &str,
 ) -> Result<&'s State<I, S, C>, IllFormed<I, S, C>> {
     let mut acc = None;
     for state in states {
-        if state.tag.iter().any(|s| s == tag) {
+        if state.tags.iter().any(|s| s == tags) {
             match acc {
                 None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
+                Some(..) => return Err(IllFormed::DuplicateTag(tags.to_owned())),
             }
         }
     }
-    acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
+    acc.ok_or(IllFormed::TagDNE(tags.to_owned()))
 }
 
 /// Look up a tag and return the specific state tagged with it.
 /// # Errors
-/// If no state has this tag, or if multiple have this tag.
+/// If no state has this tags, or if multiple have this tags.
 #[inline]
 #[allow(clippy::type_complexity)]
 pub fn find_tag_mut<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
     states: &'s mut [State<I, S, C>],
-    tag: &str,
+    tags: &str,
 ) -> Result<&'s mut State<I, S, C>, IllFormed<I, S, C>> {
     let mut acc = None;
     for state in states {
-        if state.tag.iter().any(|s| s == tag) {
+        if state.tags.iter().any(|s| s == tags) {
             match acc {
                 None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tag.to_owned())),
+                Some(..) => return Err(IllFormed::DuplicateTag(tags.to_owned())),
             }
         }
     }
-    acc.ok_or(IllFormed::TagDNE(tag.to_owned()))
+    acc.ok_or(IllFormed::TagDNE(tags.to_owned()))
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.

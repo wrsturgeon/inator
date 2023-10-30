@@ -21,7 +21,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
         State {
             transitions: self.transitions.reindex(states, index_map),
             non_accepting: self.non_accepting.clone(),
-            tag: self.tag.clone(),
+            tags: self.tags.clone(),
         }
     }
 }

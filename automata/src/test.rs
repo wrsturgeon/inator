@@ -322,7 +322,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -335,7 +335,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -348,7 +348,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: [Ok(1), Ok(2)].into_iter().collect(),
@@ -435,7 +435,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -454,7 +454,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -485,7 +485,7 @@ mod reduced {
                         .collect(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -512,7 +512,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -535,7 +535,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -551,7 +551,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -574,7 +574,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -590,7 +590,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -619,7 +619,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -641,7 +641,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -661,7 +661,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -678,7 +678,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -691,7 +691,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(2)).collect(),
@@ -708,7 +708,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -727,7 +727,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -739,7 +739,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -758,7 +758,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
             },
@@ -770,7 +770,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -793,7 +793,7 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: vec![String::new()],
-                    tag: BTreeSet::new(),
+                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
             },
@@ -806,7 +806,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -819,7 +819,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: BTreeSet::new(),
@@ -841,7 +841,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -850,7 +850,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![],
-                        tag: iter::once(String::new()).collect(),
+                        tags: iter::once(String::new()).collect(),
                     },
                     State {
                         transitions: CurryStack {
@@ -865,7 +865,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -882,7 +882,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -899,7 +899,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: iter::once(String::new()).collect(),
+                        tags: iter::once(String::new()).collect(),
                     },
                     State {
                         transitions: CurryStack {
@@ -916,7 +916,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: iter::once("\0".to_owned()).collect(),
+                        tags: iter::once("\0".to_owned()).collect(),
                     },
                     State {
                         transitions: CurryStack {
@@ -931,7 +931,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -946,7 +946,7 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: iter::once(String::new()).collect(),
+                        tags: iter::once(String::new()).collect(),
                     },
                     State {
                         transitions: CurryStack {
@@ -959,7 +959,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -972,7 +972,7 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: vec![String::new()],
-                        tag: BTreeSet::new(),
+                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(8)).collect(),
