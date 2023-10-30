@@ -247,4 +247,53 @@ mod reduced {
             vec![],
         );
     }
+
+    #[test]
+    fn fixpoint_repeat_6() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(2)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: Some(CurryInput::Scrutinize(RangeMap {
+                                entries: BTreeMap::new(),
+                            })),
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Pop,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: BTreeSet::new(),
+                    },
+                ],
+                initial: iter::once(Ok(0)).collect(),
+            },
+            vec![0, 0],
+        );
+    }
 }
