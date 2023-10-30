@@ -99,7 +99,6 @@
     clippy::wildcard_imports
 )]
 
-/*
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(any(debug_assertions, test))]
 macro_rules! get {
@@ -117,7 +116,6 @@ macro_rules! get {
         result
     }};
 }
-*/
 
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(any(debug_assertions, test))]
@@ -154,8 +152,19 @@ pub use {
 use core::iter;
 use std::collections::{BTreeMap, BTreeSet};
 
-#[cfg(feature = "quickcheck")]
+#[cfg(all(not(test), feature = "quickcheck"))]
 use quickcheck as _; // <-- TODO: remove if we write some implementations
+
+/// Check if we can split an input into a bunch of non-zero-sized
+/// slices that are all individually accepted by a given parser.
+#[inline]
+pub fn sliceable<I: Input, S: Stack, C: Ctrl<I, S>>(parser: &Graph<I, S, C>, input: &[I]) -> bool {
+    input.is_empty()
+        || (1..=input.len()).rev().any(|i| {
+            parser.accept(get!(input, ..i).iter().cloned()).is_ok()
+                && sliceable(parser, get!(input, i..))
+        })
+}
 
 /// Parser that accepts only the empty string.
 #[inline]

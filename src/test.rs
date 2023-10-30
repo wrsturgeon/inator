@@ -14,16 +14,6 @@
 
 use crate::*;
 
-/// Check if we can split this input into a bunch of non-zero-sized slices
-/// that are all individually accepted by a given parser.
-#[inline]
-fn sliceable<I: Input, S: Stack, C: Ctrl<I, S>>(parser: &Graph<I, S, C>, input: &[I]) -> bool {
-    input.is_empty()
-        || (1..=input.len()).rev().any(|i| {
-            parser.accept(input[..i].iter().cloned()).is_ok() && sliceable(parser, &input[i..])
-        })
-}
-
 #[cfg(feature = "quickcheck")]
 mod prop {
     use super::*;
@@ -48,7 +38,7 @@ mod prop {
             pre == post
         }
 
-        fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) -> bool {
+        fn kleene_star(parser: Nondeterministic<u8, u8>, both: Vec<u8>) -> bool {
             parser.check().unwrap();
             if parser.accept(iter::empty()).is_err() {
                 return true;
@@ -70,7 +60,7 @@ mod prop {
 mod reduced {
     use super::*;
 
-    fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {
+    fn kleene_star(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {
         parser.check().unwrap();
         if parser.accept(iter::empty()).is_err() {
             return;
@@ -92,8 +82,8 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_1() {
-        fixpoint_repeat(
+    fn kleene_star_1() {
+        kleene_star(
             Graph {
                 states: vec![
                     State {
@@ -126,8 +116,8 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_2() {
-        fixpoint_repeat(
+    fn kleene_star_2() {
+        kleene_star(
             Graph {
                 states: vec![
                     State {
@@ -156,8 +146,8 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_3() {
-        fixpoint_repeat(
+    fn kleene_star_3() {
+        kleene_star(
             Graph {
                 states: vec![
                     State {
@@ -190,8 +180,8 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_4() {
-        fixpoint_repeat(
+    fn kleene_star_4() {
+        kleene_star(
             Graph {
                 states: vec![State {
                     transitions: CurryStack {
@@ -209,8 +199,8 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_5() {
-        fixpoint_repeat(
+    fn kleene_star_5() {
+        kleene_star(
             Graph {
                 states: vec![
                     State {
@@ -256,8 +246,8 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_6() {
-        fixpoint_repeat(
+    fn kleene_star_6() {
+        kleene_star(
             Graph {
                 states: vec![
                     State {

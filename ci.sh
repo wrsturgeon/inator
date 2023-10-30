@@ -25,12 +25,6 @@ cargo fmt --check
 cargo clippy --all-targets --no-default-features
 cargo clippy --all-targets --all-features
 
-# Extremely slow (but lovely) UB checks
-cargo +nightly miri test --no-default-features
-cargo +nightly miri test --no-default-features --examples
-cargo +nightly miri test -r --no-default-features
-cargo +nightly miri test -r --no-default-features --examples
-
 # Non-property tests
 cargo test --no-default-features
 cargo test --no-default-features --examples
@@ -48,6 +42,7 @@ set -e
 if [ ! -z "$EXAMPLES" ]
 then
   echo $EXAMPLES | xargs -n 1 cargo +nightly miri run --example
+  echo $EXAMPLES | xargs -n 1 cargo run -r --all-features --example
 fi
 
 # Examples that are crates themselves
@@ -57,10 +52,17 @@ do
   then
     cd examples/$dir
     cargo +nightly miri run
+    cargo run -r --all-features
     cargo test
     cd ../..
   fi
 done
+
+# Extremely slow (but lovely) UB checks
+cargo +nightly miri test --no-default-features
+cargo +nightly miri test --no-default-features --examples
+cargo +nightly miri test -r --no-default-features
+cargo +nightly miri test -r --no-default-features --examples
 
 # Nix build status
 git add -A
