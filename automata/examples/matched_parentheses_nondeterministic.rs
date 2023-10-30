@@ -57,7 +57,7 @@ fn parser() -> Nondeterministic<char, Symbol> {
                 ))
                 .collect(),
             },
-            non_accepting: vec![],
+            non_accepting: BTreeSet::new(),
             tags: BTreeSet::new(),
         }],
         initial: iter::once(Ok(0)).collect(),
