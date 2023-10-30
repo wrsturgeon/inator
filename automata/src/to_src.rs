@@ -135,12 +135,25 @@ impl ToSrc for String {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        format!("\"{self}\".to_owned()")
+        format!("\"{}\".to_owned()", self.escape_default())
     }
     #[inline]
     #[must_use]
     fn src_type() -> String {
         "String".to_owned()
+    }
+}
+
+impl ToSrc for &str {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("\"{}\"", self.escape_default())
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "&'static str".to_owned()
     }
 }
 
@@ -205,7 +218,7 @@ pub enum Error {{
     /// Ended on a user-defined non-accepting state.
     UserDefined {{
         /// User-defined error message.
-        message: &'static str,
+        messages: &[&'static str],
     }},
 }}
 
@@ -260,9 +273,12 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
                 || "Ok((None, acc))".to_owned(),
                 |fst| {
                     get!(self.non_accepting, 1..).iter().fold(
-                        format!("Err(Error::UserDefined {{ messages: vec![{fst}"),
-                        |acc, msg| format!("{acc}, {msg}"),
-                    ) + "] }})"
+                        format!(
+                            "Err(Error::UserDefined {{ messages: &[{}",
+                            fst.as_str().to_src(),
+                        ),
+                        |acc, msg| format!("{acc}, {}", msg.as_str().to_src()),
+                    ) + "] })"
                 }
             ),
             self.transitions.to_src(),

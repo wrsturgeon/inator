@@ -75,10 +75,7 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
     acc: (),
 ) -> R<I> {
     match input.next() {
-        None => Err(Error::UserDefined {
-            message:
-                "Expected only a single token on [b'\t'..=b'\t'] but got another token after it",
-        }),
+        None => Err(Error::UserDefined { messages: vec!["Expected only a single token on [b\'\\t\'..=b\'\\t\'] but got another token after it", "Expected only a single token on [b\'\\n\'..=b\'\\n\'] but got another token after it", "Expected only a single token on [b\'\\r\'..=b\'\\r\'] but got another token after it", "Expected only a single token on [b\' \'..=b\' \'] but got another token after it"] }),
         Some((index, token)) => match (&context, &token) {
             (&_, &(b'\t'..=b'\t')) => match state_0(input, context, (|(), _| {})(acc, token))? {
                 (None, _) => todo!(),
