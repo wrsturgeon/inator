@@ -18,9 +18,10 @@ use crate::*;
 /// that are all individually accepted by a given parser.
 #[inline]
 fn sliceable<I: Input, S: Stack, C: Ctrl<I, S>>(parser: &Graph<I, S, C>, input: &[I]) -> bool {
-    (1..=input.len()).rev().any(|i| {
-        parser.accept(input[..i].iter().cloned()).is_ok() && sliceable(parser, &input[i..])
-    })
+    input.is_empty()
+        || (1..=input.len()).rev().any(|i| {
+            parser.accept(input[..i].iter().cloned()).is_ok() && sliceable(parser, &input[i..])
+        })
 }
 
 #[cfg(feature = "quickcheck")]
