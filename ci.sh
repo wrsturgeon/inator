@@ -6,7 +6,7 @@ if [ -z "${QUICKCHECK_TESTS}" ]
   then
   if [ "${GITHUB_REF##*/}" = "main" ]
   then
-    export QUICKCHECK_TESTS=1000000
+    export QUICKCHECK_TESTS=10000000
   else
     export QUICKCHECK_TESTS=1000
   fi
@@ -25,6 +25,12 @@ cargo fmt --check
 cargo clippy --all-targets --no-default-features
 cargo clippy --all-targets --all-features
 
+# Extremely slow (but lovely) UB checks
+cargo +nightly miri test --no-default-features
+cargo +nightly miri test --no-default-features --examples
+cargo +nightly miri test -r --no-default-features
+cargo +nightly miri test -r --no-default-features --examples
+
 # Non-property tests
 cargo test --no-default-features
 cargo test --no-default-features --examples
@@ -34,12 +40,6 @@ cargo test -r --no-default-features --examples
 # Property tests
 cargo test -r --all-features
 cargo test -r --all-features --examples
-
-# Extremely slow (but lovely) UB checks
-cargo +nightly miri test --no-default-features
-cargo +nightly miri test --no-default-features --examples
-cargo +nightly miri test -r --no-default-features
-cargo +nightly miri test -r --no-default-features --examples
 
 # Run examples
 set +e

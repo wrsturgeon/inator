@@ -10,12 +10,12 @@ use core::{iter, ops};
 use inator_automata::*;
 
 /// Tagged state that can be called later.
-#[must_use = "Fixpoints do nothing unless they're used on an automaton with the `>>` operator."]
+#[must_use = "Fixpoints do nothing unless applied to an automaton with the `>>` operator."]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Fixpoint(String);
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
-    type Output = Graph<I, S, C>;
+    type Output = Nondeterministic<I, S>;
     #[inline]
     #[allow(clippy::panic)]
     fn shr(self, rhs: Graph<I, S, C>) -> Self::Output {
@@ -40,7 +40,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
                 let _ = state.tags.insert(self.0.clone());
             }
         }
-        Graph { states, initial }
+        let mut out = Graph { states, initial }.sort();
+        while out.check_sorted().is_err() {
+            out = out.sort();
+        }
+        out
     }
 }
 
