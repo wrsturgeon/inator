@@ -40,7 +40,7 @@ pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
                 .collect(),
             },
             non_accepting: vec![],
-            tag: BTreeSet::new(),
+            tags: BTreeSet::new(),
         }],
         initial: 0,
     };
