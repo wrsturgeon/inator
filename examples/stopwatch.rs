@@ -11,10 +11,20 @@ fn main() {
 
     macro_rules! time {
         ($ex:expr) => {{
-            let (tx, rx) = mpsc::channel();
-            thread::spawn(move || tx.send($ex).expect("Couldn't send to the main thread"));
-            thread::sleep(Duration::from_millis(100));
-            rx.try_recv().expect("Time's up!")
+            let (tx_o, rx_o) = mpsc::channel();
+            let (tx_t, rx_t) = mpsc::channel();
+            let _rslt = thread::spawn(move || {
+                let out = $ex;
+                tx_t.send(())
+                    .expect("Couldn't send to the stopwatch thread");
+                tx_o.send(out).expect("Couldn't send to the main thread");
+            });
+            let _time = thread::spawn(move || {
+                thread::sleep(Duration::from_millis(100));
+                rx_t.try_recv().expect("Time's up!");
+            });
+            rx_o.recv()
+                .expect("Couldn't receive a value from the result thread")
         }};
     }
 
