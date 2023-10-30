@@ -110,7 +110,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
                 self.non_accepting.extend(other.non_accepting);
                 self.non_accepting
             },
-            tag: unwrap!(self.tag.merge(other.tag)),
+            tags: unwrap!(self.tags.merge(other.tags)),
         })
     }
 }

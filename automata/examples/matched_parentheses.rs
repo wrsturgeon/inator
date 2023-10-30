@@ -58,7 +58,7 @@ fn parser() -> Deterministic<char, Symbol> {
                 .collect(),
             },
             non_accepting: vec![],
-            tag: BTreeSet::new(),
+            tags: BTreeSet::new(),
         }],
         initial: 0,
     }
