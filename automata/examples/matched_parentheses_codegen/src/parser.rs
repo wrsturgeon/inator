@@ -32,7 +32,7 @@ pub enum Error {
     /// Ended on a user-defined non-accepting state.
     UserDefined {
         /// User-defined error message.
-        message: &'static str,
+        messages: &'static [&'static str],
     },
 }
 

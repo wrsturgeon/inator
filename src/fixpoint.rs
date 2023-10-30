@@ -10,7 +10,7 @@ use core::ops;
 use inator_automata::*;
 
 /// Tagged state that can be called later.
-#[must_use = "Fixpoints do nothing unless they're used on an automaton with the `>>` operator."]
+#[must_use = "Fixpoints do nothing unless applied to an automaton with the `>>` operator."]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Fixpoint(String);
 

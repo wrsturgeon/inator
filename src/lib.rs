@@ -140,6 +140,7 @@ macro_rules! get_mut {
 // TODO: derive ToSrc
 
 mod fixpoint;
+mod recurse;
 
 #[cfg(test)]
 mod test;
@@ -147,6 +148,7 @@ mod test;
 pub use {
     fixpoint::{fixpoint, Fixpoint},
     inator_automata::*,
+    recurse::{recurse, Recurse},
 };
 
 use core::iter;
