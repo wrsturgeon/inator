@@ -209,7 +209,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                non_accepting: vec!["Unexpected token".to_owned()],
+                non_accepting: iter::once("Unexpected token".to_owned()).collect(),
                 tags: BTreeSet::new(),
             },
             // If they successfully merged, return the merged state

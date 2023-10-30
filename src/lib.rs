@@ -168,7 +168,7 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
                 map_none: None,
                 map_some: BTreeMap::new(),
             },
-            non_accepting: vec![],
+            non_accepting: BTreeSet::new(),
             tags: BTreeSet::new(),
         }],
         initial: iter::once(Ok(0)).collect(),
@@ -187,15 +187,16 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                non_accepting: vec![],
+                non_accepting: BTreeSet::new(),
                 tags: BTreeSet::new(),
             },
             State {
-                non_accepting: vec![format!(
+                non_accepting: iter::once(format!(
                     "Expected only a single token on [{}..={}] but got another token after it",
                     range.first.to_src(),
                     range.last.to_src(),
-                )],
+                ))
+                .collect(),
                 transitions: CurryStack {
                     wildcard: Some(CurryInput::Scrutinize(RangeMap {
                         entries: iter::once((

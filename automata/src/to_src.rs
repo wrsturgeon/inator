@@ -10,7 +10,7 @@ use crate::{
     Action, CurryInput, CurryStack, Graph, IllFormed, Input, Range, RangeMap, Stack, State,
     Transition,
 };
-use core::borrow::Borrow;
+use core::{borrow::Borrow, ops::Bound};
 use std::collections::BTreeSet;
 
 /// Translate a value into Rust source code that reproduces it.
@@ -272,13 +272,16 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
             self.non_accepting.first().map_or_else(
                 || "Ok((None, acc))".to_owned(),
                 |fst| {
-                    get!(self.non_accepting, 1..).iter().fold(
-                        format!(
-                            "Err(Error::UserDefined {{ messages: &[{}",
-                            fst.as_str().to_src(),
-                        ),
-                        |acc, msg| format!("{acc}, {}", msg.as_str().to_src()),
-                    ) + "] })"
+                    self.non_accepting
+                        .range((Bound::Excluded(fst.clone()), Bound::Unbounded))
+                        .fold(
+                            format!(
+                                "Err(Error::UserDefined {{ messages: &[{}",
+                                fst.as_str().to_src(),
+                            ),
+                            |acc, msg| format!("{acc}, {}", msg.as_str().to_src()),
+                        )
+                        + "] })"
                 }
             ),
             self.transitions.to_src(),
