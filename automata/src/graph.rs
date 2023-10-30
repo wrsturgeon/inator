@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{cmp::Ordering, num::NonZeroUsize};
+use core::{cmp::Ordering, mem, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -25,6 +25,8 @@ pub type Deterministic<I, S> = Graph<I, S, usize>;
 /// One token corresponds to as many transitions as it would like;
 /// if any of these transitions eventually accept, the whole thing accepts.
 pub type Nondeterministic<I, S> = Graph<I, S, BTreeSet<Result<usize, String>>>;
+
+// TODO: make `states` a `BTreeSet`.
 
 /// Automaton loosely based on visibly pushdown automata.
 #[allow(clippy::exhaustive_structs)]
@@ -93,15 +95,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         drop(self.output_type()?);
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             // Check sorted without duplicates
-            let _ = self.states.iter().try_fold(None, |mlast, curr| {
-                mlast.map_or(Ok(Some(curr)), |last: &State<I, S, C>| {
-                    match last.cmp(curr) {
-                        Ordering::Less => Ok(Some(curr)),
-                        Ordering::Equal => Err(IllFormed::DuplicateState),
-                        Ordering::Greater => Err(IllFormed::UnsortedStates),
-                    }
-                })
-            })?;
+            self.check_sorted()?;
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
     }
@@ -256,10 +250,49 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             })
     }
 
+    /// Check if states are sorted.
+    /// # Errors
+    /// If there are duplicate states or any out of order.
+    #[inline]
+    pub fn check_sorted(&self) -> Result<(), IllFormed<I, S, C>> {
+        self.states
+            .iter()
+            .try_fold(None, |mlast, curr| {
+                mlast.map_or(Ok(Some(curr)), |last: &State<I, S, C>| {
+                    match last.cmp(curr) {
+                        Ordering::Less => Ok(Some(curr)),
+                        Ordering::Equal => Err(IllFormed::DuplicateState),
+                        Ordering::Greater => Err(IllFormed::UnsortedStates),
+                    }
+                })
+            })
+            .map(|_| {})
+    }
+
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
     #[allow(clippy::missing_panics_doc)]
     pub fn sort(mut self) -> Nondeterministic<I, S> {
+        // Remove all tags but retain their associations
+        // (in case two otherwise identical states have different tags)
+        let mut tag_map = BTreeMap::new();
+        for state in &mut self.states {
+            let untagged = State {
+                transitions: state.transitions.clone(),
+                non_accepting: state.non_accepting.clone(),
+                tag: BTreeSet::new(),
+            };
+            let tags = mem::take(&mut state.tag);
+            tag_map
+                .entry(untagged)
+                .or_insert(BTreeSet::new())
+                .extend(tags);
+        }
+        #[cfg(any(test, debug))]
+        for state in &self.states {
+            assert_eq!(state.tag, BTreeSet::new(), "Should have emptied tags");
+        }
+
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
         let index_map: BTreeMap<usize, State<_, _, _>> =
@@ -278,7 +311,10 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         let states = self
             .states
             .iter()
-            .map(|s| s.reindex(&self.states, &index_map))
+            .map(|s| State {
+                tag: unwrap!(tag_map.remove(s)),
+                ..s.reindex(&self.states, &index_map)
+            })
             .collect();
         Graph { states, initial }
     }

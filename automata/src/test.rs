@@ -239,7 +239,6 @@ mod prop {
             d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
         }
 
-        /*
         fn union(
             lhs: Nondeterministic<u8, u8>,
             rhs: Nondeterministic<u8, u8>,
@@ -283,10 +282,17 @@ mod prop {
                 }
             }
         }
-        */
 
         fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
-            parser.accept(input.iter().copied()) == parser.sort().accept(input.iter().copied())
+            let pre = parser.accept(input.iter().copied());
+            let post = parser.sort().accept(input);
+            match pre {
+                Ok(out) => Ok(out) == post,
+                Err(ParseError::BadInput(_)) => {
+                    matches!(post, Err(ParseError::BadInput(_)))
+                }
+                Err(ParseError::BadParser(_)) => true
+            }
         }
     }
 }
@@ -363,9 +369,9 @@ mod reduced {
         println!("{rhs:?}");
         println!("yields");
         let union = lhs.clone() | rhs.clone();
-        assert_eq!(union.check(), Ok(()));
         println!("{union:?}");
         println!();
+        assert_eq!(union.check(), Ok(()));
         if union.determinize().is_err() {
             return;
         }
@@ -400,6 +406,18 @@ mod reduced {
                 );
             }
         }
+    }
+
+    fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) {
+        let pre = parser.accept(input.iter().copied());
+        let post = parser.sort().accept(input);
+        match pre {
+            Ok(out) => assert_eq!(Ok(out), post),
+            Err(ParseError::BadInput(_)) => {
+                assert!(matches!(post, Err(ParseError::BadInput(_)),));
+            }
+            Err(ParseError::BadParser(_)) => {}
+        };
     }
 
     #[test]
@@ -757,6 +775,209 @@ mod reduced {
                 initial: BTreeSet::new(),
             },
             &[],
+        );
+    }
+
+    #[test]
+    fn union_11() {
+        union(
+            &Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: vec![String::new()],
+                    tag: BTreeSet::new(),
+                }],
+                initial: BTreeSet::new(),
+            },
+            &Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                ],
+                initial: BTreeSet::new(),
+            },
+            &[],
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn sort_1() {
+        sort(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![],
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![],
+                        tag: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                0,
+                                CurryInput::Scrutinize(RangeMap {
+                                    entries: BTreeMap::new(),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Local,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Local,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Local,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: iter::once("\0".to_owned()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Scrutinize(RangeMap {
+                                    entries: BTreeMap::new(),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                1,
+                                CurryInput::Scrutinize(RangeMap {
+                                    entries: BTreeMap::new(),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: [Ok(0), Ok(8), Ok(9)].into_iter().collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(1)).collect(),
+                                act: Action::Pop,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: vec![String::new()],
+                        tag: BTreeSet::new(),
+                    },
+                ],
+                initial: iter::once(Ok(8)).collect(),
+            },
+            vec![0, 0],
         );
     }
 }

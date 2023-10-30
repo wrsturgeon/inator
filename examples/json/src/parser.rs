@@ -1,3 +1,5 @@
+//! Automatically generated with [inator](https://crates.io/crates/inator).
+
 #![allow(dead_code, unused_variables)]
 
 /// Descriptive parsing error.
@@ -9,7 +11,7 @@ pub enum Error {
         /// Index of the token that caused this error.
         index: usize,
         /// Particular token that didn't correspond to a rule.
-        token: char,
+        token: u8,
     },
     /// Token that would have closed a delimiter, but the delimiter wasn't open.
     Unopened {
@@ -27,6 +29,11 @@ pub enum Error {
         /// Type of thing that wasn't closed (e.g. parentheses).
         delimiter: types::Stack,
     },
+    /// Ended on a user-defined non-accepting state.
+    UserDefined {
+        /// User-defined error message.
+        messages: &'static [&'static str],
+    },
 }
 
 type R<I> = Result<(Option<(usize, types::Stack, Option<F<I>>)>, ()), Error>;
@@ -35,12 +42,8 @@ type R<I> = Result<(Option<(usize, types::Stack, Option<F<I>>)>, ()), Error>;
 struct F<I>(fn(&mut I, Option<types::Stack>, ()) -> R<I>);
 
 #[inline]
-pub fn parse<I: IntoIterator<Item = char>>(input: I) -> Result<(), Error> {
-    match state_0(
-        &mut input.into_iter().enumerate(),
-        None,
-        <() as Default>::default(),
-    )? {
+pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
+    match state_1(&mut input.into_iter().enumerate(), None, Default::default())? {
         (None, out) => Ok(out),
         (Some((index, context, None)), out) => panic!("Some(({index:?}, {context:?}, None))"),
         (Some((index, delimiter, Some(F(_)))), _) => Err(Error::Unopened {
@@ -52,7 +55,7 @@ pub fn parse<I: IntoIterator<Item = char>>(input: I) -> Result<(), Error> {
 }
 
 #[inline]
-fn state_0<I: Iterator<Item = (usize, char)>>(
+fn state_0<I: Iterator<Item = (usize, u8)>>(
     input: &mut I,
     context: Option<types::Stack>,
     acc: (),
@@ -60,6 +63,40 @@ fn state_0<I: Iterator<Item = (usize, char)>>(
     match input.next() {
         None => Ok((None, acc)),
         Some((index, token)) => match (&context, &token) {
+            _ => Err(Error::Absurd { index, token }),
+        },
+    }
+}
+
+#[inline]
+fn state_1<I: Iterator<Item = (usize, u8)>>(
+    input: &mut I,
+    context: Option<types::Stack>,
+    acc: (),
+) -> R<I> {
+    match input.next() {
+        None => Err(Error::UserDefined { messages: &["Expected only a single token on [b\'\\t\'..=b\'\\t\'] but got another token after it", "Expected only a single token on [b\'\\n\'..=b\'\\n\'] but got another token after it", "Expected only a single token on [b\'\\r\'..=b\'\\r\'] but got another token after it", "Expected only a single token on [b\' \'..=b\' \'] but got another token after it"] }),
+        Some((index, token)) => match (&context, &token) {
+            (&_, &(b'\t'..=b'\t')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
+            (&_, &(b'\n'..=b'\n')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
+            (&_, &(b'\r'..=b'\r')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
+            (&_, &(b' '..=b' ')) => match state_0(input, context, (|(), _| {})(acc, token))? {
+                (None, _) => todo!(),
+                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
+            },
             _ => Err(Error::Absurd { index, token }),
         },
     }

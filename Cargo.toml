@@ -15,4 +15,4 @@ inator-automata = { path = "automata" }
 quickcheck = { version = "1.0.3", optional = true }
 
 [features]
-quickcheck = ["dep:quickcheck"]
+quickcheck = ["dep:quickcheck", "inator-automata/quickcheck"]

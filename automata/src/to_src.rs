@@ -53,7 +53,8 @@ impl ToSrc for u8 {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        format!("{self}")
+        // format!("{self}")
+        format!("b'{}'", self.escape_ascii())
     }
     #[inline]
     #[must_use]
@@ -134,12 +135,25 @@ impl ToSrc for String {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        format!("\"{self}\".to_owned()")
+        format!("\"{}\".to_owned()", self.escape_default())
     }
     #[inline]
     #[must_use]
     fn src_type() -> String {
         "String".to_owned()
+    }
+}
+
+impl ToSrc for &str {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("\"{}\"", self.escape_default())
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "&'static str".to_owned()
     }
 }
 
@@ -170,7 +184,9 @@ impl<I: Input, S: Stack> Graph<I, S, usize> {
         });
         let stack_t = S::src_type();
         Ok(format!(
-            r#"#![allow(dead_code, unused_variables)]
+            r#"//! Automatically generated with [inator](https://crates.io/crates/inator).
+
+#![allow(dead_code, unused_variables)]
 
 /// Descriptive parsing error.
 #[allow(dead_code)]
@@ -199,6 +215,11 @@ pub enum Error {{
         /// Type of thing that wasn't closed (e.g. parentheses).
         delimiter: {stack_t},
     }},
+    /// Ended on a user-defined non-accepting state.
+    UserDefined {{
+        /// User-defined error message.
+        messages: &'static [&'static str],
+    }},
 }}
 
 type R<I> = Result<(Option<(usize, {stack_t}, Option<F<I>>)>, {output_t}), Error>;
@@ -211,7 +232,7 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
     match state_{}(
         &mut input.into_iter().enumerate(),
         None,
-        <{output_t} as Default>::default(),
+        Default::default(),
     )? {{
         (None, out) => Ok(out),
         (Some((index, context, None)), out) => panic!("Some(({{index:?}}, {{context:?}}, None))"),
@@ -252,9 +273,12 @@ fn state_{i}<I: Iterator<Item = (usize, {})>>(input: &mut I, context: Option<{}>
                 || "Ok((None, acc))".to_owned(),
                 |fst| {
                     get!(self.non_accepting, 1..).iter().fold(
-                        format!("Err(Error::UserDefined {{ messages: vec![{fst}"),
-                        |acc, msg| format!("{acc}, {msg}"),
-                    ) + "] }})"
+                        format!(
+                            "Err(Error::UserDefined {{ messages: &[{}",
+                            fst.as_str().to_src(),
+                        ),
+                        |acc, msg| format!("{acc}, {}", msg.as_str().to_src()),
+                    ) + "] })"
                 }
             ),
             self.transitions.to_src(),
@@ -341,7 +365,7 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
             Action::Local => format!(
                 r#"match state_{dst}(input, context, ({f})(acc, token))? {{
                 (None, _) => todo!(),
-                (Some((_, _, None)), acc) => Ok(acc),
+                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             }}"#,
             ),

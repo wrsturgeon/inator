@@ -172,6 +172,9 @@ mod to_src;
 mod transition;
 mod update;
 
+#[cfg(feature = "quickcheck")]
+mod qc;
+
 pub use {
     action::Action,
     check::{Check, IllFormed},
@@ -196,7 +199,4 @@ pub use {
 mod test;
 
 #[cfg(test)]
-use rand as _; // <-- needed in an example
-
-#[cfg(feature = "quickcheck")]
-mod qc;
+use rand as _; // <-- needed in examples

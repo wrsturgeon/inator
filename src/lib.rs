@@ -172,3 +172,67 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
         initial: iter::once(Ok(0)).collect(),
     }
 }
+
+/// Accept exactly this token and do exactly these things.
+#[inline]
+#[must_use]
+pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondeterministic<I, S> {
+    Graph {
+        states: vec![
+            State {
+                transitions: CurryStack {
+                    wildcard: None,
+                    map_none: None,
+                    map_some: BTreeMap::new(),
+                },
+                non_accepting: vec![],
+                tag: BTreeSet::new(),
+            },
+            State {
+                non_accepting: vec![format!(
+                    "Expected only a single token on [{}..={}] but got another token after it",
+                    range.first.to_src(),
+                    range.last.to_src(),
+                )],
+                transitions: CurryStack {
+                    wildcard: Some(CurryInput::Scrutinize(RangeMap {
+                        entries: iter::once((
+                            range,
+                            Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update,
+                            },
+                        ))
+                        .collect(),
+                    })),
+                    map_none: None,
+                    map_some: BTreeMap::new(),
+                },
+                tag: BTreeSet::new(),
+            },
+        ],
+        initial: iter::once(Ok(1)).collect(),
+    }
+}
+
+/// Accept exactly this token and do exactly these things.
+#[inline]
+#[must_use]
+pub fn tok<I: Input, S: Stack>(token: I, update: Update<I>) -> Nondeterministic<I, S> {
+    any_of(Range::unit(token), update)
+}
+
+/// Accept exactly this token and do nothing.
+#[inline]
+#[must_use]
+pub fn toss<I: Input, S: Stack>(token: I) -> Nondeterministic<I, S> {
+    tok(token, update!(|(), _| {}))
+}
+
+/// Accept exactly this token and do nothing.
+#[inline]
+#[must_use]
+pub fn toss_range<I: Input, S: Stack>(range: Range<I>) -> Nondeterministic<I, S> {
+    any_of(range, update!(|(), _| {}))
+}
