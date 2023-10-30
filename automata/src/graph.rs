@@ -328,17 +328,18 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 pub fn find_tag<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
     states: &'s [State<I, S, C>],
     tags: &str,
-) -> Result<&'s State<I, S, C>, IllFormed<I, S, C>> {
-    let mut acc = None;
-    for state in states {
-        if state.tags.iter().any(|s| s == tags) {
-            match acc {
-                None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tags.to_owned())),
-            }
+) -> Result<BTreeSet<&'s State<I, S, C>>, IllFormed<I, S, C>> {
+    let mut acc = states.iter().fold(BTreeSet::new(), |mut acc, s| {
+        if s.tags.iter().any(|s| s == tags) {
+            acc.insert(s);
         }
+        acc
+    });
+    if acc.is_empty() {
+        Err(IllFormed::TagDNE(tags.to_owned()))
+    } else {
+        Ok(acc)
     }
-    acc.ok_or(IllFormed::TagDNE(tags.to_owned()))
 }
 
 /// Look up a tag and return the specific state tagged with it.
@@ -349,17 +350,18 @@ pub fn find_tag<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
 pub fn find_tag_mut<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
     states: &'s mut [State<I, S, C>],
     tags: &str,
-) -> Result<&'s mut State<I, S, C>, IllFormed<I, S, C>> {
-    let mut acc = None;
-    for state in states {
-        if state.tags.iter().any(|s| s == tags) {
-            match acc {
-                None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tags.to_owned())),
-            }
+) -> Result<BTreeSet<&'s mut State<I, S, C>>, IllFormed<I, S, C>> {
+    let mut acc = states.iter_mut().fold(BTreeSet::new(), |mut acc, s| {
+        if s.tags.iter().any(|s| s == tags) {
+            acc.insert(s);
         }
+        acc
+    });
+    if acc.is_empty() {
+        Err(IllFormed::TagDNE(tags.to_owned()))
+    } else {
+        Ok(acc)
     }
-    acc.ok_or(IllFormed::TagDNE(tags.to_owned()))
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.
