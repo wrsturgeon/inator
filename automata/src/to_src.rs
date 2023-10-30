@@ -218,7 +218,7 @@ pub enum Error {{
     /// Ended on a user-defined non-accepting state.
     UserDefined {{
         /// User-defined error message.
-        messages: &[&'static str],
+        messages: &'static [&'static str],
     }},
 }}
 
@@ -365,7 +365,7 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
             Action::Local => format!(
                 r#"match state_{dst}(input, context, ({f})(acc, token))? {{
                 (None, _) => todo!(),
-                (Some((_, _, None)), acc) => Ok(acc),
+                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             }}"#,
             ),
