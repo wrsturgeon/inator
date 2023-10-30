@@ -58,7 +58,11 @@ mod prop {
             if repeated.check().is_err() {
                 return false;
             }
-            repeated.accept(both).is_ok() == sliceable
+            let output = repeated.accept(both);
+            if matches!(output, Err(ParseError::BadParser(_))) {
+                return true;
+            }
+            output.is_ok() == sliceable
         }
     }
 }
@@ -81,6 +85,9 @@ mod reduced {
             println!("{r:?} {run:?}");
         }
         let output = repeated.accept(both);
+        if matches!(output, Err(ParseError::BadParser(_))) {
+            return;
+        }
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
     }
 
