@@ -7,7 +7,7 @@
 //! Execute an automaton on an input sequence.
 
 use crate::{find_tag, try_merge, Ctrl, Graph, IllFormed, Input, Stack};
-use core::fmt;
+use core::{fmt, iter};
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
@@ -110,12 +110,12 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
             .map_err(ParseError::BadParser),
     })?;
     let mut states = ctrl.view().map(|r| match r {
-        Ok(i) => get!(graph.states, i),
+        Ok(i) => iter::once(get!(graph.states, i)).collect(),
         Err(s) => find_tag(&graph.states, s).unwrap_or_else(|_| never!()),
     });
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
-            if states.any(|s| s.non_accepting.is_empty()) {
+            if states.any(|set| set.into_iter().any(|s| s.non_accepting.is_empty())) {
                 Ok((None, output_t.to_owned()))
             } else {
                 Err(ParseError::BadInput(InputError::NotAccepting))
@@ -125,9 +125,12 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
         };
     };
     let maybe_stack_top = stack.last();
-    let transitions = states.filter_map(|s| match s.transitions.get(maybe_stack_top, &token) {
-        Err(e) => Some(Err(e)),
-        Ok(opt) => opt.map(Ok),
+    let transitions = states.flat_map(|set| {
+        set.into_iter()
+            .filter_map(|s| match s.transitions.get(maybe_stack_top, &token) {
+                Err(e) => Some(Err(e)),
+                Ok(opt) => opt.map(Ok),
+            })
     });
     try_merge(transitions).map_or(Err(ParseError::BadInput(InputError::Absurd)), |r| {
         r.map_or_else(

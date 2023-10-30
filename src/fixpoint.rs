@@ -6,7 +6,7 @@
 
 //! Fixpoint: just a tagged state that can be called later.
 
-use core::ops;
+use core::{iter, ops};
 use inator_automata::*;
 
 /// Tagged state that can be called later.
@@ -24,8 +24,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
             initial,
         } = rhs;
         for r in initial.view() {
-            let _ = match r {
-                Ok(i) => get_mut!(states, i),
+            for state in match r {
+                Ok(i) => iter::once(get_mut!(states, i)).collect(),
                 Err(tag) => find_tag_mut(&mut states, tag).map_or_else(
                     |_| {
                         panic!(
@@ -36,9 +36,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
                     },
                     |s| s,
                 ),
+            } {
+                let _ = state.tags.insert(self.0.clone());
             }
-            .tags
-            .insert(self.0.clone());
         }
         Graph { states, initial }
     }
