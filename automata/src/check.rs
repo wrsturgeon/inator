@@ -18,56 +18,6 @@ const _MAX_ILL_FORMED_BYTES: usize = 64;
 #[allow(clippy::indexing_slicing)] // <-- that's the point
 const _: () = [(); _MAX_ILL_FORMED_BYTES][mem::size_of::<IllFormed<(), (), usize>>()];
 
-/*
-print-type-size type: `check::IllFormed<(), (), usize>`: 136 bytes, alignment: 8 bytes
-print-type-size     discriminant: 1 bytes
-print-type-size     variant `IncompatibleCallbacks`: 135 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 64 bytes, alignment: 8 bytes
-print-type-size         field `.1`: 64 bytes
-print-type-size     variant `TypeMismatch`: 55 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
-print-type-size         field `.1`: 24 bytes
-print-type-size     variant `WrongReturnType`: 55 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
-print-type-size         field `.1`: 24 bytes
-print-type-size     variant `TagDNE`: 31 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
-print-type-size     variant `DuplicateTag`: 31 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
-print-type-size     variant `InitialNotUnit`: 31 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 24 bytes, alignment: 8 bytes
-print-type-size     variant `WildcardMask`: 23 bytes
-print-type-size         field `.arg_stack`: 1 bytes
-print-type-size         field `.arg_token`: 1 bytes
-print-type-size         padding: 5 bytes
-print-type-size         field `.possibility_1`: 8 bytes, alignment: 8 bytes
-print-type-size         field `.possibility_2`: 8 bytes
-print-type-size     variant `Superposition`: 23 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 8 bytes, alignment: 8 bytes
-print-type-size         field `.1`: 8 bytes
-print-type-size     variant `OutOfBounds`: 15 bytes
-print-type-size         padding: 7 bytes
-print-type-size         field `.0`: 8 bytes, alignment: 8 bytes
-print-type-size     variant `IncompatibleStackActions`: 2 bytes
-print-type-size         field `.0`: 1 bytes
-print-type-size         field `.1`: 1 bytes
-print-type-size     variant `ProlongingDeath`: 0 bytes
-print-type-size     variant `InvertedRange`: 0 bytes
-print-type-size         field `.0`: 0 bytes
-print-type-size         field `.1`: 0 bytes
-print-type-size     variant `RangeMapOverlap`: 0 bytes
-print-type-size         field `.0`: 0 bytes
-print-type-size     variant `DuplicateState`: 0 bytes
-print-type-size     variant `UnsortedStates`: 0 bytes
-*/
-
 /// Witness to an ill-formed automaton (or part thereof).
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -103,8 +53,6 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
     UnsortedStates,
     /// Reference to a tagged state, but no state has that tag.
     TagDNE(String),
-    /// Two states have identical tags.
-    DuplicateTag(String),
     /// An initial state expects an accumulator argument that is not `()`.
     InitialNotUnit(String),
     /// Tried to merge two states who need different output types.
@@ -140,7 +88,6 @@ impl<I: Input, S: Stack> IllFormed<I, S, usize> {
             IllFormed::DuplicateState => IllFormed::DuplicateState,
             IllFormed::UnsortedStates => IllFormed::UnsortedStates,
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
-            IllFormed::DuplicateTag(s) => IllFormed::DuplicateTag(s),
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
             IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
