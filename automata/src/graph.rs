@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{cmp::Ordering, mem, num::NonZeroUsize};
+use core::{cmp::Ordering, iter, mem, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -58,36 +58,43 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for Graph<I, S, C> {
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
-    /// Check well-formedness.
+    /// Check a subset of well-formedness.
     /// Note that this can't check if determinization will succeed in less time than actually trying;
-    /// if you want to see if there will be any runtime errors, just determinize it.
+    /// if you want to see if there can be any runtime errors, just try to determinize it.
     /// # Errors
     /// When ill-formed (with a witness).
     #[inline]
     pub fn check(&self) -> Result<(), IllFormed<I, S, C>> {
         let n_states = self.states.len();
         for r in self.initial.view() {
-            let state = match r {
+            let states = match r {
                 Ok(i) => {
                     if let Some(state) = self.states.get(i) {
-                        state
+                        iter::once(state).collect()
                     } else {
                         return Err(IllFormed::OutOfBounds(i));
                     }
                 }
                 Err(tags) => find_tag(&self.states, tags)?,
             };
-            let input_t = state.input_type()?;
-            #[allow(clippy::match_same_arms)] // TBD
-            match input_t {
-                None /* core::convert::Infallible */ => {} // return Err(IllFormed::NoEntryPoints),
-                Some(t) if t == "()" => {}
-                Some(other) => return Err(IllFormed::InitialNotUnit(other)),
-            }
-            for curry in state.transitions.values() {
-                for transition in curry.values() {
-                    if transition.update.input_t != "()" {
-                        return Err(IllFormed::InitialNotUnit(transition.update.input_t.clone()));
+            let typed = states.into_iter().try_fold(vec![], |mut acc, s| {
+                acc.push((s, s.input_type()?));
+                Ok(acc)
+            })?;
+            for (state, input_t) in typed {
+                #[allow(clippy::match_same_arms)] // TBD
+                match input_t {
+                    None => {}
+                    Some(t) if t == "()" => {}
+                    Some(other) => return Err(IllFormed::InitialNotUnit(other)),
+                }
+                for curry in state.transitions.values() {
+                    for transition in curry.values() {
+                        if transition.update.input_t != "()" {
+                            return Err(IllFormed::InitialNotUnit(
+                                transition.update.input_t.clone(),
+                            ));
+                        }
                     }
                 }
             }
@@ -116,11 +123,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         }
         for r in run.ctrl.view() {
             if match r {
-                Ok(i) => get!(self.states, i),
+                Ok(i) => iter::once(get!(self.states, i)).collect(),
                 Err(s) => find_tag(&self.states, s).map_err(ParseError::BadParser)?,
             }
-            .non_accepting
-            .is_empty()
+            .into_iter()
+            .any(|s| s.non_accepting.is_empty())
             {
                 return Ok(run.output_t);
             }
@@ -187,10 +194,14 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         };
 
         // Merge this subset of states into one (most of the heavy lifting)
-        let mega_state: State<I, S, C> = match try_merge(subset.view().map(|r| match r {
-            Ok(i) => Ok(get!(self.states, i).clone()),
-            Err(s) => find_tag(&self.states, s).map(Clone::clone),
-        })) {
+        let result_iterator = subset.view().flat_map(|r| match r {
+            Ok(i) => iter::once(Ok(get!(self.states, i).clone())).collect(),
+            Err(s) => find_tag(&self.states, s).map_or_else(
+                |e| vec![Err(e)],
+                |set| set.into_iter().map(|st| Ok(st.clone())).collect(),
+            ),
+        });
+        let mega_state: State<I, S, C> = match try_merge(result_iterator) {
             // If no state follows, reject immediately.
             None => State {
                 transitions: CurryStack {
@@ -327,18 +338,19 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 #[allow(clippy::type_complexity)]
 pub fn find_tag<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
     states: &'s [State<I, S, C>],
-    tags: &str,
-) -> Result<&'s State<I, S, C>, IllFormed<I, S, C>> {
-    let mut acc = None;
-    for state in states {
-        if state.tags.iter().any(|s| s == tags) {
-            match acc {
-                None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tags.to_owned())),
-            }
+    tag: &str,
+) -> Result<BTreeSet<&'s State<I, S, C>>, IllFormed<I, S, C>> {
+    let acc = states.iter().fold(BTreeSet::new(), |mut acc, s| {
+        if s.tags.iter().any(|st| st == tag) {
+            let _ = acc.insert(s);
         }
+        acc
+    });
+    if acc.is_empty() {
+        Err(IllFormed::TagDNE(tag.to_owned()))
+    } else {
+        Ok(acc)
     }
-    acc.ok_or(IllFormed::TagDNE(tags.to_owned()))
 }
 
 /// Look up a tag and return the specific state tagged with it.
@@ -348,18 +360,20 @@ pub fn find_tag<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
 #[allow(clippy::type_complexity)]
 pub fn find_tag_mut<'s, I: Input, S: Stack, C: Ctrl<I, S>>(
     states: &'s mut [State<I, S, C>],
-    tags: &str,
-) -> Result<&'s mut State<I, S, C>, IllFormed<I, S, C>> {
-    let mut acc = None;
-    for state in states {
-        if state.tags.iter().any(|s| s == tags) {
-            match acc {
-                None => acc = Some(state),
-                Some(..) => return Err(IllFormed::DuplicateTag(tags.to_owned())),
-            }
+    tag: &str,
+) -> Result<BTreeSet<&'s mut State<I, S, C>>, IllFormed<I, S, C>> {
+    #[allow(clippy::mutable_key_type)]
+    let acc = states.iter_mut().fold(BTreeSet::new(), |mut acc, s| {
+        if s.tags.iter().any(|st| st == tag) {
+            let _ = acc.insert(s);
         }
+        acc
+    });
+    if acc.is_empty() {
+        Err(IllFormed::TagDNE(tag.to_owned()))
+    } else {
+        Ok(acc)
     }
-    acc.ok_or(IllFormed::TagDNE(tags.to_owned()))
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.
