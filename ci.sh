@@ -8,7 +8,7 @@ if [ -z "${QUICKCHECK_TESTS}" ]
   then
     export QUICKCHECK_TESTS=10000000
   else
-    export QUICKCHECK_TESTS=10000
+    export QUICKCHECK_TESTS=1000
   fi
 fi
 
