@@ -74,10 +74,8 @@ done
 git add -A
 nix build
 
-export GREP_RELEVANT='grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir=examples/json/JSONTestSuite --exclude=ci.sh -e'
-
 # Check for remaining `FIXME`s
-$GREP_RELEVANT FIXME && exit 1 || : # next line checks result
+grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir='*JSONTestSuite*' --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
 
 # Print remaining `TODO`s
-$GREP_RELEVANT TODO || :
+grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir='*JSONTestSuite*' --exclude=ci.sh -e TODO || :
