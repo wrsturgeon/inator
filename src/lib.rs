@@ -137,17 +137,37 @@ macro_rules! get_mut {
     }};
 }
 
+/// One-argument function.
+#[macro_export]
+macro_rules! f1 {
+    ($ex:expr) => {
+        $crate::F1::_from_macro(stringify!($ex).to_owned(), $ex)
+    };
+}
+
+/// One-argument function.
+#[macro_export]
+macro_rules! f2 {
+    ($ex:expr) => {
+        $crate::F2::_from_macro(stringify!($ex).to_owned(), $ex)
+    };
+}
+
 // TODO: derive ToSrc
 
+mod f;
 mod fixpoint;
+mod num;
 mod recurse;
 
 #[cfg(test)]
 mod test;
 
 pub use {
+    f::{F1, F2},
     fixpoint::{fixpoint, Fixpoint},
     inator_automata::*,
+    num::integer,
     recurse::{recurse, Recurse},
 };
 
@@ -238,4 +258,52 @@ pub fn toss<I: Input, S: Stack>(token: I) -> Nondeterministic<I, S> {
 #[must_use]
 pub fn toss_range<I: Input, S: Stack>(range: Range<I>) -> Nondeterministic<I, S> {
     any_of(range, update!(|(), _| {}))
+}
+
+/// Run this parser, then apply this function to the result.
+#[inline]
+#[must_use]
+pub fn process<I: Input, S: Stack, C: Ctrl<I, S>>(
+    parser: Graph<I, S, C>,
+    combinator: F1,
+) -> Graph<I, S, C> {
+    let Ok(parser_output_t) = parser.output_type() else {
+        panic!("Inconsistent types in the parser argument to `process`.")
+    };
+    if parser_output_t != Some(combinator.arg_t) {
+        panic!(
+            "Called `process` with a function that wants an input of type `{}`, \
+            but the parser {}.",
+            combinator.arg_t,
+            parser_output_t
+                .map_or_else(|| "never returns".to_owned(), |t| format!("returns `{t}`"))
+        );
+    }
+    todo!()
+}
+
+/// Save the current value and put it aside, run this second parser from scratch, then combine the results.
+#[inline]
+#[must_use]
+pub fn combine<I: Input, S: Stack, C: Ctrl<I, S>>(
+    parser: Graph<I, S, C>,
+    combinator: F2,
+) -> Graph<I, S, C> {
+    let Ok(maybe_parser_input_t) = parser.input_type() else {
+        panic!("Inconsistent types in the parser argument to `combine`.")
+    };
+    let Some(parser_output_t) = maybe_parser_input_t else {
+        panic!(
+            "Parser argument to `combine` has no initial states, \
+            so it can never parse anything.",
+        )
+    };
+    if parser_output_t != "()" {
+        panic!(
+            "Called `combine` with a parser that doesn't start from scratch \
+            (it asks for an input of type `{parser_output_t}` instead of `()`)."
+        );
+    }
+    // TODO: We might have to define a `Combine` struct to handle the `>>` operator
+    todo!()
 }

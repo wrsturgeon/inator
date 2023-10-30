@@ -261,6 +261,18 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             })
     }
 
+    /// Compute the output type of any successful run.
+    /// # Errors
+    /// If multiple accepting states attempt to return different types.
+    #[inline]
+    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
+        self.states
+            .iter()
+            .try_fold(None, |acc: Option<String>, state| {
+                Ok(state.input_type()?.or(acc))
+            })
+    }
+
     /// Check if states are sorted.
     /// # Errors
     /// If there are duplicate states or any out of order.
