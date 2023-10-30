@@ -5,6 +5,8 @@
  */
 
 #![allow(
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
     clippy::integer_division,
     clippy::panic,
     clippy::print_stdout,
@@ -294,6 +296,14 @@ mod prop {
                 Err(ParseError::BadParser(_)) => true
             }
         }
+
+        fn shr(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
+            let splittable = (0..=input.len()).any(|i| {
+                lhs.accept(input[..i].iter().copied()).is_ok() &&
+                rhs.accept(input[i..].iter().copied()).is_ok()
+            });
+            (lhs >> rhs).accept(input).is_ok() == splittable
+        }
     }
 }
 
@@ -418,6 +428,14 @@ mod reduced {
             }
             Err(ParseError::BadParser(_)) => {}
         };
+    }
+
+    fn shr(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, input: Vec<u8>) {
+        let splittable = (0..=input.len()).any(|i| {
+            lhs.accept(input[..i].iter().copied()).is_ok()
+                && rhs.accept(input[i..].iter().copied()).is_ok()
+        });
+        assert_eq!((lhs >> rhs).accept(input).is_ok(), splittable);
     }
 
     #[test]
@@ -978,6 +996,41 @@ mod reduced {
                 initial: iter::once(Ok(8)).collect(),
             },
             vec![0, 0],
+        );
+    }
+
+    #[test]
+    fn shr_1() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                    tags: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+            },
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                    tags: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+            },
+            vec![0],
         );
     }
 }

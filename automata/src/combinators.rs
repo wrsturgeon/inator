@@ -32,13 +32,10 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
     }
 }
 
-impl<I: Input, S: Stack> ops::BitAnd for Nondeterministic<I, S> {
+impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
-    #[allow(clippy::todo, unused_mut, unused_variables)]
-    fn bitand(mut self, other: Self) -> Self {
-        // Note that intersection on pushdown automata is impossible;
-        // we just reject a subset of automata that wouldn't work.
-        todo!() // TODO
+    fn shr(self, _: Self) -> Self::Output {
+        self
     }
 }
