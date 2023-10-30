@@ -204,7 +204,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
     pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
-            non_accepting: Vec::arbitrary(g),
+            non_accepting: BTreeSet::arbitrary(g),
             tags: BTreeSet::arbitrary(g),
         }
     }
