@@ -272,7 +272,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 mlast.map_or(Ok(Some(curr)), |last: &State<I, S, C>| {
                     match last.cmp(curr) {
                         Ordering::Less => Ok(Some(curr)),
-                        Ordering::Equal => Err(IllFormed::DuplicateState),
+                        Ordering::Equal => Err(IllFormed::DuplicateState(Box::new(curr.clone()))),
                         Ordering::Greater => Err(IllFormed::UnsortedStates),
                     }
                 })
@@ -319,7 +319,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
             })
             .collect();
-        let mut states: Vec<_> = self
+        let states: Vec<_> = self
             .states
             .iter()
             .map(|s| State {
@@ -327,7 +327,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 ..s.reindex(&self.states, &index_map)
             })
             .collect();
-        states.dedup();
         Graph { states, initial }
     }
 }
