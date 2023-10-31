@@ -25,12 +25,6 @@ cargo fmt --check
 cargo clippy --all-targets --no-default-features
 cargo clippy --all-targets --all-features
 
-# Extremely slow (but lovely) UB checks
-cargo +nightly miri test --no-default-features
-cargo +nightly miri test --no-default-features --examples
-cargo +nightly miri test -r --no-default-features
-cargo +nightly miri test -r --no-default-features --examples
-
 # Non-property tests
 cargo test --no-default-features
 cargo test --no-default-features --examples
@@ -61,6 +55,12 @@ do
     cd ../..
   fi
 done
+
+# Extremely slow (but lovely) UB checks
+cargo +nightly miri test --no-default-features
+cargo +nightly miri test --no-default-features --examples
+cargo +nightly miri test -r --no-default-features
+cargo +nightly miri test -r --no-default-features --examples
 
 # Nix build status
 git add -A
