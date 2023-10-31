@@ -7,8 +7,8 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Deterministic, IllFormed, Input, Nondeterministic, Range,
-    RangeMap, Stack, State, Transition, Update,
+    Action, Ctrl, CurryInput, CurryStack, Deterministic, Graph, IllFormed, Input, Range, RangeMap,
+    Stack, State, Transition, Update,
 };
 use core::{borrow::Borrow, ops::Bound};
 use std::collections::{BTreeMap, BTreeSet};
@@ -88,7 +88,7 @@ impl<T: ToSrc> ToSrc for BTreeSet<T> {
             return format!("core::iter::once({}).collect()", fst.to_src());
         };
         format!(
-            "[{}, {}{}].collect()",
+            "[{}, {}{}].into_iter().collect()",
             fst.to_src(),
             snd.to_src(),
             iter.fold(String::new(), |acc, x| format!("{acc}, {}", x.to_src())),
@@ -135,7 +135,11 @@ impl ToSrc for String {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        format!("\"{}\".to_owned()", self.escape_default())
+        if self.is_empty() {
+            "String::new()".to_owned()
+        } else {
+            format!("\"{}\".to_owned()", self.escape_default())
+        }
     }
     #[inline]
     #[must_use]
@@ -391,7 +395,7 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
     }
 }
 
-impl<I: Input, S: Stack> ToSrc for Nondeterministic<I, S> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for Graph<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
@@ -428,7 +432,7 @@ impl<T: ToSrc> ToSrc for Vec<T> {
     }
 }
 
-impl<I: Input, S: Stack> ToSrc for State<I, S, BTreeSet<Result<usize, String>>> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for State<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
@@ -448,7 +452,7 @@ impl<I: Input, S: Stack> ToSrc for State<I, S, BTreeSet<Result<usize, String>>> 
     }
 }
 
-impl<I: Input, S: Stack> ToSrc for CurryStack<I, S, BTreeSet<Result<usize, String>>> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for CurryStack<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
@@ -468,7 +472,7 @@ impl<I: Input, S: Stack> ToSrc for CurryStack<I, S, BTreeSet<Result<usize, Strin
     }
 }
 
-impl<I: Input, S: Stack> ToSrc for CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for CurryInput<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         match *self {
@@ -486,7 +490,7 @@ impl<I: Input, S: Stack> ToSrc for CurryInput<I, S, BTreeSet<Result<usize, Strin
     }
 }
 
-impl<I: Input, S: Stack> ToSrc for RangeMap<I, S, BTreeSet<Result<usize, String>>> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for RangeMap<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!("RangeMap {{ entries: {} }}", self.entries.to_src())
@@ -536,7 +540,7 @@ impl<A: ToSrc, B: ToSrc> ToSrc for (A, B) {
     }
 }
 
-impl<I: Input, S: Stack> ToSrc for Transition<I, S, BTreeSet<Result<usize, String>>> {
+impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for Transition<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(

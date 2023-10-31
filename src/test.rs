@@ -5,6 +5,7 @@
  */
 
 #![allow(
+    clippy::absolute_paths,
     clippy::arithmetic_side_effects,
     clippy::indexing_slicing,
     clippy::print_stdout,
@@ -69,6 +70,7 @@ mod prop {
 
 mod reduced {
     use super::*;
+    use core::marker::PhantomData;
 
     fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {
         parser.check().unwrap();
@@ -89,6 +91,10 @@ mod reduced {
             return;
         }
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
+    }
+
+    fn sort(parser: Nondeterministic<u8, u8>) {
+        parser.sort().check_sorted().unwrap();
     }
 
     #[test]
@@ -305,58 +311,65 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_7() {
-        fixpoint_repeat(
-            Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
+    fn sort_1() {
+        sort(Nondeterministic {
+            states: vec![
+                State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
                     },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: iter::once(String::new()).collect(),
+                    non_accepting: std::collections::BTreeSet::<String>::new(),
+                    tags: core::iter::once("da capo".to_owned()).collect(),
+                },
+                State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
                     },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|(), _| {}),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
+                    non_accepting: std::collections::BTreeSet::<String>::new(),
+                    tags: core::iter::once(String::new()).collect(),
+                },
+                State {
+                    transitions: CurryStack {
+                        wildcard: Some(CurryInput::Wildcard(Transition {
+                            dst: core::iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: Update {
+                                input_t: "()".to_owned(),
+                                output_t: "()".to_owned(),
+                                ghost: PhantomData,
+                                src: "|(), _| {}",
+                            },
+                        })),
+                        map_none: None,
+                        map_some: BTreeMap::new(),
                     },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(1)).collect(),
-                                act: Action::Local,
-                                update: update!(|(), _| {}),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
+                    non_accepting: std::collections::BTreeSet::<String>::new(),
+                    tags: std::collections::BTreeSet::<String>::new(),
+                },
+                State {
+                    transitions: CurryStack {
+                        wildcard: Some(CurryInput::Wildcard(Transition {
+                            dst: core::iter::once(Ok(1)).collect(),
+                            act: Action::Local,
+                            update: Update {
+                                input_t: "()".to_owned(),
+                                output_t: "()".to_owned(),
+                                ghost: PhantomData,
+                                src: "|(), _| {}",
+                            },
+                        })),
+                        map_none: None,
+                        map_some: BTreeMap::new(),
                     },
-                ],
-                initial: iter::once(Ok(0)).collect(),
-            },
-            vec![],
-        );
+                    non_accepting: std::collections::BTreeSet::<String>::new(),
+                    tags: std::collections::BTreeSet::<String>::new(),
+                },
+            ],
+            initial: core::iter::once(Ok(0)).collect(),
+        });
     }
 }

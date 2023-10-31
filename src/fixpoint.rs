@@ -40,9 +40,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
                 let _ = state.tags.insert(self.0.clone());
             }
         }
-        let out = Graph { states, initial }.sort();
+        let orig = Graph { states, initial };
+        let orig_src = orig.to_src();
+        let out = orig.sort();
         if out.check_sorted().is_err() {
-            panic!("Sorting error: {}", out.to_src());
+            panic!("Sorting error: {orig_src}");
         }
         out
     }
