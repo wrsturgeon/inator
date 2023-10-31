@@ -12,6 +12,7 @@ use core::ops;
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
+    #[allow(clippy::manual_assert, clippy::panic)]
     fn bitor(mut self, other: Self) -> Self {
         // Note that union on pushdown automata is undecidable;
         // we just reject a subset of automata that wouldn't work.
