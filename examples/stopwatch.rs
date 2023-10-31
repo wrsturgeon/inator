@@ -17,7 +17,7 @@ fn main() {
                         tx.send(out).expect("Couldn't send to the main thread");
                     })
                     .expect("Couldn't start another thread");
-                while now.elapsed() < Duration::from_millis(1000) {
+                while now.elapsed() < Duration::from_secs(10) {
                     if let Ok(ok) = rx.try_recv() {
                         return Some(ok);
                     }
