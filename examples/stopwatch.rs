@@ -20,7 +20,7 @@ fn main() {
                 tx_o.send(out).expect("Couldn't send to the main thread");
             });
             let _time = thread::spawn(move || {
-                thread::sleep(Duration::from_millis(100));
+                thread::sleep(Duration::from_millis(1000));
                 rx_t.try_recv().expect("Time's up!");
             });
             rx_o.recv()
@@ -50,11 +50,11 @@ fn main() {
         let pc = Arc::clone(&parser);
         let bc = Arc::clone(&both);
         let sliceable = time!(sliceable(&pc, &bc));
-        let first_half = time!(fixpoint("da capo") >> Arc::into_inner(parser).unwrap());
+        let first_half = time!(fixpoint("da capo") >> parser.as_ref().clone());
         let repeated = Arc::new(time!(first_half >> recurse("da capo")));
         let rc = Arc::clone(&repeated);
         time!(rc.check()).unwrap();
-        let output = time!(repeated.accept(Arc::into_inner(both).unwrap()));
+        let output = time!(repeated.accept(both.as_ref().clone()));
         if matches!(output, Err(ParseError::BadParser(_))) {
             return;
         }
