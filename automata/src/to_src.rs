@@ -7,11 +7,11 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Graph, IllFormed, Input, Range, RangeMap, Stack, State,
-    Transition,
+    Action, CurryInput, CurryStack, Deterministic, IllFormed, Input, Nondeterministic, Range,
+    RangeMap, Stack, State, Transition, Update,
 };
 use core::{borrow::Borrow, ops::Bound};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Translate a value into Rust source code that reproduces it.
 pub trait ToSrc {
@@ -97,7 +97,7 @@ impl<T: ToSrc> ToSrc for BTreeSet<T> {
     #[inline]
     #[must_use]
     fn src_type() -> String {
-        "std::collections::BTreeSet::<usize>".to_owned()
+        format!("std::collections::BTreeSet::<{}>", T::src_type())
     }
 }
 
@@ -121,7 +121,7 @@ impl<T: ToSrc, E: ToSrc> ToSrc for Result<T, E> {
     fn to_src(&self) -> String {
         self.as_ref().map_or_else(
             |e| format!("Err({})", e.to_src()),
-            |x| format!("Some({})", x.to_src()),
+            |x| format!("Ok({})", x.to_src()),
         )
     }
     #[inline]
@@ -170,7 +170,7 @@ impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
     }
 }
 
-impl<I: Input, S: Stack> Graph<I, S, usize> {
+impl<I: Input, S: Stack> Deterministic<I, S> {
     /// Translate a value into Rust source code that reproduces it.
     /// # Errors
     /// If this automaton is ill-formed.
@@ -388,5 +388,201 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
                 _ => todo!(),
             },
         }
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for Nondeterministic<I, S> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "Nondeterministic {{ states: {}, initial: {} }}",
+            self.states.to_src(),
+            self.initial.to_src()
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Nondeterministic::<{}, {}>", I::src_type(), S::src_type())
+    }
+}
+
+impl<T: ToSrc> ToSrc for Vec<T> {
+    #[inline]
+    fn to_src(&self) -> String {
+        self.first().map_or_else(
+            || "vec![]".to_owned(),
+            |fst| {
+                format!(
+                    "vec![{}{}]",
+                    fst.to_src(),
+                    get!(self, 1..)
+                        .iter()
+                        .fold(String::new(), |acc, x| format!("{acc}, {}", x.to_src()))
+                )
+            },
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Vce::<{}>", T::src_type())
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for State<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "State {{ transitions: {}, non_accepting: {}, tags: {} }}",
+            self.transitions.to_src(),
+            self.non_accepting.to_src(),
+            self.tags.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "State::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for CurryStack<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "CurryStack {{ wildcard: {}, map_none: {}, map_some: {} }}",
+            self.wildcard.to_src(),
+            self.map_none.to_src(),
+            self.map_some.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "CurryStack::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        match *self {
+            Self::Wildcard(ref w) => format!("CurryInput::Wildcard({})", w.to_src()),
+            Self::Scrutinize(ref s) => format!("CurryInput::Scrutinize({})", s.to_src()),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "CurryInput::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for RangeMap<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!("RangeMap {{ entries: {} }}", self.entries.to_src())
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "RangeMap::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<K: Clone + Ord + ToSrc, V: Clone + ToSrc> ToSrc for BTreeMap<K, V> {
+    #[inline]
+    fn to_src(&self) -> String {
+        match self.len() {
+            0 => "BTreeMap::new()".to_owned(),
+            1 => format!("iter::once({}).collect()", {
+                let (k, v) = unwrap!(self.first_key_value());
+                (k.clone(), v.clone()).to_src()
+            }),
+            _ => format!(
+                "{}.into_iter().collect()",
+                self.iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>()
+                    .to_src()
+            ),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("BTreeMap::<{}, {}>", K::src_type(), V::src_type())
+    }
+}
+
+impl<A: ToSrc, B: ToSrc> ToSrc for (A, B) {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!("({}, {})", self.0.to_src(), self.1.to_src())
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("({}, {})", A::src_type(), B::src_type())
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for Transition<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "Transition {{ dst: {}, act: {}, update: {} }}",
+            self.dst.to_src(),
+            self.act.to_src(),
+            self.update.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "Transition::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<S: Stack> ToSrc for Action<S> {
+    #[inline]
+    fn to_src(&self) -> String {
+        match *self {
+            Self::Local => "Action::Local".to_owned(),
+            Self::Push(ref s) => format!("Action::Push({})", s.to_src()),
+            Self::Pop => "Action::Pop".to_owned(),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Action::<{}>", S::src_type())
+    }
+}
+
+impl<I: Input> ToSrc for Update<I> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "Update {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
+            self.input_t.to_src(),
+            self.output_t.to_src(),
+            self.src.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Update::<{}>", I::src_type())
     }
 }
