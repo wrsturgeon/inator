@@ -33,6 +33,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
     #[inline]
     #[allow(clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
+        println!("Evaluting `... >> Recurse(...`");
         let (accepting_indices, accepting_tags) = self.states.iter().enumerate().fold(
             (BTreeSet::new(), BTreeSet::new()),
             |(mut acc_i, mut acc_t), (i, s)| {
@@ -43,6 +44,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 (acc_i, acc_t)
             },
         );
+        println!("Found all accepting indices and tags");
         let mut out = Graph {
             states: self
                 .states
@@ -54,9 +56,10 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .view()
                 .map(|r| r.map_err(str::to_owned))
                 .collect(),
-        }
-        .sort();
+        };
+        println!("Computed the initial output");
         while out.check_sorted().is_err() {
+            println!("Sorted it");
             out = out.sort();
         }
         out
