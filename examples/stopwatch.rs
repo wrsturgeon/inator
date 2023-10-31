@@ -70,15 +70,19 @@ fn main() {
         let parser = Arc::new(time!(Nondeterministic::<u8, u8>::arbitrary(
             &mut gc.lock().unwrap()
         )));
-        panic::catch_unwind(|| check(both, parser)).expect(
-            "
+        let pc = Arc::clone(&parser);
+        let bc = Arc::clone(&both);
+        if panic::catch_unwind(|| check(bc, pc)).is_err() {
+            panic!(
+                "
 Parser:
 {parser:?}
 
 Input:
 {both:?}
 ",
-        );
+            );
+        }
     }
 }
 
