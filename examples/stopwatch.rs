@@ -52,18 +52,20 @@ fn main() {
                     panic!(
                         "
 Parser:
-{shrunk:?}
+{:?}
 
 ",
+                        shrunk.to_src(),
                     )
                 }
             }
             panic!(
                 "
 Parser:
-{parser:?}
+{:?}
 
 ",
+                parser.to_src(),
             )
         }
     }

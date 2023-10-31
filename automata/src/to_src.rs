@@ -7,8 +7,8 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Action, CurryInput, CurryStack, Graph, IllFormed, Input, Range, RangeMap, Stack, State,
-    Transition,
+    Action, CurryInput, CurryStack, Deterministic, IllFormed, Input, Nondeterministic, Range,
+    RangeMap, Stack, State, Transition, Update,
 };
 use core::{borrow::Borrow, ops::Bound};
 use std::collections::BTreeSet;
@@ -170,7 +170,7 @@ impl<T: Clone + Ord + ToSrc> ToSrc for Range<T> {
     }
 }
 
-impl<I: Input, S: Stack> Graph<I, S, usize> {
+impl<I: Input, S: Stack> Deterministic<I, S> {
     /// Translate a value into Rust source code that reproduces it.
     /// # Errors
     /// If this automaton is ill-formed.
@@ -388,5 +388,113 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
                 _ => todo!(),
             },
         }
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for Nondeterministic<I, S> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "Nondeterministic {{ states: {}, initial: {} }}",
+            self.states.to_src(),
+            self.initial.to_src()
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Nondeterministic::<{}, {}>", I::src_type(), S::src_type())
+    }
+}
+
+impl<T: ToSrc> ToSrc for Vec<T> {
+    #[inline]
+    fn to_src(&self) -> String {
+        self.first().map_or_else(
+            || "vec![]".to_owned(),
+            |fst| {
+                format!(
+                    "vec![{}{}]",
+                    fst.to_src(),
+                    get!(self, 1..)
+                        .iter()
+                        .fold(String::new(), |acc, x| format!("{acc}, {}", x.to_src()))
+                )
+            },
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Vce::<{}>", T::src_type())
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for State<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "State {{ transitions: {}, non_accepting: {}, tags: {} }}",
+            self.transitions.to_src(),
+            self.non_accepting.to_src(),
+            self.tags.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "State::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for Transition<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "Transition {{ dst: {}, act: {}, update: {} }}",
+            self.dst.to_src(),
+            self.act.to_src(),
+            self.update.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "Transition::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<S: Stack> ToSrc for Action<S> {
+    #[inline]
+    fn to_src(&self) -> String {
+        match self {
+            Self::Local => "Action::Local".to_owned(),
+            Self::Push(s) => format!("Action::Push({})", s.to_src()),
+            Self::Pop => "Action::Pop".to_owned(),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Action::<{}>", S::src_type())
+    }
+}
+
+impl<I: Input> ToSrc for Update<I> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "Input {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
+            self.input_t.to_src(),
+            self.output_t.to_src(),
+            self.src.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Input::<{}>", I::src_type())
     }
 }

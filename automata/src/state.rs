@@ -17,7 +17,6 @@ pub struct State<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Map from input tokens to actions.
     pub transitions: CurryStack<I, S, C>,
     /// If input ends while in this state, should we accept?
-    // TODO: use a `BTreeSet`.
     pub non_accepting: BTreeSet<String>,
     /// Optional name for this state.
     pub tags: BTreeSet<String>,
