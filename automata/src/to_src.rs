@@ -11,7 +11,7 @@ use crate::{
     RangeMap, Stack, State, Transition, Update,
 };
 use core::{borrow::Borrow, ops::Bound};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Translate a value into Rust source code that reproduces it.
 pub trait ToSrc {
@@ -445,6 +445,94 @@ impl<I: Input, S: Stack> ToSrc for State<I, S, BTreeSet<Result<usize, String>>> 
             I::src_type(),
             S::src_type()
         )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for CurryStack<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "State {{ wildcard: {}, map_none: {}, map_some: {} }}",
+            self.wildcard.to_src(),
+            self.map_none.to_src(),
+            self.map_some.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "CurryStack::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        match *self {
+            Self::Wildcard(ref w) => format!("CurryInput::Wildcard({})", w.to_src()),
+            Self::Scrutinize(ref s) => format!("CurryInput::Scrutinize({})", s.to_src()),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "CurryInput::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<I: Input, S: Stack> ToSrc for RangeMap<I, S, BTreeSet<Result<usize, String>>> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!("RangeMap {{ entries: {} }}", self.entries.to_src())
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!(
+            "RangeMap::<{}, {}, BTreeSet<Result<usize, String>>>",
+            I::src_type(),
+            S::src_type()
+        )
+    }
+}
+
+impl<K: Clone + Ord + ToSrc, V: Clone + ToSrc> ToSrc for BTreeMap<K, V> {
+    #[inline]
+    fn to_src(&self) -> String {
+        match self.len() {
+            0 => format!("BTreeMap::new()"),
+            1 => format!("iter::once({}).collect()", {
+                let (k, v) = unwrap!(self.first_key_value());
+                (k.clone(), v.clone()).to_src()
+            }),
+            _ => format!(
+                "{}.into_iter().collect()",
+                self.iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>()
+                    .to_src()
+            ),
+        }
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("BTreeMap::<{}, {}>", K::src_type(), V::src_type())
+    }
+}
+
+impl<A: ToSrc, B: ToSrc> ToSrc for (A, B) {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!("({}, {})", self.0.to_src(), self.1.to_src())
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("({}, {})", A::src_type(), B::src_type())
     }
 }
 
