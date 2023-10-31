@@ -76,6 +76,7 @@
     clippy::question_mark_used,
     clippy::redundant_pub_crate,
     clippy::ref_patterns,
+    clippy::same_name_method,
     clippy::semicolon_outside_block,
     clippy::separated_literal_suffix,
     clippy::similar_names,

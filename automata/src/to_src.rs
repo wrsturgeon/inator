@@ -505,7 +505,7 @@ impl<K: Clone + Ord + ToSrc, V: Clone + ToSrc> ToSrc for BTreeMap<K, V> {
     #[inline]
     fn to_src(&self) -> String {
         match self.len() {
-            0 => format!("BTreeMap::new()"),
+            0 => "BTreeMap::new()".to_owned(),
             1 => format!("iter::once({}).collect()", {
                 let (k, v) = unwrap!(self.first_key_value());
                 (k.clone(), v.clone()).to_src()
@@ -559,9 +559,9 @@ impl<I: Input, S: Stack> ToSrc for Transition<I, S, BTreeSet<Result<usize, Strin
 impl<S: Stack> ToSrc for Action<S> {
     #[inline]
     fn to_src(&self) -> String {
-        match self {
+        match *self {
             Self::Local => "Action::Local".to_owned(),
-            Self::Push(s) => format!("Action::Push({})", s.to_src()),
+            Self::Push(ref s) => format!("Action::Push({})", s.to_src()),
             Self::Pop => "Action::Pop".to_owned(),
         }
     }
