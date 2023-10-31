@@ -319,7 +319,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
             })
             .collect();
-        let states = self
+        let mut states: Vec<_> = self
             .states
             .iter()
             .map(|s| State {
@@ -327,6 +327,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 ..s.reindex(&self.states, &index_map)
             })
             .collect();
+        states.dedup();
         Graph { states, initial }
     }
 }
