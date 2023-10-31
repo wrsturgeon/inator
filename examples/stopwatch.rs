@@ -7,25 +7,29 @@ fn main() {
         env, panic,
         sync::{mpsc, Arc},
         thread,
+        time::Instant,
     };
 
     macro_rules! time {
-        ($ex:expr) => {{
-            let (tx_o, rx_o) = mpsc::channel();
-            let (tx_t, rx_t) = mpsc::channel();
-            let _rslt = thread::spawn(move || {
-                let out = $ex;
-                tx_t.send(())
-                    .expect("Couldn't send to the stopwatch thread");
-                tx_o.send(out).expect("Couldn't send to the main thread");
-            });
-            let _time = thread::spawn(move || {
-                thread::sleep(Duration::from_millis(1000));
-                rx_t.try_recv().expect("Time's up!");
-            });
-            rx_o.recv()
-                .expect("Couldn't receive a value from the result thread")
-        }};
+        ($ex:expr) => {
+            (|| {
+                let (tx, rx) = mpsc::channel();
+                let now = Instant::now();
+                thread::Builder::new()
+                    .name("Worker".to_owned())
+                    .spawn(move || {
+                        let out = $ex;
+                        tx.send(out).expect("Couldn't send to the main thread");
+                    })
+                    .expect("Couldn't start another thread");
+                while now.elapsed() < Duration::from_millis(1000) {
+                    if let Ok(out) = rx.try_recv() {
+                        return out;
+                    }
+                }
+                panic!("Time's up!")
+            })()
+        };
     }
 
     let gen_size = env::var("QUICKCHECK_GENERATOR_SIZE")
