@@ -51,7 +51,7 @@ fn main() {
         let bc = Arc::clone(&both);
         let sliceable = time!(sliceable(&pc, &bc));
         let first_half = time!(fixpoint("da capo") >> parser.as_ref().clone());
-        let repeated = Arc::new(time!(first_half >> recurse("da capo")));
+        let repeated = Arc::new(time!(first_half >> recurse("da capo"))); // <-- This is the infinite loop!
         let rc = Arc::clone(&repeated);
         time!(rc.check()).unwrap();
         let output = time!(repeated.accept(both.as_ref().clone()));
