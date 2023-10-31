@@ -97,7 +97,7 @@ impl<T: ToSrc> ToSrc for BTreeSet<T> {
     #[inline]
     #[must_use]
     fn src_type() -> String {
-        "std::collections::BTreeSet::<usize>".to_owned()
+        format!("std::collections::BTreeSet::<{}>", T::src_type())
     }
 }
 
@@ -121,7 +121,7 @@ impl<T: ToSrc, E: ToSrc> ToSrc for Result<T, E> {
     fn to_src(&self) -> String {
         self.as_ref().map_or_else(
             |e| format!("Err({})", e.to_src()),
-            |x| format!("Some({})", x.to_src()),
+            |x| format!("Ok({})", x.to_src()),
         )
     }
     #[inline]
@@ -452,7 +452,7 @@ impl<I: Input, S: Stack> ToSrc for CurryStack<I, S, BTreeSet<Result<usize, Strin
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "State {{ wildcard: {}, map_none: {}, map_some: {} }}",
+            "CurryStack {{ wildcard: {}, map_none: {}, map_some: {} }}",
             self.wildcard.to_src(),
             self.map_none.to_src(),
             self.map_some.to_src(),
@@ -575,7 +575,7 @@ impl<I: Input> ToSrc for Update<I> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "Input {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
+            "Update {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
             self.input_t.to_src(),
             self.output_t.to_src(),
             self.src.to_src(),
@@ -583,6 +583,6 @@ impl<I: Input> ToSrc for Update<I> {
     }
     #[inline]
     fn src_type() -> String {
-        format!("Input::<{}>", I::src_type())
+        format!("Update::<{}>", I::src_type())
     }
 }
