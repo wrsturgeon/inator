@@ -94,7 +94,18 @@ mod reduced {
     }
 
     fn sort(parser: Nondeterministic<u8, u8>) {
-        parser.sort().check_sorted().unwrap();
+        println!(
+            "Sorting
+{parser:?}
+"
+        );
+        let sorted = parser.sort();
+        println!(
+            "Sorted into
+{sorted:?}
+"
+        );
+        sorted.check_sorted().unwrap();
     }
 
     #[test]
