@@ -5,7 +5,7 @@ fn main() {
     use quickcheck::*;
     use std::{
         env, panic,
-        sync::{mpsc, Arc, Mutex},
+        sync::{mpsc, Arc},
         thread,
     };
 
@@ -33,46 +33,33 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(100);
 
-    /*
-    let qc_tests = env::var("QUICKCHECK_TESTS")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(100);
-    */
+    // let qc_tests = env::var("QUICKCHECK_TESTS")
+    //     .ok()
+    //     .and_then(|s| s.parse().ok())
+    //     .unwrap_or(100);
 
-    fn check(both: Arc<Vec<u8>>, parser: Arc<Nondeterministic<u8, u8>>) {
-        let pc = Arc::clone(&parser);
-        time!(pc.check()).unwrap();
-        let pc = Arc::clone(&parser);
-        if time!(pc.accept(iter::empty()).is_err()) {
+    fn check(both: &[u8], parser: &Nondeterministic<u8, u8>) {
+        parser.check().unwrap();
+        if parser.accept(iter::empty()).is_err() {
             return;
         }
-        let pc = Arc::clone(&parser);
-        let bc = Arc::clone(&both);
-        let sliceable = time!(sliceable(&pc, &bc));
-        let first_half = time!(fixpoint("da capo") >> parser.as_ref().clone());
+        let sliceable = sliceable(&parser, &both);
+        let first_half = fixpoint("da capo") >> parser.clone();
         let repeated = Arc::new(time!(first_half >> recurse("da capo"))); // <-- This is the infinite loop!
-        let rc = Arc::clone(&repeated);
-        time!(rc.check()).unwrap();
-        let output = time!(repeated.accept(both.as_ref().clone()));
+        repeated.check().unwrap();
+        let output = repeated.accept(both.iter().copied());
         if matches!(output, Err(ParseError::BadParser(_))) {
             return;
         }
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
     }
 
-    let g = Arc::new(Mutex::new(Gen::new(gen_size)));
-    // for i in 0..qc_tests {
+    let mut gen = Gen::new(gen_size);
+    // for _ in 0..qc_tests {
     loop {
-        let gc = Arc::clone(&g);
-        let both = Arc::new(time!(Vec::arbitrary(&mut gc.lock().unwrap())));
-        let gc = Arc::clone(&g);
-        let parser = Arc::new(time!(Nondeterministic::<u8, u8>::arbitrary(
-            &mut gc.lock().unwrap()
-        )));
-        let pc = Arc::clone(&parser);
-        let bc = Arc::clone(&both);
-        if panic::catch_unwind(|| check(bc, pc)).is_err() {
+        let both = Vec::arbitrary(&mut gen);
+        let parser = Nondeterministic::<u8, u8>::arbitrary(&mut gen);
+        if panic::catch_unwind(|| check(&both, &parser)).is_err() {
             panic!(
                 "
 Parser:
