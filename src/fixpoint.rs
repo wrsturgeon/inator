@@ -42,7 +42,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
         }
         let out = Graph { states, initial }.sort();
         if out.check_sorted().is_err() {
-            panic!("Sorting error");
+            panic!("Sorting error: {}", out.to_src());
         }
         out
     }

@@ -6,7 +6,7 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-use crate::{Input, Nondeterministic, Stack};
+use crate::{Input, Nondeterministic, Stack, ToSrc};
 use core::ops;
 
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
@@ -26,7 +26,7 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         self.states.extend(other_states);
         self.initial.extend(other_initial);
         if self.check_sorted().is_err() {
-            panic!("Sorting error");
+            panic!("Sorting error: {}", self.to_src());
         }
         self
     }

@@ -57,7 +57,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
         }
         .sort();
         if out.check_sorted().is_err() {
-            panic!("Sorting error");
+            panic!("Sorting error: {}", out.to_src());
         }
         out
     }
