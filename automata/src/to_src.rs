@@ -135,7 +135,7 @@ impl ToSrc for String {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        format!("\"{}\".to_owned()", self.escape_default())
+        format!(r#""{}".to_owned()"#, self.escape_default())
     }
     #[inline]
     #[must_use]
