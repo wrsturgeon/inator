@@ -383,4 +383,58 @@ mod reduced {
             initial: core::iter::once(Ok(0)).collect(),
         });
     }
+
+    #[test]
+    fn sort_2() {
+        sort(Nondeterministic {
+            states: vec![
+                State {
+                    transitions: CurryStack {
+                        wildcard: Some(CurryInput::Wildcard(Transition {
+                            dst: core::iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: Update {
+                                input_t: "()".to_owned(),
+                                output_t: "()".to_owned(),
+                                ghost: PhantomData,
+                                src: "|(), _| {}",
+                            },
+                        })),
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: core::iter::once(String::new()).collect(),
+                    tags: std::collections::BTreeSet::<String>::new(),
+                },
+                State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: core::iter::once(String::new()).collect(),
+                    tags: std::collections::BTreeSet::<String>::new(),
+                },
+                State {
+                    transitions: CurryStack {
+                        wildcard: Some(CurryInput::Wildcard(Transition {
+                            dst: core::iter::once(Ok(1)).collect(),
+                            act: Action::Local,
+                            update: Update {
+                                input_t: "()".to_owned(),
+                                output_t: "()".to_owned(),
+                                ghost: PhantomData,
+                                src: "|(), _| {}",
+                            },
+                        })),
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: core::iter::once(String::new()).collect(),
+                    tags: std::collections::BTreeSet::<String>::new(),
+                },
+            ],
+            initial: std::collections::BTreeSet::<Result<usize, String>>::new(),
+        });
+    }
 }
