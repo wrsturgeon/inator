@@ -1,6 +1,6 @@
 #[cfg(feature = "quickcheck")]
 fn main() {
-    use core::{iter, time::Duration};
+    use core::time::Duration;
     use inator::*;
     use quickcheck::*;
     use std::{env, panic, sync::mpsc, thread, time::Instant};
@@ -37,38 +37,35 @@ fn main() {
     //     .and_then(|s| s.parse().ok())
     //     .unwrap_or(100);
 
-    fn check(both: Vec<u8>, parser: Nondeterministic<u8, u8>) {
-        parser.check().unwrap();
-        if parser.accept(iter::empty()).is_err() {
-            return;
-        }
-        let sliceable = sliceable(&parser, &both);
+    fn check(parser: &Nondeterministic<u8, u8>) -> bool {
         let first_half = fixpoint("da capo") >> parser.clone();
-        let Some(repeated) = time!(first_half >> recurse("da capo")) else {
-            panic!(
-                "
-Parser:
-{parser:?}
-
-Input:
-{both:?}
-",
-            )
-        };
-        repeated.check().unwrap();
-        let output = repeated.accept(both.iter().copied());
-        if matches!(output, Err(ParseError::BadParser(_))) {
-            return;
-        }
-        assert_eq!(output.is_ok(), sliceable, "{output:?}");
+        time!(first_half >> recurse("da capo")).is_some()
     }
 
     let mut gen = Gen::new(gen_size);
     // for _ in 0..qc_tests {
     loop {
-        let both = Vec::arbitrary(&mut gen);
-        let parser = Nondeterministic::<u8, u8>::arbitrary(&mut gen);
-        check(both, parser);
+        let parser = Nondeterministic::arbitrary(&mut gen);
+        if !check(&parser) {
+            for shrunk in parser.shrink() {
+                if !check(&shrunk) {
+                    panic!(
+                        "
+Parser:
+{shrunk:?}
+
+",
+                    )
+                }
+            }
+            panic!(
+                "
+Parser:
+{parser:?}
+
+",
+            )
+        }
     }
 }
 
