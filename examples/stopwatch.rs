@@ -3,12 +3,7 @@ fn main() {
     use core::{iter, time::Duration};
     use inator::*;
     use quickcheck::*;
-    use std::{
-        env, panic,
-        sync::{mpsc, Arc},
-        thread,
-        time::Instant,
-    };
+    use std::{env, panic, sync::mpsc, thread, time::Instant};
 
     macro_rules! time {
         ($ex:expr) => {
@@ -23,11 +18,11 @@ fn main() {
                     })
                     .expect("Couldn't start another thread");
                 while now.elapsed() < Duration::from_millis(1000) {
-                    if let Ok(out) = rx.try_recv() {
-                        return out;
+                    if let Ok(ok) = rx.try_recv() {
+                        return Some(ok);
                     }
                 }
-                panic!("Time's up!")
+                None
             })()
         };
     }
@@ -42,14 +37,24 @@ fn main() {
     //     .and_then(|s| s.parse().ok())
     //     .unwrap_or(100);
 
-    fn check(both: &[u8], parser: &Nondeterministic<u8, u8>) {
+    fn check(both: Vec<u8>, parser: Nondeterministic<u8, u8>) {
         parser.check().unwrap();
         if parser.accept(iter::empty()).is_err() {
             return;
         }
         let sliceable = sliceable(&parser, &both);
         let first_half = fixpoint("da capo") >> parser.clone();
-        let repeated = Arc::new(time!(first_half >> recurse("da capo"))); // <-- This is the infinite loop!
+        let Some(repeated) = time!(first_half >> recurse("da capo")) else {
+            panic!(
+                "
+Parser:
+{parser:?}
+
+Input:
+{both:?}
+",
+            )
+        };
         repeated.check().unwrap();
         let output = repeated.accept(both.iter().copied());
         if matches!(output, Err(ParseError::BadParser(_))) {
@@ -63,17 +68,7 @@ fn main() {
     loop {
         let both = Vec::arbitrary(&mut gen);
         let parser = Nondeterministic::<u8, u8>::arbitrary(&mut gen);
-        if panic::catch_unwind(|| check(&both, &parser)).is_err() {
-            panic!(
-                "
-Parser:
-{parser:?}
-
-Input:
-{both:?}
-",
-            );
-        }
+        check(both, parser);
     }
 }
 
