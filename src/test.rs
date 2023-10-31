@@ -303,4 +303,60 @@ mod reduced {
             vec![0, 0],
         );
     }
+
+    #[test]
+    fn fixpoint_repeat_7() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(1)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                        tags: BTreeSet::new(),
+                    },
+                ],
+                initial: iter::once(Ok(0)).collect(),
+            },
+            vec![],
+        );
+    }
 }

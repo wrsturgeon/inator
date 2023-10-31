@@ -31,7 +31,7 @@ fn will_accept(
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
     type Output = Nondeterministic<I, S>;
     #[inline]
-    #[allow(clippy::panic)]
+    #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
         let (accepting_indices, accepting_tags) = self.states.iter().enumerate().fold(
             (BTreeSet::new(), BTreeSet::new()),
@@ -43,7 +43,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 (acc_i, acc_t)
             },
         );
-        let mut out = Graph {
+        let out = Graph {
             states: self
                 .states
                 .into_iter()
@@ -56,8 +56,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .collect(),
         }
         .sort();
-        while out.check_sorted().is_err() {
-            out = out.sort();
+        if out.check_sorted().is_err() {
+            panic!("Sorting error");
         }
         out
     }

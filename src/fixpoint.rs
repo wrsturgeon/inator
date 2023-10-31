@@ -17,7 +17,7 @@ pub struct Fixpoint(String);
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
     type Output = Nondeterministic<I, S>;
     #[inline]
-    #[allow(clippy::panic)]
+    #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Graph<I, S, C>) -> Self::Output {
         let Graph {
             mut states,
@@ -40,9 +40,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
                 let _ = state.tags.insert(self.0.clone());
             }
         }
-        let mut out = Graph { states, initial }.sort();
-        while out.check_sorted().is_err() {
-            out = out.sort();
+        let out = Graph { states, initial }.sort();
+        if out.check_sorted().is_err() {
+            panic!("Sorting error");
         }
         out
     }
