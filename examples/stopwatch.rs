@@ -4,7 +4,7 @@ fn main() {
     use inator::*;
     use quickcheck::*;
     use std::{
-        env,
+        env, panic,
         sync::{mpsc, Arc, Mutex},
         thread,
     };
@@ -33,28 +33,19 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(100);
 
-    let qc_tests = 100000;
-    // env::var("QUICKCHECK_TESTS")
-    //     .ok()
-    //     .and_then(|s| s.parse().ok())
-    //     .unwrap_or(100);
+    /*
+    let qc_tests = env::var("QUICKCHECK_TESTS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(100);
+    */
 
-    println!("Running {qc_tests} tests");
-
-    let g = Arc::new(Mutex::new(Gen::new(gen_size)));
-    for i in 0..qc_tests {
-        println!("{i}");
-        let gc = Arc::clone(&g);
-        let both = Arc::new(time!(Vec::arbitrary(&mut gc.lock().unwrap())));
-        let gc = Arc::clone(&g);
-        let parser = Arc::new(time!(Nondeterministic::<u8, u8>::arbitrary(
-            &mut gc.lock().unwrap()
-        )));
+    fn check(both: Arc<Vec<u8>>, parser: Arc<Nondeterministic<u8, u8>>) {
         let pc = Arc::clone(&parser);
         time!(pc.check()).unwrap();
         let pc = Arc::clone(&parser);
         if time!(pc.accept(iter::empty()).is_err()) {
-            continue;
+            return;
         }
         let pc = Arc::clone(&parser);
         let bc = Arc::clone(&both);
@@ -65,9 +56,29 @@ fn main() {
         time!(rc.check()).unwrap();
         let output = time!(repeated.accept(Arc::into_inner(both).unwrap()));
         if matches!(output, Err(ParseError::BadParser(_))) {
-            continue;
+            return;
         }
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
+    }
+
+    let g = Arc::new(Mutex::new(Gen::new(gen_size)));
+    // for i in 0..qc_tests {
+    loop {
+        let gc = Arc::clone(&g);
+        let both = Arc::new(time!(Vec::arbitrary(&mut gc.lock().unwrap())));
+        let gc = Arc::clone(&g);
+        let parser = Arc::new(time!(Nondeterministic::<u8, u8>::arbitrary(
+            &mut gc.lock().unwrap()
+        )));
+        panic::catch_unwind(|| check(both, parser)).expect(
+            "
+Parser:
+{parser:?}
+
+Input:
+{both:?}
+",
+        );
     }
 }
 

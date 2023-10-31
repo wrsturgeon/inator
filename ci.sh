@@ -14,6 +14,26 @@ fi
 
 set -u
 
+# Run examples
+set +e
+export EXAMPLES=$(cargo run --example 2>&1 | grep '^ ')
+set -e
+if [ ! -z "$EXAMPLES" ]
+then
+  echo $EXAMPLES | xargs -n 1 cargo run -r --all-features --example
+fi
+
+# Examples that are crates themselves
+for dir in $(ls -A examples)
+do
+  if [ -d examples/$dir ]
+  then
+    cd examples/$dir
+    cargo run -r --all-features
+    cd ../..
+  fi
+done
+
 # Update our workbench
 rustup update || :
 rustup toolchain install nightly || :
@@ -35,24 +55,19 @@ cargo test -r --no-default-features --examples
 cargo test -r --all-features
 cargo test -r --all-features --examples
 
-# Run examples
-set +e
-export EXAMPLES=$(cargo run --example 2>&1 | grep '^ ')
-set -e
+# Run examples (again, slowly)
 if [ ! -z "$EXAMPLES" ]
 then
-  echo $EXAMPLES | xargs -n 1 cargo +nightly miri run --example
-  echo $EXAMPLES | xargs -n 1 cargo run -r --all-features --example
+  echo $EXAMPLES | xargs -n 1 cargo +nightly miri run --no-default-features --example
 fi
 
-# Examples that are crates themselves
+# Examples that are crates themselves (again, slowly)
 for dir in $(ls -A examples)
 do
   if [ -d examples/$dir ]
   then
     cd examples/$dir
-    cargo +nightly miri run
-    cargo run -r --all-features
+    cargo +nightly miri run --no-default-features
     cargo test
     cd ../..
   fi
