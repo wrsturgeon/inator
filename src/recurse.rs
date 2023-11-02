@@ -31,19 +31,25 @@ fn will_accept(
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
     type Output = Nondeterministic<I, S>;
     #[inline]
-    #[allow(clippy::panic)]
+    #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
-        let (accepting_indices, accepting_tags) = self.states.iter().enumerate().fold(
-            (BTreeSet::new(), BTreeSet::new()),
-            |(mut acc_i, mut acc_t), (i, s)| {
-                if s.non_accepting.is_empty() {
-                    let _ = acc_i.insert(i);
-                    acc_t.extend(s.tags.iter().cloned());
-                }
-                (acc_i, acc_t)
-            },
-        );
-        let mut out = Graph {
+        let accepting_indices =
+            self.states
+                .iter()
+                .enumerate()
+                .fold(BTreeSet::new(), |mut acc_i, (i, s)| {
+                    if s.non_accepting.is_empty() {
+                        let _ = acc_i.insert(i);
+                    }
+                    acc_i
+                });
+        let accepting_tags = self
+            .tags
+            .iter()
+            .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
+            .map(|(k, _)| k.clone())
+            .collect();
+        Graph {
             states: self
                 .states
                 .into_iter()
@@ -54,12 +60,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .view()
                 .map(|r| r.map_err(str::to_owned))
                 .collect(),
+            tags: self.tags,
         }
-        .sort();
-        while out.check_sorted().is_err() {
-            out = out.sort();
-        }
-        out
+        .sort()
     }
 }
 
@@ -75,7 +78,6 @@ fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
     State {
         transitions: add_tail_call_curry_stack(s.transitions, r, accepting_indices, accepting_tags),
         non_accepting: s.non_accepting,
-        tags: s.tags,
     }
 }
 
@@ -181,25 +183,6 @@ fn add_tail_call_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
         update: s.update,
     }
 }
-
-/*
-
-        match self.transitions.wildcard {
-            None => {}
-            Some(CurryInput::Wildcard(ref mut w)) => if w.dst.view().any(will_accept) {},
-            Some(CurryInput::Scrutinize(ref mut s)) => todo!(),
-        }
-        let path_to_accepting = state
-            .transitions
-            .values()
-            .flat_map(|curry| curry.values())
-            .map(|transition| transition);
-        for curry in state.transitions.values() {
-            for shit in curry.values() {}
-        }
-
-
-*/
 
 /// Call a tagged state by name.
 #[inline]

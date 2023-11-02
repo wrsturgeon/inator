@@ -116,3 +116,18 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
             .retain(|k, _| key.clone().intersection(k.clone()).is_none());
     }
 }
+
+impl<I: Input, S: Stack> RangeMap<I, S, usize> {
+    /// Convert the control parameter from `usize` to anything else.
+    #[inline]
+    #[must_use]
+    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> RangeMap<I, S, C> {
+        RangeMap {
+            entries: self
+                .entries
+                .into_iter()
+                .map(|(k, v)| (k, v.convert_ctrl()))
+                .collect(),
+        }
+    }
+}
