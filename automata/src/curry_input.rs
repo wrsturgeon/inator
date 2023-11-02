@@ -135,3 +135,15 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
         };
     }
 }
+
+impl<I: Input, S: Stack> CurryInput<I, S, usize> {
+    /// Convert the control parameter from `usize` to anything else.
+    #[inline]
+    #[must_use]
+    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> CurryInput<I, S, C> {
+        match self {
+            CurryInput::Wildcard(w) => CurryInput::Wildcard(w.convert_ctrl()),
+            CurryInput::Scrutinize(s) => CurryInput::Scrutinize(s.convert_ctrl()),
+        }
+    }
+}

@@ -102,6 +102,24 @@
 /*
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(any(debug_assertions, test))]
+macro_rules! unwrap {
+    ($expr:expr) => {
+        $expr.unwrap()
+    };
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! unwrap {
+    ($expr:expr) => {{
+        #[allow(unsafe_code)]
+        let result = unsafe { $expr.unwrap_unchecked() };
+        result
+    }};
+}
+
+/// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
+#[cfg(any(debug_assertions, test))]
 macro_rules! get {
     ($expr:expr, $index:expr) => {
         $expr.get($index).unwrap()
@@ -117,7 +135,6 @@ macro_rules! get {
         result
     }};
 }
-*/
 
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(any(debug_assertions, test))]
@@ -136,6 +153,7 @@ macro_rules! get_mut {
         result
     }};
 }
+*/
 
 /// One-argument function.
 #[macro_export]
@@ -189,9 +207,9 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
                 map_some: BTreeMap::new(),
             },
             non_accepting: BTreeSet::new(),
-            tags: BTreeSet::new(),
         }],
         initial: iter::once(Ok(0)).collect(),
+        tags: BTreeMap::new(),
     }
 }
 
@@ -208,7 +226,6 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                     map_some: BTreeMap::new(),
                 },
                 non_accepting: BTreeSet::new(),
-                tags: BTreeSet::new(),
             },
             State {
                 non_accepting: iter::once(format!(
@@ -232,10 +249,10 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                     map_none: None,
                     map_some: BTreeMap::new(),
                 },
-                tags: BTreeSet::new(),
             },
         ],
         initial: iter::once(Ok(1)).collect(),
+        tags: BTreeMap::new(),
     }
 }
 
