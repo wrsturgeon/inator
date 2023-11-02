@@ -6,7 +6,7 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-use crate::{Input, Merge, Nondeterministic, Stack, ToSrc};
+use crate::{Input, Merge, Nondeterministic, Stack};
 use core::ops;
 
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {

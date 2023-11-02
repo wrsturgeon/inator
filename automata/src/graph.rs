@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{cmp::Ordering, iter, mem, num::NonZeroUsize};
+use core::{iter, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -109,7 +109,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         drop(self.output_type()?);
         for (i, state) in self.states.iter().enumerate() {
             if get!(self.states, ..i).contains(state) {
-                return Err(IllFormed::DuplicateState);
+                return Err(IllFormed::DuplicateState(Box::new(state.clone())));
             }
         }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {

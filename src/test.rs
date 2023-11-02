@@ -71,7 +71,6 @@ mod prop {
 
 mod reduced {
     use super::*;
-    use core::marker::PhantomData;
 
     fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {
         parser.check().unwrap();
@@ -92,21 +91,6 @@ mod reduced {
             return;
         }
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
-    }
-
-    fn sort(parser: Nondeterministic<u8, u8>) {
-        println!(
-            "Sorting
-{parser:?}
-"
-        );
-        let sorted = parser.sort();
-        println!(
-            "Sorted into
-{sorted:?}
-"
-        );
-        sorted.check_sorted().unwrap();
     }
 
     #[test]
@@ -313,122 +297,5 @@ mod reduced {
             },
             vec![0, 0],
         );
-    }
-
-    #[test]
-    fn sort_1() {
-        sort(Nondeterministic {
-            states: vec![
-                State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::<String>::new(),
-                },
-                State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::<String>::new(),
-                },
-                State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: core::iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: Update {
-                                input_t: "()".to_owned(),
-                                output_t: "()".to_owned(),
-                                ghost: PhantomData,
-                                src: "|(), _| {}",
-                            },
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::<String>::new(),
-                },
-                State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: core::iter::once(Ok(1)).collect(),
-                            act: Action::Local,
-                            update: Update {
-                                input_t: "()".to_owned(),
-                                output_t: "()".to_owned(),
-                                ghost: PhantomData,
-                                src: "|(), _| {}",
-                            },
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::<String>::new(),
-                },
-            ],
-            initial: core::iter::once(Ok(0)).collect(),
-            tags: [
-                ("da capo".to_owned(), iter::once(0).collect()),
-                (String::new(), iter::once(1).collect()),
-            ]
-            .into_iter()
-            .collect(),
-        });
-    }
-
-    #[test]
-    fn sort_2() {
-        sort(Nondeterministic {
-            states: vec![
-                State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: core::iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: Update {
-                                input_t: "()".to_owned(),
-                                output_t: "()".to_owned(),
-                                ghost: PhantomData,
-                                src: "|(), _| {}",
-                            },
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: core::iter::once(String::new()).collect(),
-                },
-                State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: core::iter::once(String::new()).collect(),
-                },
-                State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: core::iter::once(Ok(1)).collect(),
-                            act: Action::Local,
-                            update: Update {
-                                input_t: "()".to_owned(),
-                                output_t: "()".to_owned(),
-                                ghost: PhantomData,
-                                src: "|(), _| {}",
-                            },
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: core::iter::once(String::new()).collect(),
-                },
-            ],
-            initial: BTreeSet::<Result<usize, String>>::new(),
-            tags: BTreeMap::new(),
-        });
     }
 }
