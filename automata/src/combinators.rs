@@ -70,6 +70,16 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
 
         self.states.extend(other_states);
         self.tags.extend(other_tags);
+        if self.initial.iter().any(|r| {
+            will_accept(
+                r.as_ref().map_or_else(|s| Err(s.as_str()), |&i| Ok(i)),
+                &accepting_indices,
+                &accepting_tags,
+            )
+        }) {
+            self.initial.extend(other_initial.iter().cloned());
+        }
+
         Graph {
             states: self
                 .states
