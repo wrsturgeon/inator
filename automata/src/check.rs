@@ -50,8 +50,6 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Two identical states at different indices.
     DuplicateState,
     /// States out of sorted order in memory.
-    UnsortedStates,
-    /// Reference to a tagged state, but no state has that tag.
     TagDNE(String),
     /// An initial state expects an accumulator argument that is not `()`.
     InitialNotUnit(String),
@@ -86,7 +84,6 @@ impl<I: Input, S: Stack> IllFormed<I, S, usize> {
             IllFormed::IncompatibleStackActions(a, b) => IllFormed::IncompatibleStackActions(a, b),
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
             IllFormed::DuplicateState => IllFormed::DuplicateState,
-            IllFormed::UnsortedStates => IllFormed::UnsortedStates,
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),

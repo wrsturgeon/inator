@@ -25,10 +25,7 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
         self.states.extend(other_states);
         self.initial.extend(other_initial);
-        while self.check_sorted().is_err() {
-            self = self.sort();
-        }
-        self
+        self.sort() // <-- Not guarantted to sort (almost always) but certainly does remove duplicate states
     }
 }
 

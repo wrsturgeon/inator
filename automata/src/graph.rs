@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{cmp::Ordering, iter, mem, num::NonZeroUsize};
+use core::{iter, mem, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -100,9 +100,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             }
         }
         drop(self.output_type()?);
+        for (i, state) in self.states.iter().enumerate() {
+            if get!(self.states, ..i).contains(state) {
+                return Err(IllFormed::DuplicateState);
+            }
+        }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
-            // Check sorted without duplicates
-            self.check_sorted()?;
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
     }
@@ -259,25 +262,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     Ok(acc)
                 }
             })
-    }
-
-    /// Check if states are sorted.
-    /// # Errors
-    /// If there are duplicate states or any out of order.
-    #[inline]
-    pub fn check_sorted(&self) -> Result<(), IllFormed<I, S, C>> {
-        self.states
-            .iter()
-            .try_fold(None, |mlast, curr| {
-                mlast.map_or(Ok(Some(curr)), |last: &State<I, S, C>| {
-                    match last.cmp(curr) {
-                        Ordering::Less => Ok(Some(curr)),
-                        Ordering::Equal => Err(IllFormed::DuplicateState),
-                        Ordering::Greater => Err(IllFormed::UnsortedStates),
-                    }
-                })
-            })
-            .map(|_| {})
     }
 
     /// Change nothing about the semantics but sort the internal vector of states.

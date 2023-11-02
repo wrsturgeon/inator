@@ -40,11 +40,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
                 let _ = state.tags.insert(self.0.clone());
             }
         }
-        let mut out = Graph { states, initial }.sort();
-        while out.check_sorted().is_err() {
-            out = out.sort();
-        }
-        out
+        Graph { states, initial }.sort()
     }
 }
 
