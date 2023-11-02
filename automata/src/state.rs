@@ -19,8 +19,6 @@ pub struct State<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// If input ends while in this state, should we accept?
     // TODO: use a `BTreeSet`.
     pub non_accepting: BTreeSet<String>,
-    /// Optional name for this state.
-    pub tags: BTreeSet<String>,
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
@@ -47,13 +45,24 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     }
 }
 
+impl<I: Input, S: Stack> State<I, S, usize> {
+    /// Convert the control parameter from `usize` to anything else.
+    #[inline]
+    #[must_use]
+    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> State<I, S, C> {
+        State {
+            transitions: self.transitions.convert_ctrl(),
+            non_accepting: self.non_accepting,
+        }
+    }
+}
+
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for State<I, S, C> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
             transitions: self.transitions.clone(),
             non_accepting: self.non_accepting.clone(),
-            tags: self.tags.clone(),
         }
     }
 }
@@ -63,9 +72,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for State<I, S, C> {}
 impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for State<I, S, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.non_accepting == other.non_accepting
-            && self.transitions == other.transitions
-            && self.tags == other.tags
+        self.non_accepting == other.non_accepting && self.transitions == other.transitions
     }
 }
 
@@ -75,7 +82,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for State<I, S, C> {
         self.transitions
             .cmp(&other.transitions)
             .then_with(|| self.non_accepting.cmp(&other.non_accepting))
-            .then_with(|| self.tags.cmp(&other.tags))
     }
 }
 

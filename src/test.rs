@@ -5,8 +5,10 @@
  */
 
 #![allow(
+    clippy::absolute_paths,
     clippy::arithmetic_side_effects,
     clippy::indexing_slicing,
+    clippy::panic,
     clippy::print_stdout,
     clippy::unwrap_used,
     clippy::use_debug
@@ -103,7 +105,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -116,10 +117,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: [Ok(0), Ok(1)].into_iter().collect(),
+                tags: BTreeMap::new(),
             },
             vec![0],
         );
@@ -137,37 +138,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: iter::once(String::new()).collect(),
-                    },
-                ],
-                initial: iter::once(Ok(0)).collect(),
-            },
-            vec![],
-        );
-    }
-
-    #[test]
-    fn fixpoint_repeat_3() {
-        fixpoint_repeat(
-            Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -180,17 +150,17 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(1)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0, 0, 0],
         );
     }
 
     #[test]
-    fn fixpoint_repeat_4() {
+    fn fixpoint_repeat_3() {
         fixpoint_repeat(
             Graph {
                 states: vec![State {
@@ -200,16 +170,16 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0],
         );
     }
 
     #[test]
-    fn fixpoint_repeat_5() {
+    fn fixpoint_repeat_4() {
         fixpoint_repeat(
             Graph {
                 states: vec![
@@ -220,7 +190,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -233,7 +202,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -246,17 +214,17 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![],
         );
     }
 
     #[test]
-    fn fixpoint_repeat_6() {
+    fn fixpoint_repeat_5() {
         fixpoint_repeat(
             Graph {
                 states: vec![
@@ -271,7 +239,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -282,7 +249,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -295,10 +261,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0, 0],
         );

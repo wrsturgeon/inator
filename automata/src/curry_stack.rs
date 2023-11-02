@@ -110,3 +110,20 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
             .chain(self.map_some.values())
     }
 }
+
+impl<I: Input, S: Stack> CurryStack<I, S, usize> {
+    /// Convert the control parameter from `usize` to anything else.
+    #[inline]
+    #[must_use]
+    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> CurryStack<I, S, C> {
+        CurryStack {
+            wildcard: self.wildcard.map(CurryInput::convert_ctrl),
+            map_none: self.map_none.map(CurryInput::convert_ctrl),
+            map_some: self
+                .map_some
+                .into_iter()
+                .map(|(k, v)| (k, v.convert_ctrl()))
+                .collect(),
+        }
+    }
+}

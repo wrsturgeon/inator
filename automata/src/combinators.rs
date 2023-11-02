@@ -6,12 +6,13 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-use crate::{Input, Nondeterministic, Stack};
+use crate::{Input, Merge, Nondeterministic, Stack};
 use core::ops;
 
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
+    #[allow(clippy::manual_assert, clippy::panic)]
     fn bitor(mut self, other: Self) -> Self {
         // Note that union on pushdown automata is undecidable;
         // we just reject a subset of automata that wouldn't work.
@@ -22,13 +23,12 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         let Self {
             states: other_states,
             initial: other_initial,
+            tags: other_tags,
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
         self.states.extend(other_states);
         self.initial.extend(other_initial);
-        while self.check_sorted().is_err() {
-            self = self.sort();
-        }
-        self
+        self.tags = unwrap!(self.tags.merge(other_tags));
+        self.sort() // <-- Not guarantted to sort (almost always) but certainly does remove duplicate states
     }
 }
 

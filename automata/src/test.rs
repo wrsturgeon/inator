@@ -320,53 +320,6 @@ mod reduced {
         }
     }
 
-    #[test]
-    fn determinize_implies_no_runtime_errors_1() {
-        determinize_implies_no_runtime_errors(
-            &Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|x: u8, _| x),
-                            })),
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|x: u8, _| x),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
-                    },
-                ],
-                initial: [Ok(1), Ok(2)].into_iter().collect(),
-            },
-            &[0],
-        );
-    }
-
     fn union(lhs: &Nondeterministic<u8, u8>, rhs: &Nondeterministic<u8, u8>, input: &[u8]) {
         if lhs.determinize().is_err() {
             return;
@@ -419,8 +372,12 @@ mod reduced {
     }
 
     fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) {
+        println!("Original: {parser:?}");
         let pre = parser.accept(input.iter().copied());
-        let post = parser.sort().accept(input);
+        let sorted = parser.sort();
+        println!("Sorted: {sorted:?}");
+        sorted.check().unwrap();
+        let post = sorted.accept(input);
         match pre {
             Ok(out) => assert_eq!(Ok(out), post),
             Err(ParseError::BadInput(_)) => {
@@ -439,11 +396,57 @@ mod reduced {
     }
 
     #[test]
+    fn determinize_implies_no_runtime_errors_1() {
+        determinize_implies_no_runtime_errors(
+            &Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|x: u8, _| x),
+                            })),
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|x: u8, _| x),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: iter::once(String::new()).collect(),
+                    },
+                ],
+                initial: [Ok(1), Ok(2)].into_iter().collect(),
+                tags: BTreeMap::new(),
+            },
+            &[0],
+        );
+    }
+
+    #[test]
     fn union_01() {
         union(
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -453,9 +456,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &[],
         );
@@ -472,13 +475,14 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &[],
         );
@@ -503,13 +507,14 @@ mod reduced {
                         .collect(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &[],
         );
@@ -530,13 +535,14 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &[0],
         );
@@ -553,9 +559,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -569,9 +575,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &[0],
         );
@@ -592,9 +598,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -608,9 +614,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &[0],
         );
@@ -637,9 +643,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -659,9 +665,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &[0],
         );
@@ -679,7 +685,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -696,7 +701,6 @@ mod reduced {
                             .collect(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -709,10 +713,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(2)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -726,9 +730,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &[0],
         );
@@ -745,9 +749,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -757,9 +761,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &[],
         );
@@ -776,9 +780,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![State {
@@ -788,9 +792,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &[],
         );
@@ -811,9 +815,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: iter::once(String::new()).collect(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &Graph {
                 states: vec![
@@ -824,7 +828,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -837,139 +840,24 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
             },
             &[],
         );
     }
 
     #[test]
-    #[allow(clippy::too_many_lines)]
     fn sort_1() {
         sort(
-            Graph {
+            Nondeterministic {
                 states: vec![
                     State {
                         transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                        tags: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                0,
-                                CurryInput::Scrutinize(RangeMap {
-                                    entries: BTreeMap::new(),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                1,
-                                CurryInput::Wildcard(Transition {
-                                    dst: iter::once(Ok(0)).collect(),
-                                    act: Action::Local,
-                                    update: update!(|(), _| {}),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                1,
-                                CurryInput::Wildcard(Transition {
-                                    dst: iter::once(Ok(0)).collect(),
-                                    act: Action::Local,
-                                    update: update!(|(), _| {}),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                1,
-                                CurryInput::Wildcard(Transition {
-                                    dst: iter::once(Ok(0)).collect(),
-                                    act: Action::Local,
-                                    update: update!(|(), _| {}),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: iter::once("\0".to_owned()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                1,
-                                CurryInput::Scrutinize(RangeMap {
-                                    entries: BTreeMap::new(),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                1,
-                                CurryInput::Scrutinize(RangeMap {
-                                    entries: BTreeMap::new(),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                        tags: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
                             wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: [Ok(0), Ok(8), Ok(9)].into_iter().collect(),
+                                dst: iter::once(Ok(0)).collect(),
                                 act: Action::Local,
                                 update: update!(|(), _| {}),
                             })),
@@ -977,25 +865,32 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: iter::once(String::new()).collect(),
                     },
                     State {
                         transitions: CurryStack {
                             wildcard: Some(CurryInput::Wildcard(Transition {
                                 dst: iter::once(Ok(1)).collect(),
-                                act: Action::Pop,
+                                act: Action::Local,
                                 update: update!(|(), _| {}),
                             })),
                             map_none: None,
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: iter::once(String::new()).collect(),
-                        tags: BTreeSet::new(),
                     },
                 ],
-                initial: iter::once(Ok(8)).collect(),
+                initial: BTreeSet::<Result<usize, String>>::new(),
+                tags: BTreeMap::new(),
             },
-            vec![0, 0],
+            vec![],
         );
     }
 
