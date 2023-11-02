@@ -388,11 +388,31 @@ mod reduced {
     }
 
     fn shr(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, input: Vec<u8>) {
-        let splittable = (0..=input.len()).any(|i| {
-            lhs.accept(input[..i].iter().copied()).is_ok()
+        println!("LHS: {lhs:?}");
+        println!("RHS: {rhs:?}");
+        let mut split = None;
+        for i in 0..=input.len() {
+            if lhs.accept(input[..i].iter().copied()).is_ok()
                 && rhs.accept(input[i..].iter().copied()).is_ok()
-        });
-        assert_eq!((lhs >> rhs).accept(input).is_ok(), splittable);
+            {
+                split = Some(i);
+                break;
+            }
+        }
+        split.map_or_else(
+            || println!("Couldn't split {input:?}"),
+            |i| {
+                println!(
+                    "Split {input:?} into {:?} and {:?}",
+                    &input[..i],
+                    &input[i..],
+                );
+            },
+        );
+        let concat = lhs >> rhs;
+        println!("SHR: {concat:?}");
+        let concat_accepted = concat.accept(input).is_ok();
+        assert_eq!(concat_accepted, split.is_some());
     }
 
     #[test]
@@ -905,9 +925,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             Graph {
                 states: vec![State {
@@ -921,9 +941,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0],
         );
