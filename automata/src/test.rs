@@ -321,10 +321,7 @@ mod reduced {
     }
 
     fn union(lhs: &Nondeterministic<u8, u8>, rhs: &Nondeterministic<u8, u8>, input: &[u8]) {
-        if lhs.determinize().is_err() {
-            return;
-        }
-        if rhs.determinize().is_err() {
+        if lhs.determinize().is_err() || rhs.determinize().is_err() {
             return;
         }
         println!("{lhs:?}");
@@ -946,6 +943,23 @@ mod reduced {
                 tags: BTreeMap::new(),
             },
             vec![0],
+        );
+    }
+
+    #[test]
+    fn shr_2() {
+        shr(
+            Graph {
+                states: vec![],
+                initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![],
+                initial: BTreeSet::new(),
+                tags: iter::once((String::new(), iter::once(0).collect())).collect(),
+            },
+            vec![],
         );
     }
 }
