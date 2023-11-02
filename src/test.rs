@@ -141,35 +141,6 @@ mod reduced {
                     },
                     State {
                         transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                    },
-                ],
-                initial: iter::once(Ok(0)).collect(),
-                tags: iter::once((String::new(), iter::once(1).collect())).collect(),
-            },
-            vec![],
-        );
-    }
-
-    #[test]
-    fn fixpoint_repeat_3() {
-        fixpoint_repeat(
-            Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: BTreeSet::new(),
-                    },
-                    State {
-                        transitions: CurryStack {
                             wildcard: Some(CurryInput::Wildcard(Transition {
                                 dst: iter::once(Ok(0)).collect(),
                                 act: Action::Local,
@@ -189,7 +160,7 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_4() {
+    fn fixpoint_repeat_3() {
         fixpoint_repeat(
             Graph {
                 states: vec![State {
@@ -208,7 +179,7 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_5() {
+    fn fixpoint_repeat_4() {
         fixpoint_repeat(
             Graph {
                 states: vec![
@@ -253,7 +224,7 @@ mod reduced {
     }
 
     #[test]
-    fn fixpoint_repeat_6() {
+    fn fixpoint_repeat_5() {
         fixpoint_repeat(
             Graph {
                 states: vec![

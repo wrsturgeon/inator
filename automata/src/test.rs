@@ -366,7 +366,7 @@ mod reduced {
         let pre = parser.accept(input.iter().copied());
         let sorted = parser.sort();
         println!("Sorted: {sorted:?}");
-        sorted.check_sorted().unwrap();
+        sorted.check().unwrap();
         let post = sorted.accept(input);
         match pre {
             Ok(out) => assert_eq!(Ok(out), post),

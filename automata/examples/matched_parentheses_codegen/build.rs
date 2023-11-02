@@ -3,7 +3,10 @@ use inator_automata::{
     update, Action, CurryInput, CurryStack, Deterministic, IllFormed, Range, RangeMap, State,
     Transition,
 };
-use std::{collections::BTreeSet, io};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io,
+};
 use symbols::Symbol;
 
 pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
@@ -40,9 +43,9 @@ pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
                 .collect(),
             },
             non_accepting: BTreeSet::new(),
-            tags: BTreeSet::new(),
         }],
         initial: 0,
+        tags: BTreeMap::new(),
     };
 
     parser.to_file("src/parser.rs")
