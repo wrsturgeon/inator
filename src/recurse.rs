@@ -33,16 +33,22 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
     #[inline]
     #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
-        let (accepting_indices, accepting_tags) = self.states.iter().enumerate().fold(
-            (BTreeSet::new(), BTreeSet::new()),
-            |(mut acc_i, mut acc_t), (i, s)| {
-                if s.non_accepting.is_empty() {
-                    let _ = acc_i.insert(i);
-                    acc_t.extend(s.tags.iter().cloned());
-                }
-                (acc_i, acc_t)
-            },
-        );
+        let accepting_indices =
+            self.states
+                .iter()
+                .enumerate()
+                .fold(BTreeSet::new(), |mut acc_i, (i, s)| {
+                    if s.non_accepting.is_empty() {
+                        let _ = acc_i.insert(i);
+                    }
+                    acc_i
+                });
+        let accepting_tags = self
+            .tags
+            .iter()
+            .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
+            .map(|(k, _)| k.clone())
+            .collect();
         let orig = Graph {
             states: self
                 .states
@@ -54,6 +60,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .view()
                 .map(|r| r.map_err(str::to_owned))
                 .collect(),
+            tags: self.tags,
         };
         let orig_src = orig.to_src();
         let out = orig.sort();
@@ -76,7 +83,6 @@ fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
     State {
         transitions: add_tail_call_curry_stack(s.transitions, r, accepting_indices, accepting_tags),
         non_accepting: s.non_accepting,
-        tags: s.tags,
     }
 }
 

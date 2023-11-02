@@ -8,6 +8,7 @@
     clippy::absolute_paths,
     clippy::arithmetic_side_effects,
     clippy::indexing_slicing,
+    clippy::panic,
     clippy::print_stdout,
     clippy::unwrap_used,
     clippy::use_debug
@@ -120,7 +121,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -133,10 +133,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: [Ok(0), Ok(1)].into_iter().collect(),
+                tags: BTreeMap::new(),
             },
             vec![0],
         );
@@ -154,7 +154,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -163,10 +162,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: iter::once(String::new()).collect(),
                     },
                 ],
                 initial: iter::once(Ok(0)).collect(),
+                tags: iter::once((String::new(), iter::once(1).collect())).collect(),
             },
             vec![],
         );
@@ -184,7 +183,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -197,10 +195,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(1)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0, 0, 0],
         );
@@ -217,9 +215,9 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: BTreeSet::new(),
-                    tags: BTreeSet::new(),
                 }],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0],
         );
@@ -237,7 +235,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -250,7 +247,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -263,10 +259,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![],
         );
@@ -288,7 +284,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -299,7 +294,6 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                     State {
                         transitions: CurryStack {
@@ -312,10 +306,10 @@ mod reduced {
                             map_some: BTreeMap::new(),
                         },
                         non_accepting: BTreeSet::new(),
-                        tags: BTreeSet::new(),
                     },
                 ],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
             },
             vec![0, 0],
         );
@@ -331,8 +325,7 @@ mod reduced {
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
-                    non_accepting: std::collections::BTreeSet::<String>::new(),
-                    tags: core::iter::once("da capo".to_owned()).collect(),
+                    non_accepting: BTreeSet::<String>::new(),
                 },
                 State {
                     transitions: CurryStack {
@@ -340,8 +333,7 @@ mod reduced {
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
-                    non_accepting: std::collections::BTreeSet::<String>::new(),
-                    tags: core::iter::once(String::new()).collect(),
+                    non_accepting: BTreeSet::<String>::new(),
                 },
                 State {
                     transitions: CurryStack {
@@ -358,8 +350,7 @@ mod reduced {
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
-                    non_accepting: std::collections::BTreeSet::<String>::new(),
-                    tags: std::collections::BTreeSet::<String>::new(),
+                    non_accepting: BTreeSet::<String>::new(),
                 },
                 State {
                     transitions: CurryStack {
@@ -376,11 +367,16 @@ mod reduced {
                         map_none: None,
                         map_some: BTreeMap::new(),
                     },
-                    non_accepting: std::collections::BTreeSet::<String>::new(),
-                    tags: std::collections::BTreeSet::<String>::new(),
+                    non_accepting: BTreeSet::<String>::new(),
                 },
             ],
             initial: core::iter::once(Ok(0)).collect(),
+            tags: [
+                ("da capo".to_owned(), iter::once(0).collect()),
+                (String::new(), iter::once(1).collect()),
+            ]
+            .into_iter()
+            .collect(),
         });
     }
 
@@ -404,7 +400,6 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: core::iter::once(String::new()).collect(),
-                    tags: std::collections::BTreeSet::<String>::new(),
                 },
                 State {
                     transitions: CurryStack {
@@ -413,7 +408,6 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: core::iter::once(String::new()).collect(),
-                    tags: std::collections::BTreeSet::<String>::new(),
                 },
                 State {
                     transitions: CurryStack {
@@ -431,10 +425,10 @@ mod reduced {
                         map_some: BTreeMap::new(),
                     },
                     non_accepting: core::iter::once(String::new()).collect(),
-                    tags: std::collections::BTreeSet::<String>::new(),
                 },
             ],
-            initial: std::collections::BTreeSet::<Result<usize, String>>::new(),
+            initial: BTreeSet::<Result<usize, String>>::new(),
+            tags: BTreeMap::new(),
         });
     }
 }

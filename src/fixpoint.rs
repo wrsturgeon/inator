@@ -20,27 +20,35 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
     #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Graph<I, S, C>) -> Self::Output {
         let Graph {
-            mut states,
+            states,
             initial,
+            mut tags,
         } = rhs;
-        for r in initial.view() {
-            for state in match r {
-                Ok(i) => iter::once(get_mut!(states, i)).collect(),
-                Err(tag) => find_tag_mut(&mut states, tag).map_or_else(
-                    |_| {
-                        panic!(
-                            "Weird error: \
-                            an earlier parser called a fixpoint by name, \
-                            but that name was nowhere to be found.",
-                        )
+        let init_set = initial
+            .view()
+            .flat_map(|r| {
+                r.map_or_else(
+                    |tag| {
+                        tags.get(tag)
+                            .expect(
+                                "Weird error: \
+                                an earlier parser called a fixpoint by name, \
+                                but that name was nowhere to be found.",
+                            )
+                            .clone()
                     },
-                    |s| s,
-                ),
-            } {
-                let _ = state.tags.insert(self.0.clone());
-            }
+                    |i| iter::once(i).collect(),
+                )
+            })
+            .collect();
+        if tags.insert(self.0, init_set).is_some() {
+            panic!("Fixpoint name already in use");
         }
-        let orig = Graph { states, initial };
+        let orig = Graph {
+            states,
+            initial,
+            tags,
+        };
         let orig_src = orig.to_src();
         let out = orig.sort();
         if out.check_sorted().is_err() {
