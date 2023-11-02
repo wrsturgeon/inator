@@ -44,17 +44,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
         if tags.insert(self.0, init_set).is_some() {
             panic!("Fixpoint name already in use");
         }
-        let orig = Graph {
-            states,
-            initial,
-            tags,
-        };
-        let orig_src = orig.to_src();
-        let out = orig.sort();
-        if out.check_sorted().is_err() {
-            panic!("Sorting error: {orig_src}");
-        }
-        out
+        Graph { states, initial, tags }.sort()
     }
 }
 

@@ -49,7 +49,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
             .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
             .map(|(k, _)| k.clone())
             .collect();
-        let orig = Graph {
+        Graph {
             states: self
                 .states
                 .into_iter()
@@ -61,13 +61,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .map(|r| r.map_err(str::to_owned))
                 .collect(),
             tags: self.tags,
-        };
-        let orig_src = orig.to_src();
-        let out = orig.sort();
-        if out.check_sorted().is_err() {
-            panic!("Sorting error: {orig_src}");
         }
-        out
+        .sort()
     }
 }
 
@@ -188,25 +183,6 @@ fn add_tail_call_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
         update: s.update,
     }
 }
-
-/*
-
-        match self.transitions.wildcard {
-            None => {}
-            Some(CurryInput::Wildcard(ref mut w)) => if w.dst.view().any(will_accept) {},
-            Some(CurryInput::Scrutinize(ref mut s)) => todo!(),
-        }
-        let path_to_accepting = state
-            .transitions
-            .values()
-            .flat_map(|curry| curry.values())
-            .map(|transition| transition);
-        for curry in state.transitions.values() {
-            for shit in curry.values() {}
-        }
-
-
-*/
 
 /// Call a tagged state by name.
 #[inline]

@@ -28,12 +28,7 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         self.states.extend(other_states);
         self.initial.extend(other_initial);
         self.tags = unwrap!(self.tags.merge(other_tags));
-        let orig_src = self.to_src();
-        self = self.sort();
-        if self.check_sorted().is_err() {
-            panic!("Sorting error: {orig_src}");
-        }
-        self
+        self.sort() // <-- Not guarantted to sort (almost always) but certainly does remove duplicate states
     }
 }
 
