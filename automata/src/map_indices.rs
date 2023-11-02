@@ -19,6 +19,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 .into_iter()
                 .map(|s| s.map_indices(&mut f))
                 .collect(),
+            tags: self
+                .tags
+                .into_iter()
+                .map(|(k, v)| (k, v.into_iter().map(&mut f).collect()))
+                .collect(),
             initial: self.initial.map_indices(f),
         }
     }

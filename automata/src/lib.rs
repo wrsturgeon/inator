@@ -182,7 +182,7 @@ pub use {
     ctrl::{Ctrl, CtrlMergeConflict},
     curry_input::CurryInput,
     curry_stack::CurryStack,
-    graph::{find_tag, find_tag_mut, Deterministic, Graph, Nondeterministic},
+    graph::{Deterministic, Graph, Nondeterministic},
     in_progress::{InProgress, InputError, ParseError},
     input::Input,
     merge::{merge, try_merge, Merge},

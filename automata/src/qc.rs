@@ -72,9 +72,14 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S
                         continue 'sort_again;
                     }
                 }
+                let mut tags = BTreeMap::<String, BTreeSet<usize>>::arbitrary(g);
+                for set in tags.values_mut() {
+                    *set = set.iter().map(|&i| i % nz_post).collect();
+                }
                 return Self {
                     states,
                     initial: initial.map_indices(|i| i % nz_post),
+                    tags,
                 };
             }
         }
@@ -82,10 +87,14 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S
     #[inline]
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         Box::new(
-            (self.states.clone(), self.initial.clone())
+            (self.states.clone(), self.initial.clone(), self.tags.clone())
                 .shrink()
-                .filter_map(|(states, initial)| {
-                    let s = Self { states, initial };
+                .filter_map(|(states, initial, tags)| {
+                    let s = Self {
+                        states,
+                        initial,
+                        tags,
+                    };
                     (s.check() == Ok(())).then_some(s)
                 }),
         )
@@ -151,16 +160,11 @@ macro_rules! shrink_only {
 }
 
 shrink_only!(|self: &State| Box::new(
-    (
-        self.transitions.clone(),
-        self.non_accepting.clone(),
-        self.tags.clone()
-    )
+    (self.transitions.clone(), self.non_accepting.clone(),)
         .shrink()
-        .map(|(transitions, non_accepting, tags)| Self {
+        .map(|(transitions, non_accepting)| Self {
             transitions,
             non_accepting,
-            tags,
         })
 ));
 
@@ -205,7 +209,6 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
         Self {
             transitions: CurryStack::arbitrary_given(n_states, g),
             non_accepting: BTreeSet::arbitrary(g),
-            tags: BTreeSet::arbitrary(g),
         }
     }
 }

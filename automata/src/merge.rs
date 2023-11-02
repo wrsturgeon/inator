@@ -7,8 +7,8 @@
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
 use crate::{
-    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, Range, RangeMap,
-    Stack, State, Transition, Update,
+    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, RangeMap, Stack,
+    State, Transition, Update,
 };
 use core::convert::Infallible;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
@@ -80,15 +80,16 @@ impl<T: Ord> Merge for BTreeSet<T> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for BTreeMap<Range<I>, Transition<I, S, C>> {
-    type Error = IllFormed<I, S, C>;
+impl<K: Clone + Ord, V: Merge> Merge for BTreeMap<K, V> {
+    type Error = (K, V::Error);
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
         for (k, v) in other {
             match self.entry(k) {
                 Entry::Occupied(extant) => {
                     let (lk, lv) = extant.remove_entry();
-                    drop(self.insert(lk, lv.merge(v)?));
+                    let mv = lv.merge(v).map_err(|e| (lk.clone(), e))?;
+                    drop(self.insert(lk, mv));
                 }
                 Entry::Vacant(empty) => drop(empty.insert(v)),
             }
@@ -110,7 +111,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
                 self.non_accepting.extend(other.non_accepting);
                 self.non_accepting
             },
-            tags: unwrap!(self.tags.merge(other.tags)),
         })
     }
 }
@@ -127,6 +127,7 @@ impl<T> Merge for Vec<T> {
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryStack<I, S, C> {
     type Error = IllFormed<I, S, C>;
     #[inline]
+    #[allow(clippy::wildcard_enum_match_arm)]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
             wildcard: self
@@ -137,7 +138,23 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryStack<I, S, C> {
                 .map_none
                 .merge(other.map_none)
                 .or_else(|(a, b)| Ok(Some(a.merge(b)?)))?,
-            map_some: self.map_some.merge(other.map_some)?,
+            map_some: self
+                .map_some
+                .merge(other.map_some)
+                .map_err(|(lk, e)| match e {
+                    IllFormed::WildcardMask {
+                        arg_stack: None,
+                        arg_token,
+                        possibility_1,
+                        possibility_2,
+                    } => IllFormed::WildcardMask {
+                        arg_stack: Some(lk),
+                        arg_token,
+                        possibility_1,
+                        possibility_2,
+                    },
+                    anything_else => anything_else,
+                })?,
         })
     }
 }
@@ -164,46 +181,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for BTreeMap<S, CurryInput<I, S, C>> {
-    type Error = IllFormed<I, S, C>;
-    #[inline]
-    #[allow(clippy::wildcard_enum_match_arm)]
-    fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
-        for (k, v) in other {
-            match self.entry(k) {
-                Entry::Occupied(extant) => {
-                    let (lk, lv) = extant.remove_entry();
-                    drop(self.insert(
-                        lk.clone(),
-                        lv.merge(v).map_err(|e| match e {
-                            IllFormed::WildcardMask {
-                                arg_stack: None,
-                                arg_token,
-                                possibility_1,
-                                possibility_2,
-                            } => IllFormed::WildcardMask {
-                                arg_stack: Some(lk),
-                                arg_token,
-                                possibility_1,
-                                possibility_2,
-                            },
-                            anything_else => anything_else,
-                        })?,
-                    ));
-                }
-                Entry::Vacant(empty) => drop(empty.insert(v)),
-            }
-        }
-        Ok(self)
-    }
-}
-
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for RangeMap<I, S, C> {
     type Error = IllFormed<I, S, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
-            entries: self.entries.merge(other.entries)?,
+            entries: self.entries.merge(other.entries).map_err(|(_, e)| e)?,
         })
     }
 }

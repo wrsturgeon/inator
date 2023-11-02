@@ -4,7 +4,7 @@ use inator_automata::{
     ToSrc, Transition,
 };
 use rand::{thread_rng, RngCore};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum Symbol {
@@ -58,9 +58,9 @@ fn parser() -> Deterministic<char, Symbol> {
                 .collect(),
             },
             non_accepting: BTreeSet::new(),
-            tags: BTreeSet::new(),
         }],
         initial: 0,
+        tags: BTreeMap::new(),
     }
 }
 

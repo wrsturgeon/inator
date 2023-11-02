@@ -6,7 +6,7 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-use crate::{Input, Nondeterministic, Stack, ToSrc};
+use crate::{Input, Merge, Nondeterministic, Stack, ToSrc};
 use core::ops;
 
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
@@ -23,9 +23,11 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         let Self {
             states: other_states,
             initial: other_initial,
+            tags: other_tags,
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
         self.states.extend(other_states);
         self.initial.extend(other_initial);
+        self.tags = unwrap!(self.tags.merge(other_tags));
         let orig_src = self.to_src();
         self = self.sort();
         if self.check_sorted().is_err() {

@@ -399,9 +399,10 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for Graph<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "Nondeterministic {{ states: {}, initial: {} }}",
+            "Nondeterministic {{ states: {}, initial: {}, tags: {} }}",
             self.states.to_src(),
-            self.initial.to_src()
+            self.initial.to_src(),
+            self.tags.to_src(),
         )
     }
     #[inline]
@@ -436,10 +437,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for State<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "State {{ transitions: {}, non_accepting: {}, tags: {} }}",
+            "State {{ transitions: {}, non_accepting: {} }}",
             self.transitions.to_src(),
             self.non_accepting.to_src(),
-            self.tags.to_src(),
         )
     }
     #[inline]
@@ -578,12 +578,13 @@ impl<S: Stack> ToSrc for Action<S> {
 impl<I: Input> ToSrc for Update<I> {
     #[inline]
     fn to_src(&self) -> String {
-        format!(
-            "Update {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
-            self.input_t.to_src(),
-            self.output_t.to_src(),
-            self.src.to_src(),
-        )
+        // format!(
+        //     "Update {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
+        //     self.input_t.to_src(),
+        //     self.output_t.to_src(),
+        //     self.src.to_src(),
+        // )
+        format!("update!({})", self.src.to_src())
     }
     #[inline]
     fn src_type() -> String {

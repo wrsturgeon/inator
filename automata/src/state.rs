@@ -19,8 +19,6 @@ pub struct State<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// If input ends while in this state, should we accept?
     // TODO: use a `BTreeSet`.
     pub non_accepting: BTreeSet<String>,
-    /// Optional name for this state.
-    pub tags: BTreeSet<String>,
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
@@ -55,7 +53,6 @@ impl<I: Input, S: Stack> State<I, S, usize> {
         State {
             transitions: self.transitions.convert_ctrl(),
             non_accepting: self.non_accepting,
-            tags: self.tags,
         }
     }
 }
@@ -66,7 +63,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for State<I, S, C> {
         Self {
             transitions: self.transitions.clone(),
             non_accepting: self.non_accepting.clone(),
-            tags: self.tags.clone(),
         }
     }
 }
