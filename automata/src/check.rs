@@ -48,8 +48,8 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Can't call two different functions on half-constructed outputs at the same time.
     IncompatibleCallbacks(Box<Update<I>>, Box<Update<I>>),
     /// Two identical states at different indices.
-    DuplicateState,
-    /// States out of sorted order in memory.
+    DuplicateState(Box<State<I, S, C>>),
+    /// Reference to a tagged state, but no state has that tag.
     TagDNE(String),
     /// An initial state expects an accumulator argument that is not `()`.
     InitialNotUnit(String),
@@ -77,13 +77,13 @@ impl<I: Input, S: Stack> IllFormed<I, S, usize> {
             } => IllFormed::WildcardMask {
                 arg_stack,
                 arg_token,
-                possibility_1: possibility_1.convert_ctrl(),
-                possibility_2: possibility_2.convert_ctrl(),
+                possibility_1: Box::new(possibility_1.convert_ctrl()),
+                possibility_2: Box::new(possibility_2.convert_ctrl()),
             },
             IllFormed::Superposition(a, b) => IllFormed::Superposition(a, b),
             IllFormed::IncompatibleStackActions(a, b) => IllFormed::IncompatibleStackActions(a, b),
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
-            IllFormed::DuplicateState => IllFormed::DuplicateState,
+            IllFormed::DuplicateState(s) => IllFormed::DuplicateState(Box::new(s.convert_ctrl())),
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),

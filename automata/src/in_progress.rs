@@ -6,8 +6,8 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{find_tag, try_merge, Ctrl, Graph, IllFormed, Input, Stack};
-use core::{fmt, iter};
+use crate::{try_merge, Ctrl, Graph, IllFormed, Input, Stack};
+use core::fmt;
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
@@ -105,13 +105,21 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
                 Ok(())
             }
         }
-        Err(s) => find_tag(&graph.states, s)
-            .map(|_| {})
-            .map_err(ParseError::BadParser),
+        Err(tag) => graph
+            .tags
+            .get(tag)
+            .map(|_| ())
+            .ok_or(ParseError::BadParser(IllFormed::TagDNE(tag.to_owned()))),
     })?;
     let mut states = ctrl.view().map(|r| match r {
-        Ok(i) => iter::once(get!(graph.states, i)).collect(),
-        Err(s) => find_tag(&graph.states, s).unwrap_or_else(|_| never!()),
+        Ok(i) => vec![get!(graph.states, i)],
+        Err(tag) => graph
+            .tags
+            .get(tag)
+            .unwrap_or_else(|| never!())
+            .iter()
+            .map(|&i| get!(graph.states, i))
+            .collect(),
     });
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
