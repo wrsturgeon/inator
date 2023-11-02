@@ -43,7 +43,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 (acc_i, acc_t)
             },
         );
-        let mut out = Graph {
+        Graph {
             states: self
                 .states
                 .into_iter()
@@ -55,11 +55,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .map(|r| r.map_err(str::to_owned))
                 .collect(),
         }
-        .sort();
-        while out.check_sorted().is_err() {
-            out = out.sort();
-        }
-        out
+        .sort()
     }
 }
 
