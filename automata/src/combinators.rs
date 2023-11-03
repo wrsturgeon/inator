@@ -76,12 +76,28 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
 
         self.states.extend(other_states);
         self.tags.extend(other_tags);
+
+        // If any initial states are immediately accepting, we need to start in the second parser, too.
         if self.initial.iter().any(|r| {
             will_accept(
                 r.as_ref().map_or_else(|s| Err(s.as_str()), |&i| Ok(i)),
                 &accepting_indices,
                 &accepting_tags,
             )
+            /*
+            && {
+                let states = r.as_ref().map_or_else(
+                    |tag| {
+                        unwrap!(self.tags.get(tag))
+                            .iter()
+                            .map(|&i| get!(self.states, i))
+                            .collect()
+                    },
+                    |&i| vec![get!(self.states, i)],
+                );
+                states.into_iter().all(|s| !s.)
+            }
+            */
         }) {
             self.initial.extend(other_initial.iter().cloned());
         }
