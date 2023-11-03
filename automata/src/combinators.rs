@@ -33,7 +33,8 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         self.states.extend(other_states);
         self.initial.extend(other_initial);
         self.tags = unwrap!(self.tags.merge(other_tags));
-        match self.sort().determinize() {
+        self.sort();
+        match self.determinize() {
             Ok(d) => d.generalize(),
             Err(e) => panic!("{e}"),
         }
@@ -105,7 +106,7 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
             self.initial.extend(other_initial.iter().cloned());
         }
 
-        match (Graph {
+        let mut out = Graph {
             states: self
                 .states
                 .into_iter()
@@ -114,10 +115,9 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
                 })
                 .collect(),
             ..self
-        })
-        .sort()
-        .determinize()
-        {
+        };
+        out.sort();
+        match out.determinize() {
             Ok(d) => d.generalize(),
             Err(e) => panic!("{e}"),
         }
