@@ -112,6 +112,13 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 return Err(IllFormed::DuplicateState(Box::new(state.clone())));
             }
         }
+        for pointers in self.tags.values() {
+            for &index in pointers {
+                if index >= n_states {
+                    return Err(IllFormed::OutOfBounds(index));
+                }
+            }
+        }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
