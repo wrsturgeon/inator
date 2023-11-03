@@ -73,7 +73,7 @@ mod prop {
 }
 
 mod reduced {
-    #![allow(clippy::print_stdout,clippy::use_debug)]
+    #![allow(clippy::print_stdout, clippy::use_debug)]
 
     use super::*;
 
