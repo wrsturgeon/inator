@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{iter, num::NonZeroUsize};
+use core::{iter, mem, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -289,44 +289,29 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
     #[allow(clippy::missing_panics_doc, unused_unsafe)]
-    pub fn sort(mut self) -> Nondeterministic<I, S> {
+    pub fn sort(&mut self) {
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
         let index_map: BTreeMap<usize, State<_, _, _>> =
             self.states.iter().cloned().enumerate().collect();
         self.states.sort_unstable();
         self.states.dedup(); // <-- Cool that we can do this!
-        let initial = self
+        self.initial = self
             .initial
-            .view()
-            .map(|r| {
-                r.map_err(str::to_owned)
-                    .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
-            })
-            .collect();
-        let tags = self
-            .tags
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    k,
-                    v.into_iter()
-                        .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
-                        .collect(),
-                )
-            })
-            .collect();
-        let mut states: Vec<_> = self
+            .map_indices(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))));
+        for tags in self.tags.values_mut() {
+            *tags = tags
+                .into_iter()
+                .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
+                .collect()
+        }
+        self.states = self
             .states
             .iter()
             .map(|s| s.reindex(&self.states, &index_map))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .collect();
-        states.dedup();
-        Graph {
-            states,
-            initial,
-            tags,
-        }
     }
 }
 
