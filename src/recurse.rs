@@ -49,7 +49,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
             .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
             .map(|(k, _)| k.clone())
             .collect();
-        Graph {
+        let mut out = Graph {
             states: self
                 .states
                 .into_iter()
@@ -61,8 +61,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
                 .map(|r| r.map_err(str::to_owned))
                 .collect(),
             tags: self.tags,
-        }
-        .sort()
+        };
+        out.sort();
+        out
     }
 }
 
