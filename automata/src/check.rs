@@ -106,7 +106,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
             Self::InvertedRange(ref a, ref b) => {
                 write!(
                     f,
-                    "Range with endpoints flipped: {:?}..={:?}",
+                    "Range with endpoints flipped: {}..={}",
                     a.to_src(),
                     b.to_src(),
                 )
