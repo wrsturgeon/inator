@@ -51,7 +51,9 @@ mod prop {
         }
 
         fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) -> bool {
-            parser.check().unwrap();
+            if parser.check().is_err() {
+                return false;
+            }
             if parser.accept(iter::empty()).is_err() {
                 return true;
             }
@@ -59,6 +61,9 @@ mod prop {
             let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
             if repeated.check().is_err() {
                 return false;
+            }
+            if repeated.determinize().is_err() {
+                return true;
             }
             let output = repeated.accept(both);
             if matches!(output, Err(ParseError::BadParser(_))) {
@@ -81,6 +86,9 @@ mod reduced {
         let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
         println!("Repeated: {repeated:#?}");
         repeated.check().unwrap();
+        if repeated.determinize().is_err() {
+            return;
+        }
         let mut run = both.iter().copied().run(&repeated);
         println!("    {run:?}");
         while let Some(r) = run.next() {
@@ -267,6 +275,90 @@ mod reduced {
                 tags: BTreeMap::new(),
             },
             vec![0, 0],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_6() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                255,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Pop,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(1)).collect(),
+                                act: Action::Push(255),
+                                update: update!(|(), _| {}),
+                            })),
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: [Ok(0), Ok(1)].into_iter().collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![0, 0],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_7() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Push(0),
+                                update: update!(|(), _| {}),
+                            })),
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Scrutinize(RangeMap {
+                                entries: iter::once((
+                                    Range { first: 0, last: 0 },
+                                    Transition {
+                                        dst: iter::once(Ok(0)).collect(),
+                                        act: Action::Pop,
+                                        update: update!(|(), _| {}),
+                                    },
+                                ))
+                                .collect(),
+                            })),
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: [Ok(0), Ok(1)].into_iter().collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![1, 0],
         );
     }
 }

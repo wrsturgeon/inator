@@ -158,6 +158,7 @@ mod combinators;
 mod ctrl;
 mod curry_input;
 mod curry_stack;
+mod generalize;
 mod graph;
 mod in_progress;
 mod input;
