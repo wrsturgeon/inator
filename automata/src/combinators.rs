@@ -43,21 +43,16 @@ impl<I: Input, S: Stack> ops::BitOr for Deterministic<I, S> {
 impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
     type Output = Self;
     #[inline]
-    fn shr(self, rhs: Self) -> Self::Output {
-        let mut s = self.generalize();
-        let other = rhs.generalize();
-        if s.check().is_err() {
-            panic!("Internal error")
+    fn shr(mut self, other: Self) -> Self::Output {
+        let rhs_init = {
+            let curry = &get!(other.states, other.initial).transitions;
+            curry.wildcard.clone().merge(curry.map_none.clone())
         }
-        let size = s.states.len();
-        let Graph {
-            states: other_states,
-            initial: other_initial,
-            tags: other_tags,
-        } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
+        .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))))
+        .map(CurryInput::generalize);
 
         let accepting_indices =
-            s.states
+            self.states
                 .iter_mut()
                 .enumerate()
                 .fold(BTreeSet::new(), |mut acc_i, (i, st)| {
@@ -72,15 +67,40 @@ impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
                     }
                     acc_i
                 });
-        let accepting_tags: BTreeSet<String> = s
+        let accepting_tags: BTreeSet<String> = self
             .tags
             .iter()
             .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
             .map(|(k, _)| k.clone())
             .collect();
 
+        let mut s = self.generalize();
+        if s.check().is_err() {
+            panic!("Internal error")
+        }
+        let size = s.states.len();
+
+        let Graph {
+            states: other_states,
+            initial: other_initial,
+            tags: other_tags,
+        } = other
+            .generalize()
+            .map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
+
         s.states.extend(other_states);
         s.tags.extend(other_tags);
+
+        // For every transition that an empty stack can take from the initial state of the right-hand parser,
+        // add that transition (only on the empty stack) to each accepting state of the left-hand parser.
+        for state in &mut s.states {
+            state.transitions.map_none = state
+                .transitions
+                .map_none
+                .take()
+                .merge(rhs_init.clone())
+                .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))));
+        }
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.
         if s.initial.iter().any(|r| {
