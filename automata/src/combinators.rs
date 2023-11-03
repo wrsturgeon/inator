@@ -35,7 +35,7 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         self.tags = unwrap!(self.tags.merge(other_tags));
         match self.sort().determinize() {
             Ok(d) => d.generalize(),
-            Err(_e) => panic!("TODO: ERROR MESSAGE"),
+            Err(e) => panic!("{e}"),
         }
     }
 }
@@ -119,7 +119,7 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
         .determinize()
         {
             Ok(d) => d.generalize(),
-            Err(_e) => panic!("TODO: ERROR MESSAGE"),
+            Err(e) => panic!("{e}"),
         }
     }
 }
