@@ -303,6 +303,9 @@ mod prop {
                 rhs.accept(input[i..].iter().copied()).is_ok()
             });
             let concat = lhs >> rhs;
+            if concat.check().is_err() {
+                return false;
+            }
             if concat.determinize().is_err() {
                 return true;
             }

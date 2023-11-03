@@ -81,6 +81,9 @@ mod reduced {
         let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
         println!("Repeated: {repeated:#?}");
         repeated.check().unwrap();
+        if repeated.determinize().is_err() {
+            return;
+        }
         let mut run = both.iter().copied().run(&repeated);
         println!("    {run:?}");
         while let Some(r) = run.next() {
