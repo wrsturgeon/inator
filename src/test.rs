@@ -123,6 +123,38 @@ mod reduced {
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
     }
 
+    fn fixpoint_repeat_twice(
+        lhs: Nondeterministic<u8, u8>,
+        rhs: Nondeterministic<u8, u8>,
+        both: Vec<u8>,
+    ) {
+        lhs.check().unwrap();
+        rhs.check().unwrap();
+        if lhs.accept(iter::empty()).is_err() || rhs.accept(iter::empty()).is_err() {
+            return;
+        }
+        let sliceable = {
+            let parser = lhs.clone() >> rhs.clone();
+            sliceable(&parser, &both)
+        };
+        let repeated = fixpoint("da capo") >> lhs >> rhs >> recurse("da capo");
+        println!("Repeated: {repeated:#?}");
+        repeated.check().unwrap();
+        if repeated.determinize().is_err() {
+            return;
+        }
+        let mut run = both.iter().copied().run(&repeated);
+        println!("    {run:?}");
+        while let Some(r) = run.next() {
+            println!("{r:?} {run:?}");
+        }
+        let output = repeated.accept(both);
+        if matches!(output, Err(ParseError::BadParser(_))) {
+            return;
+        }
+        assert_eq!(output.is_ok(), sliceable, "{output:?}");
+    }
+
     #[test]
     fn fixpoint_repeat_1() {
         fixpoint_repeat(
@@ -381,6 +413,45 @@ mod reduced {
                 tags: BTreeMap::new(),
             },
             vec![1, 0],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_twice_1() {
+        fixpoint_repeat_twice(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: iter::once((
+                            0,
+                            CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(0)).collect(),
+                                act: Action::Local,
+                                update: update!(|(), _| {}),
+                            }),
+                        ))
+                        .collect(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![],
         );
     }
 }
