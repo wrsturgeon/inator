@@ -9,46 +9,47 @@
 #![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
 
 use crate::{
-    Ctrl, CurryInput, CurryStack, Graph, Input, Merge, Nondeterministic, RangeMap, Stack, State,
+    Ctrl, CurryInput, CurryStack, Deterministic, Graph, Input, Merge, RangeMap, Stack, State,
     Transition,
 };
 use core::{iter, ops};
 use std::collections::BTreeSet;
 
-impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
+impl<I: Input, S: Stack> ops::BitOr for Deterministic<I, S> {
     type Output = Self;
     #[inline]
-    fn bitor(mut self, other: Self) -> Self {
+    fn bitor(self, rhs: Self) -> Self {
+        let mut s = self.generalize();
+        let other = rhs.generalize();
         // Note that union on pushdown automata is undecidable;
         // we just reject a subset of automata that wouldn't work.
-        if self.check().is_err() {
+        if s.check().is_err() {
             panic!("Internal error")
         }
-        let size = self.states.len();
+        let size = s.states.len();
         let Graph {
             states: other_states,
             initial: other_initial,
             tags: other_tags,
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
-        self.states.extend(other_states);
-        self.initial.extend(other_initial);
-        self.tags = unwrap!(self.tags.merge(other_tags));
-        self.sort();
-        match self.determinize() {
-            Ok(d) => d.generalize(),
-            Err(e) => panic!("{e}"),
-        }
+        s.states.extend(other_states);
+        s.initial.extend(other_initial);
+        s.tags = unwrap!(s.tags.merge(other_tags));
+        s.sort();
+        s.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
 }
 
-impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
+impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
     type Output = Self;
     #[inline]
-    fn shr(mut self, other: Self) -> Self::Output {
-        if self.check().is_err() {
+    fn shr(self, rhs: Self) -> Self::Output {
+        let mut s = self.generalize();
+        let other = rhs.generalize();
+        if s.check().is_err() {
             panic!("Internal error")
         }
-        let size = self.states.len();
+        let size = s.states.len();
         let Graph {
             states: other_states,
             initial: other_initial,
@@ -56,12 +57,12 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
 
         let accepting_indices =
-            self.states
+            s.states
                 .iter_mut()
                 .enumerate()
-                .fold(BTreeSet::new(), |mut acc_i, (i, s)| {
-                    if s.non_accepting.is_empty() {
-                        s.non_accepting = iter::once(
+                .fold(BTreeSet::new(), |mut acc_i, (i, st)| {
+                    if st.non_accepting.is_empty() {
+                        st.non_accepting = iter::once(
                             "Ran the first part of a two-parser concatenation \
                             (with `>>`) but not the second one."
                                 .to_owned(),
@@ -71,42 +72,39 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
                     }
                     acc_i
                 });
-        let accepting_tags: BTreeSet<String> = self
+        let accepting_tags: BTreeSet<String> = s
             .tags
             .iter()
             .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
             .map(|(k, _)| k.clone())
             .collect();
 
-        self.states.extend(other_states);
-        self.tags.extend(other_tags);
+        s.states.extend(other_states);
+        s.tags.extend(other_tags);
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.
-        if self.initial.iter().any(|r| {
+        if s.initial.iter().any(|r| {
             will_accept(
-                r.as_ref().map_or_else(|s| Err(s.as_str()), |&i| Ok(i)),
+                r.as_ref().map_or_else(|st| Err(st.as_str()), |&i| Ok(i)),
                 &accepting_indices,
                 &accepting_tags,
             )
         }) {
-            self.initial.extend(other_initial.iter().cloned());
+            s.initial.extend(other_initial.iter().cloned());
         }
 
         let mut out = Graph {
-            states: self
+            states: s
                 .states
                 .into_iter()
-                .map(|s| {
-                    add_tail_call_state(s, &other_initial, &accepting_indices, &accepting_tags)
+                .map(|st| {
+                    add_tail_call_state(st, &other_initial, &accepting_indices, &accepting_tags)
                 })
                 .collect(),
-            ..self
+            ..s
         };
         out.sort();
-        match out.determinize() {
-            Ok(d) => d.generalize(),
-            Err(e) => panic!("{e}"),
-        }
+        out.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
 }
 

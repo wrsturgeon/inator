@@ -6,12 +6,11 @@
 
 //! Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
 
-use std::collections::BTreeSet;
-
 use crate::{
     Ctrl, CurryInput, CurryStack, Graph, Input, Nondeterministic, RangeMap, Stack, State,
     Transition,
 };
+use std::collections::BTreeSet;
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.

@@ -29,7 +29,7 @@ fn will_accept(
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
-    type Output = Nondeterministic<I, S>;
+    type Output = Deterministic<I, S>;
     #[inline]
     #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
@@ -63,7 +63,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
             tags: self.tags,
         };
         out.sort();
-        out
+        out.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
 }
 

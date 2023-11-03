@@ -71,7 +71,7 @@ mod prop {
             output.is_ok() == sliceable
         }
 
-        fn fixpoint_repeat_twice(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, both: Vec<u8>) -> bool {
+        fn fixpoint_repeat_twice(lhs: Deterministic<u8, u8>, rhs: Deterministic<u8, u8>, both: Vec<u8>) -> bool {
             if lhs.accept(iter::empty()).is_err() || rhs.accept(iter::empty()).is_err() {
                 return true;
             }
@@ -128,8 +128,8 @@ mod reduced {
     }
 
     fn fixpoint_repeat_twice(
-        lhs: Nondeterministic<u8, u8>,
-        rhs: Nondeterministic<u8, u8>,
+        lhs: Deterministic<u8, u8>,
+        rhs: Deterministic<u8, u8>,
         both: Vec<u8>,
     ) {
         lhs.check().unwrap();
@@ -434,7 +434,7 @@ mod reduced {
                     },
                     non_accepting: BTreeSet::new(),
                 }],
-                initial: iter::once(Ok(0)).collect(),
+                initial: 0,
                 tags: BTreeMap::new(),
             },
             Graph {
@@ -445,7 +445,7 @@ mod reduced {
                         map_some: iter::once((
                             0,
                             CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
+                                dst: 0,
                                 act: Action::Local,
                                 update: update!(|(), _| {}),
                             }),
@@ -454,7 +454,7 @@ mod reduced {
                     },
                     non_accepting: BTreeSet::new(),
                 }],
-                initial: iter::once(Ok(0)).collect(),
+                initial: 0,
                 tags: BTreeMap::new(),
             },
             vec![],
