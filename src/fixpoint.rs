@@ -15,7 +15,7 @@ use inator_automata::*;
 pub struct Fixpoint(String);
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
-    type Output = Nondeterministic<I, S>;
+    type Output = Graph<I, S, C>;
     #[inline]
     #[allow(clippy::manual_assert, clippy::panic)]
     fn shr(self, rhs: Graph<I, S, C>) -> Self::Output {
@@ -44,12 +44,13 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Graph<I, S, C>> for Fixpoint {
         if tags.insert(self.0, init_set).is_some() {
             panic!("Fixpoint name already in use");
         }
-        Graph {
+        let mut out = Graph {
             states,
             initial,
             tags,
-        }
-        .sort()
+        };
+        out.sort();
+        out
     }
 }
 
