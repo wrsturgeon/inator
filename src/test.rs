@@ -69,6 +69,28 @@ mod prop {
             }
             output.is_ok() == sliceable
         }
+
+        fn fixpoint_repeat_twice(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, both: Vec<u8>) -> bool {
+            if lhs.accept(iter::empty()).is_err() || rhs.accept(iter::empty()).is_err() {
+                return true;
+            }
+            let sliceable = {
+                let parser = lhs.clone() >> rhs.clone();
+                sliceable(&parser, &both)
+            };
+            let repeated = fixpoint("da capo") >> lhs >> rhs >> recurse("da capo");
+            if repeated.check().is_err() {
+                return false;
+            }
+            if repeated.determinize().is_err() {
+                return true;
+            }
+            let output = repeated.accept(both);
+            if matches!(output, Err(ParseError::BadParser(_))) {
+                return true;
+            }
+            output.is_ok() == sliceable
+        }
     }
 }
 
