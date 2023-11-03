@@ -88,20 +88,6 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
                 &accepting_indices,
                 &accepting_tags,
             )
-            /*
-            && {
-                let states = r.as_ref().map_or_else(
-                    |tag| {
-                        unwrap!(self.tags.get(tag))
-                            .iter()
-                            .map(|&i| get!(self.states, i))
-                            .collect()
-                    },
-                    |&i| vec![get!(self.states, i)],
-                );
-                states.into_iter().all(|s| !s.)
-            }
-            */
         }) {
             self.initial.extend(other_initial.iter().cloned());
         }

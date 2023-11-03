@@ -180,7 +180,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         ordering.sort_unstable();
         ordering.dedup();
 
-        let output = Deterministic {
+        let mut output = Deterministic {
             initial: unwrap!(ordering.binary_search(&self.initial)),
             states: ordering
                 .iter()
@@ -197,6 +197,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 .collect(),
             tags: BTreeMap::new(),
         };
+        output.sort();
         output
             .check()
             .map(|()| output)
