@@ -10,7 +10,7 @@ use crate::{
     Ctrl, CurryInput, CurryStack, Graph, Input, Merge, Nondeterministic, RangeMap, Stack, State,
     Transition,
 };
-use core::ops;
+use core::{iter, ops};
 use std::collections::BTreeSet;
 
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
@@ -53,10 +53,16 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
 
         let accepting_indices =
             self.states
-                .iter()
+                .iter_mut()
                 .enumerate()
                 .fold(BTreeSet::new(), |mut acc_i, (i, s)| {
                     if s.non_accepting.is_empty() {
+                        s.non_accepting = iter::once(
+                            "Ran the first part of a two-parser concatenation \
+                            (with `>>`) but not the second one."
+                                .to_owned(),
+                        )
+                        .collect(); // <-- No longer accepting since we need to run the second parser
                         let _ = acc_i.insert(i);
                     }
                     acc_i

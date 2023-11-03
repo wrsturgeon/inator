@@ -32,8 +32,11 @@ cargo test -r --no-default-features
 cargo test -r --no-default-features --examples
 
 # Property tests
-cargo test -r --all-features
-cargo test -r --all-features --examples
+for i in $(seq 2 9)
+do
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=${i} cargo test -r --all-features
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=${i} cargo test -r --all-features --examples
+done
 
 # Run examples
 set +e

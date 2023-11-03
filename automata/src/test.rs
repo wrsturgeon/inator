@@ -385,6 +385,9 @@ mod reduced {
     }
 
     fn shr(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, input: Vec<u8>) {
+        if lhs.check().is_err() || rhs.check().is_err() {
+            return;
+        }
         println!("LHS: {lhs:?}");
         println!("RHS: {rhs:?}");
         let mut split = None;
@@ -960,6 +963,69 @@ mod reduced {
                 tags: iter::once((String::new(), iter::once(0).collect())).collect(),
             },
             vec![],
+        );
+    }
+
+    #[test]
+    fn shr_3() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![],
+                initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
+            },
+            vec![],
+        );
+    }
+
+    #[test]
+    fn shr_4() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Pop,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![0],
         );
     }
 }
