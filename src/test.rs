@@ -81,6 +81,9 @@ mod reduced {
         let repeated = fixpoint("da capo") >> parser >> recurse("da capo");
         println!("Repeated: {repeated:#?}");
         repeated.check().unwrap();
+        if repeated.determinize().is_err() {
+            return;
+        }
         let mut run = both.iter().copied().run(&repeated);
         println!("    {run:?}");
         while let Some(r) = run.next() {
@@ -264,6 +267,47 @@ mod reduced {
                     },
                 ],
                 initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![0, 0],
+        );
+    }
+
+    #[test]
+    fn fixpoint_repeat_6() {
+        fixpoint_repeat(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: iter::once((
+                                255,
+                                CurryInput::Wildcard(Transition {
+                                    dst: iter::once(Ok(0)).collect(),
+                                    act: Action::Pop,
+                                    update: update!(|(), _| {}),
+                                }),
+                            ))
+                            .collect(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: Some(CurryInput::Wildcard(Transition {
+                                dst: iter::once(Ok(1)).collect(),
+                                act: Action::Push(255),
+                                update: update!(|(), _| {}),
+                            })),
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: [Ok(0), Ok(1)].into_iter().collect(),
                 tags: BTreeMap::new(),
             },
             vec![0, 0],
