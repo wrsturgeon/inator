@@ -9,9 +9,7 @@
     clippy::arithmetic_side_effects,
     clippy::indexing_slicing,
     clippy::panic,
-    clippy::print_stdout,
-    clippy::unwrap_used,
-    clippy::use_debug
+    clippy::unwrap_used
 )]
 
 use crate::*;
@@ -75,6 +73,8 @@ mod prop {
 }
 
 mod reduced {
+    #![allow(clippy::print_stdout,clippy::use_debug)]
+
     use super::*;
 
     fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {

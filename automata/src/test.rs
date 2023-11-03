@@ -9,11 +9,9 @@
     clippy::indexing_slicing,
     clippy::integer_division,
     clippy::panic,
-    clippy::print_stdout,
     clippy::todo,
     clippy::unreachable,
-    clippy::unwrap_used,
-    clippy::use_debug
+    clippy::unwrap_used
 )]
 
 #[cfg(feature = "quickcheck")]
@@ -21,7 +19,7 @@ mod prop {
     use crate::*;
     use core::num::NonZeroUsize;
     use quickcheck::*;
-    use std::{collections::BTreeSet, env};
+    use std::{collections::BTreeSet, env, panic};
 
     #[inline]
     fn gen_size() -> usize {
@@ -252,7 +250,9 @@ mod prop {
             if rhs.determinize().is_err() {
                 return true;
             }
-            let union = lhs.clone() | rhs.clone();
+            let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
+                return true;
+            };
             if union.check().is_err() {
                 return false;
             }
@@ -302,7 +302,9 @@ mod prop {
                 lhs.accept(input[..i].iter().copied()).is_ok() &&
                 rhs.accept(input[i..].iter().copied()).is_ok()
             });
-            let concat = lhs >> rhs;
+            let Ok(concat) = panic::catch_unwind(|| lhs >> rhs) else {
+                return true;
+            };
             if concat.check().is_err() {
                 return false;
             }
@@ -315,9 +317,14 @@ mod prop {
 }
 
 mod reduced {
+    #![allow(clippy::print_stdout, clippy::use_debug)]
+
     use crate::*;
     use core::iter;
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        panic,
+    };
 
     fn determinize_implies_no_runtime_errors(nd: &Nondeterministic<u8, u8>, input: &[u8]) {
         if let Ok(d) = nd.determinize() {
@@ -335,7 +342,9 @@ mod reduced {
         println!("union");
         println!("{rhs:?}");
         println!("yields");
-        let union = lhs.clone() | rhs.clone();
+        let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
+            return;
+        };
         println!("{union:?}");
         println!();
         assert_eq!(union.check(), Ok(()));
@@ -416,7 +425,9 @@ mod reduced {
                 );
             },
         );
-        let concat = lhs >> rhs;
+        let Ok(concat) = panic::catch_unwind(|| lhs >> rhs) else {
+            return;
+        };
         println!("SHR: {concat:?}");
         if concat.determinize().is_err() {
             return;

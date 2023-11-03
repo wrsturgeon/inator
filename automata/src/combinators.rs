@@ -6,6 +6,8 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
+#![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
+
 use crate::{
     Ctrl, CurryInput, CurryStack, Graph, Input, Merge, Nondeterministic, RangeMap, Stack, State,
     Transition,
@@ -16,12 +18,11 @@ use std::collections::BTreeSet;
 impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
     type Output = Self;
     #[inline]
-    #[allow(clippy::manual_assert, clippy::panic)]
     fn bitor(mut self, other: Self) -> Self {
         // Note that union on pushdown automata is undecidable;
         // we just reject a subset of automata that wouldn't work.
         if self.check().is_err() {
-            return self;
+            panic!("Internal error")
         }
         let size = self.states.len();
         let Graph {
@@ -32,7 +33,10 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         self.states.extend(other_states);
         self.initial.extend(other_initial);
         self.tags = unwrap!(self.tags.merge(other_tags));
-        self.sort() // <-- Not guarantted to sort (almost always) but certainly does remove duplicate states
+        match self.sort().determinize() {
+            Ok(d) => d.generalize(),
+            Err(_e) => panic!("TODO: ERROR MESSAGE"),
+        }
     }
 }
 
@@ -41,9 +45,8 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
     #[inline]
     fn shr(mut self, other: Self) -> Self::Output {
         if self.check().is_err() {
-            return self;
+            panic!("Internal error")
         }
-
         let size = self.states.len();
         let Graph {
             states: other_states,
@@ -102,7 +105,7 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
             self.initial.extend(other_initial.iter().cloned());
         }
 
-        Graph {
+        match (Graph {
             states: self
                 .states
                 .into_iter()
@@ -111,8 +114,13 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
                 })
                 .collect(),
             ..self
-        }
+        })
         .sort()
+        .determinize()
+        {
+            Ok(d) => d.generalize(),
+            Err(_e) => panic!("TODO: ERROR MESSAGE"),
+        }
     }
 }
 
