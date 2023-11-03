@@ -8,7 +8,7 @@
 
 use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
-    RangeMap, Stack, State, ToSrc, Transition,
+    RangeMap, Stack, State, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -288,10 +288,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
-    #[allow(clippy::panic)] // <-- FIXME
     #[allow(clippy::missing_panics_doc, unused_unsafe)]
     pub fn sort(mut self) -> Nondeterministic<I, S> {
-        let orig_self = self.to_src();
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
         let index_map: BTreeMap<usize, State<_, _, _>> =
@@ -306,7 +304,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
             })
             .collect();
-        let sorted_self = self.to_src();
         let tags = self
             .tags
             .into_iter()
@@ -314,18 +311,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 (
                     k,
                     v.into_iter()
-                        .map(|i| {
-                            unwrap!(self.states.binary_search(index_map.get(&i).unwrap_or_else(
-                                || panic!(
-                                    "
-Couldn't find {i:?} in {}.
-Original `self` was {orig_self}.
-  Sorted `self` was {sorted_self}.
-",
-                                    index_map.to_src(),
-                                )
-                            )))
-                        })
+                        .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
                         .collect(),
                 )
             })

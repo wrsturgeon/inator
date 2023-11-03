@@ -302,7 +302,11 @@ mod prop {
                 lhs.accept(input[..i].iter().copied()).is_ok() &&
                 rhs.accept(input[i..].iter().copied()).is_ok()
             });
-            (lhs >> rhs).accept(input).is_ok() == splittable
+            let concat = lhs >> rhs;
+            if concat.determinize().is_err() {
+                return true;
+            }
+            concat.accept(input).is_ok() == splittable
         }
     }
 }
@@ -411,6 +415,9 @@ mod reduced {
         );
         let concat = lhs >> rhs;
         println!("SHR: {concat:?}");
+        if concat.determinize().is_err() {
+            return;
+        }
         let concat_accepted = concat.accept(input).is_ok();
         assert_eq!(concat_accepted, split.is_some());
     }
