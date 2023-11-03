@@ -10,7 +10,7 @@ use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
     RangeMap, Stack, State, Transition,
 };
-use core::{iter, mem, num::NonZeroUsize};
+use core::{iter, num::NonZeroUsize};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     ffi::OsStr,
@@ -298,19 +298,19 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         self.states.dedup(); // <-- Cool that we can do this!
         self.initial = self
             .initial
+            .clone()
             .map_indices(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))));
         for tags in self.tags.values_mut() {
             *tags = tags
-                .into_iter()
-                .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))))
-                .collect()
+                .iter()
+                .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(i)))))
+                .collect();
         }
+        // Can't do this in-place since the entire state array is required as an argument.
         self.states = self
             .states
             .iter()
             .map(|s| s.reindex(&self.states, &index_map))
-            .collect::<BTreeSet<_>>()
-            .into_iter()
             .collect();
     }
 }

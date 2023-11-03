@@ -32,7 +32,8 @@ impl<I: Input, S: Stack> ops::BitOr for Nondeterministic<I, S> {
         self.states.extend(other_states);
         self.initial.extend(other_initial);
         self.tags = unwrap!(self.tags.merge(other_tags));
-        self.sort() // <-- Not guarantted to sort (almost always) but certainly does remove duplicate states
+        self.sort(); // <-- Not guarantted to sort (almost always) but certainly does remove duplicate states
+        self
     }
 }
 
@@ -102,7 +103,7 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
             self.initial.extend(other_initial.iter().cloned());
         }
 
-        Graph {
+        let mut out = Graph {
             states: self
                 .states
                 .into_iter()
@@ -111,8 +112,9 @@ impl<I: Input, S: Stack> ops::Shr for Nondeterministic<I, S> {
                 })
                 .collect(),
             ..self
-        }
-        .sort()
+        };
+        out.sort();
+        out
     }
 }
 

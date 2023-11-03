@@ -287,7 +287,9 @@ mod prop {
 
         fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
             let pre = parser.accept(input.iter().copied());
-            let post = parser.sort().accept(input);
+            let mut sorted = parser;
+            sorted.sort();
+            let post = sorted.accept(input);
             match pre {
                 Ok(out) => Ok(out) == post,
                 Err(ParseError::BadInput(_)) => {
@@ -378,7 +380,8 @@ mod reduced {
     fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) {
         println!("Original: {parser:?}");
         let pre = parser.accept(input.iter().copied());
-        let sorted = parser.sort();
+        let mut sorted = parser;
+        sorted.sort();
         println!("Sorted: {sorted:?}");
         sorted.check().unwrap();
         let post = sorted.accept(input);
