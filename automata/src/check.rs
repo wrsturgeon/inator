@@ -7,9 +7,10 @@
 //! Check well-formedness.
 
 use crate::{
-    Action, Ctrl, CurryInput, CurryStack, Input, Range, RangeMap, Stack, State, Transition, Update,
+    Action, Ctrl, CurryInput, CurryStack, Input, Range, RangeMap, Stack, State, ToSrc, Transition,
+    Update,
 };
-use core::{mem, num::NonZeroUsize};
+use core::{fmt, mem, num::NonZeroUsize};
 use std::collections::BTreeSet;
 
 /// Maximum size we're willing to tolerate in an `Err` variant (for performance reasons).
@@ -88,6 +89,79 @@ impl<I: Input, S: Stack> IllFormed<I, S, usize> {
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
             IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
+        }
+    }
+}
+
+impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::OutOfBounds(i) => write!(f, "State index out of bounds: {i}"),
+            Self::ProlongingDeath => write!(
+                f,
+                "Transition to a state that will never accept. \
+                Try removing the state along with any transitions to it.",
+            ),
+            Self::InvertedRange(ref a, ref b) => {
+                write!(
+                    f,
+                    "Range with endpoints flipped: {}..={}",
+                    a.to_src(),
+                    b.to_src(),
+                )
+            }
+            Self::RangeMapOverlap(ref r) => {
+                write!(f, "Multiple ranges would accept {}", r.to_src())
+            }
+            Self::WildcardMask {
+                ref arg_stack,
+                ref arg_token,
+                ref possibility_1,
+                ref possibility_2,
+            } => {
+                write!(
+                    f,
+                    "When the stack top is {} and the token is {}, \
+                    a wildcard match succeeds ({}), \
+                    but so does a specific match ({}).",
+                    arg_stack.to_src(),
+                    arg_token.to_src(),
+                    possibility_1.to_src(),
+                    possibility_2.to_src(),
+                )
+            }
+            Self::Superposition(a, b) => write!(
+                f,
+                "Tried to visit two different deterministic states \
+                ({a} and {b}) at the same time.",
+            ),
+            Self::IncompatibleStackActions(ref a, ref b) => {
+                write!(
+                    f,
+                    "Can't {} and {} the stack at the same time.",
+                    a.in_english(),
+                    b.in_english(),
+                )
+            }
+            Self::IncompatibleCallbacks(ref a, ref b) => {
+                write!(
+                    f,
+                    "Tried to call both `{}` and `{}` at the same time.",
+                    a.src, b.src,
+                )
+            }
+            Self::DuplicateState(ref s) => write!(f, "Duplicate state: {}", s.to_src()),
+            Self::TagDNE(ref tag) => write!(
+                f,
+                "Requested a transition to a tag that does not exist: \"{tag}\"",
+            ),
+            Self::InitialNotUnit(ref s) => write!(
+                f,
+                "Initial state needs to take a unit-type input (`()`) but takes `{s}` instead.",
+            ),
+            Self::TypeMismatch(ref a, ref b) => write!(f, "Type mismatch: `{a}` =/= `{b}`."),
+            Self::WrongReturnType(ref a, ref b) => write!(f, "Wrong output type: `{a}` =/= `{b}`"),
         }
     }
 }
