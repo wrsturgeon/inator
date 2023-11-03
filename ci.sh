@@ -32,10 +32,10 @@ cargo test -r --no-default-features
 cargo test -r --no-default-features --examples
 
 # Property tests
-for i in $(seq 2 11)
+for i in $(seq 2 8)
 do
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=${i} cargo test -r --all-features
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=${i} cargo test -r --all-features --examples
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test -r --all-features
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test -r --all-features --examples
 done
 
 # Run examples

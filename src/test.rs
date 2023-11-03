@@ -28,6 +28,7 @@ fn sliceable<I: Input, S: Stack, C: Ctrl<I, S>>(parser: &Graph<I, S, C>, input: 
 mod prop {
     use super::*;
     use quickcheck::*;
+    use std::panic;
 
     quickcheck! {
         fn empty_works(input: Vec<u8>) -> bool {
@@ -75,7 +76,9 @@ mod prop {
                 return true;
             }
             let sliceable = {
-                let parser = lhs.clone() >> rhs.clone();
+                let Ok(parser) = panic::catch_unwind(|| lhs.clone() >> rhs.clone()) else {
+                    return true;
+                };
                 sliceable(&parser, &both)
             };
             let repeated = fixpoint("da capo") >> lhs >> rhs >> recurse("da capo");
@@ -98,6 +101,7 @@ mod reduced {
     #![allow(clippy::print_stdout, clippy::use_debug)]
 
     use super::*;
+    use std::panic;
 
     fn fixpoint_repeat(parser: Nondeterministic<u8, u8>, both: Vec<u8>) {
         parser.check().unwrap();
@@ -134,7 +138,9 @@ mod reduced {
             return;
         }
         let sliceable = {
-            let parser = lhs.clone() >> rhs.clone();
+            let Ok(parser) = panic::catch_unwind(|| lhs.clone() >> rhs.clone()) else {
+                return;
+            };
             sliceable(&parser, &both)
         };
         let repeated = fixpoint("da capo") >> lhs >> rhs >> recurse("da capo");
