@@ -5,6 +5,8 @@
  */
 
 #![allow(
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
     clippy::integer_division,
     clippy::panic,
     clippy::print_stdout,
@@ -294,6 +296,21 @@ mod prop {
                 Err(ParseError::BadParser(_)) => true
             }
         }
+
+        fn shr(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
+            let splittable = (0..=input.len()).any(|i| {
+                lhs.accept(input[..i].iter().copied()).is_ok() &&
+                rhs.accept(input[i..].iter().copied()).is_ok()
+            });
+            let concat = lhs >> rhs;
+            if concat.check().is_err() {
+                return false;
+            }
+            if concat.determinize().is_err() {
+                return true;
+            }
+            concat.accept(input).is_ok() == splittable
+        }
     }
 }
 
@@ -311,10 +328,7 @@ mod reduced {
     }
 
     fn union(lhs: &Nondeterministic<u8, u8>, rhs: &Nondeterministic<u8, u8>, input: &[u8]) {
-        if lhs.determinize().is_err() {
-            return;
-        }
-        if rhs.determinize().is_err() {
+        if lhs.determinize().is_err() || rhs.determinize().is_err() {
             return;
         }
         println!("{lhs:?}");
@@ -375,6 +389,40 @@ mod reduced {
             }
             Err(ParseError::BadParser(_)) => {}
         };
+    }
+
+    fn shr(lhs: Nondeterministic<u8, u8>, rhs: Nondeterministic<u8, u8>, input: Vec<u8>) {
+        if lhs.check().is_err() || rhs.check().is_err() {
+            return;
+        }
+        println!("LHS: {lhs:?}");
+        println!("RHS: {rhs:?}");
+        let mut split = None;
+        for i in 0..=input.len() {
+            if lhs.accept(input[..i].iter().copied()).is_ok()
+                && rhs.accept(input[i..].iter().copied()).is_ok()
+            {
+                split = Some(i);
+                break;
+            }
+        }
+        split.map_or_else(
+            || println!("Couldn't split {input:?}"),
+            |i| {
+                println!(
+                    "Split {input:?} into {:?} and {:?}",
+                    &input[..i],
+                    &input[i..],
+                );
+            },
+        );
+        let concat = lhs >> rhs;
+        println!("SHR: {concat:?}");
+        if concat.determinize().is_err() {
+            return;
+        }
+        let concat_accepted = concat.accept(input).is_ok();
+        assert_eq!(concat_accepted, split.is_some());
     }
 
     #[test]
@@ -873,6 +921,121 @@ mod reduced {
                 tags: BTreeMap::new(),
             },
             vec![],
+        );
+    }
+
+    #[test]
+    fn shr_1() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![0],
+        );
+    }
+
+    #[test]
+    fn shr_2() {
+        shr(
+            Graph {
+                states: vec![],
+                initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![],
+                initial: BTreeSet::new(),
+                tags: iter::once((String::new(), iter::once(0).collect())).collect(),
+            },
+            vec![],
+        );
+    }
+
+    #[test]
+    fn shr_3() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: None,
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![],
+                initial: BTreeSet::new(),
+                tags: BTreeMap::new(),
+            },
+            vec![],
+        );
+    }
+
+    #[test]
+    fn shr_4() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Pop,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            Graph {
+                states: vec![State {
+                    transitions: CurryStack {
+                        wildcard: None,
+                        map_none: Some(CurryInput::Wildcard(Transition {
+                            dst: iter::once(Ok(0)).collect(),
+                            act: Action::Local,
+                            update: update!(|(), _| {}),
+                        })),
+                        map_some: BTreeMap::new(),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: iter::once(Ok(0)).collect(),
+                tags: BTreeMap::new(),
+            },
+            vec![0],
         );
     }
 }

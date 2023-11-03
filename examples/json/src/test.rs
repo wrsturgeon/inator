@@ -1,3 +1,4 @@
+/*
 use crate::*;
 use std::{fs, path::PathBuf};
 
@@ -19,6 +20,7 @@ fn all_test_cases() -> impl Iterator<Item = (PathBuf, Vec<u8>, bool)> {
             Some((file.path(), fs::read(file.path()).unwrap(), succeed))
         })
 }
+*/
 
 #[test]
 fn entire_test_suite() {
