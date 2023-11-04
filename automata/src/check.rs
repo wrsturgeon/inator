@@ -145,7 +145,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
             Self::IncompatibleStackActions(ref a, ref b) => {
                 write!(
                     f,
-                    "Can't {} and {} the stack at the same time.",
+                    "Can't {} and {} at the same time.",
                     a.in_english(),
                     b.in_english(),
                 )

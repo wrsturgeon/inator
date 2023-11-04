@@ -37,7 +37,7 @@ pub struct Graph<I: Input, S: Stack, C: Ctrl<I, S>> {
     /// Initial state of the machine (before reading input).
     pub initial: C,
     /// Map string tags to the state or states they represent.
-    pub tags: BTreeMap<String, BTreeSet<usize>>,
+    pub tags: BTreeMap<String, usize>,
 }
 
 impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for Graph<I, S, C> {
@@ -70,10 +70,10 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     pub fn check(&self) -> Result<(), IllFormed<I, S, C>> {
         let n_states = self.states.len();
         for r in self.initial.view() {
-            let states: BTreeSet<&_> = match r {
+            let state = match r {
                 Ok(i) => {
                     if let Some(state) = self.states.get(i) {
-                        iter::once(state).collect()
+                        state
                     } else {
                         return Err(IllFormed::OutOfBounds(i));
                     }
@@ -81,27 +81,18 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 Err(tag) => self
                     .tags
                     .get(tag)
-                    .map(|set| set.iter().map(|&i| get!(self.states, i)).collect())
+                    .map(|&i| get!(self.states, i))
                     .ok_or(IllFormed::TagDNE(tag.to_owned()))?,
             };
-            let typed = states.into_iter().try_fold(vec![], |mut acc, s| {
-                acc.push((s, s.input_type()?));
-                Ok(acc)
-            })?;
-            for (state, input_t) in typed {
-                #[allow(clippy::match_same_arms)] // TBD
-                match input_t {
-                    None => {}
-                    Some(t) if t == "()" => {}
-                    Some(other) => return Err(IllFormed::InitialNotUnit(other)),
+            if let Some(t) = state.input_type()? {
+                if t != "()" {
+                    return Err(IllFormed::InitialNotUnit(t));
                 }
-                for curry in state.transitions.values() {
-                    for transition in curry.values() {
-                        if transition.update.input_t != "()" {
-                            return Err(IllFormed::InitialNotUnit(
-                                transition.update.input_t.clone(),
-                            ));
-                        }
+            }
+            for curry in state.transitions.values() {
+                for transition in curry.values() {
+                    if transition.update.input_t != "()" {
+                        return Err(IllFormed::InitialNotUnit(transition.update.input_t.clone()));
                     }
                 }
             }
@@ -112,11 +103,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 return Err(IllFormed::DuplicateState(Box::new(state.clone())));
             }
         }
-        for pointers in self.tags.values() {
-            for &index in pointers {
-                if index >= n_states {
-                    return Err(IllFormed::OutOfBounds(index));
-                }
+        for &index in self.tags.values() {
+            if index >= n_states {
+                return Err(IllFormed::OutOfBounds(index));
             }
         }
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
@@ -140,17 +129,17 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         }
         for r in run.ctrl.view() {
             if match r {
-                Ok(i) => vec![get!(self.states, i)],
-                Err(tag) => self
-                    .tags
-                    .get(tag)
-                    .ok_or(ParseError::BadParser(IllFormed::TagDNE(tag.to_owned())))?
-                    .iter()
-                    .map(|&i| get!(self.states, i))
-                    .collect(),
+                Ok(i) => get!(self.states, i),
+                Err(tag) => get!(
+                    self.states,
+                    *self
+                        .tags
+                        .get(tag)
+                        .ok_or(ParseError::BadParser(IllFormed::TagDNE(tag.to_owned())))?
+                ),
             }
-            .into_iter()
-            .any(|s| s.non_accepting.is_empty())
+            .non_accepting
+            .is_empty()
             {
                 return Ok(run.output_t);
             }
@@ -174,6 +163,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         // Associate each subset of states with a merged state
         let mut subsets_as_states = BTreeMap::new();
         self.explore(&mut subsets_as_states, &self.initial)?;
+        for &i in self.tags.values() {
+            self.explore(&mut subsets_as_states, &C::from_usize(i))?;
+        }
 
         // Fix an ordering on those subsets
         let mut ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
@@ -195,7 +187,54 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     }
                 })
                 .collect(),
-            tags: BTreeMap::new(),
+            tags: self
+                .tags
+                .iter()
+                .map(|(k, &v)| {
+                    (
+                        k.clone(),
+                        unwrap!(ordering.binary_search(&C::from_usize(v))),
+                        // unwrap!(ordering.binary_search_by(|c| {
+                        //     // Make sure there's only one element and name it `r`
+                        //     let r = {
+                        //         let mut view = c.view();
+                        //         let Some(r) = view.next() else {
+                        //             return Ordering::Less;
+                        //         };
+                        //         if view.next().is_some() {
+                        //             return Ordering::Greater;
+                        //         }
+                        //         r
+                        //     };
+                        //     match r {
+                        //         Ok(ref i) => i,
+                        //         Err(tag) => unwrap!(self.tags.get(tag)),
+                        //     }
+                        //     .cmp(&v)
+                        // })),
+                        // ordering
+                        //     .iter()
+                        //     .position(|c| {
+                        //         // Make sure there's only one element and name it `r`
+                        //         let r = {
+                        //             let mut view = c.view();
+                        //             let Some(r) = view.next() else {
+                        //                 return false;
+                        //             };
+                        //             if view.next().is_some() {
+                        //                 return false;
+                        //             }
+                        //             r
+                        //         };
+                        //         match r {
+                        //             Ok(i) => i == v,
+                        //             Err(tag) => self.tags.get(tag) == Some(&v),
+                        //         }
+                        //     })
+                        //     .unwrap(),
+                    )
+                })
+                .collect(),
         };
         output.sort();
         output
@@ -217,15 +256,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         };
 
         // Merge this subset of states into one (most of the heavy lifting)
-        let result_iterator = subset.view().flat_map(|r| match r {
-            Ok(i) => vec![Ok(get!(self.states, i).clone())],
+        let result_iterator = subset.view().map(|r| match r {
+            Ok(i) => Ok(get!(self.states, i).clone()),
             Err(s) => self.tags.get(s).map_or_else(
-                || vec![Err(IllFormed::TagDNE(s.to_owned()))],
-                |set| {
-                    set.iter()
-                        .map(|&i| Ok(get!(self.states, i).clone()))
-                        .collect()
-                },
+                || Err(IllFormed::TagDNE(s.to_owned())),
+                |&i| Ok(get!(self.states, i).clone()),
             ),
         });
         let mega_state: State<I, S, C> = match try_merge(result_iterator) {
@@ -289,7 +324,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
-    #[allow(clippy::missing_panics_doc, unused_unsafe)]
+    #[allow(clippy::missing_panics_doc)]
     pub fn sort(&mut self) {
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
@@ -301,11 +336,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             .initial
             .clone()
             .map_indices(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))));
-        for tags in self.tags.values_mut() {
-            *tags = tags
-                .iter()
-                .map(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(i)))))
-                .collect();
+        for i in self.tags.values_mut() {
+            *i = unwrap!(self.states.binary_search(unwrap!(index_map.get(i))));
         }
         // Can't do this in-place since the entire state array is required as an argument.
         self.states = self

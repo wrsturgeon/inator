@@ -112,7 +112,7 @@ macro_rules! unwrap {
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! unwrap {
     ($expr:expr) => {{
-        #[allow(unsafe_code)]
+        #[allow(unsafe_code, unused_unsafe)]
         let result = unsafe { $expr.unwrap_unchecked() };
         result
     }};
@@ -130,7 +130,7 @@ macro_rules! get {
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! get {
     ($expr:expr, $index:expr) => {{
-        #[allow(unsafe_code)]
+        #[allow(unsafe_code, unused_unsafe)]
         let result = unsafe { $expr.get_unchecked($index) };
         result
     }};

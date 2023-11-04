@@ -75,9 +75,9 @@ impl<S: Stack> Action<S> {
     #[inline]
     pub fn in_english(&self) -> String {
         match *self {
-            Self::Local => "do nothing to".to_owned(),
-            Self::Push(ref s) => format!("push `{}` onto", s.to_src()),
-            Self::Pop => "pop from".to_owned(),
+            Self::Local => "leave the stack untouched".to_owned(),
+            Self::Push(ref s) => format!("push `{}` onto the stack", s.to_src()),
+            Self::Pop => "pop from the stack".to_owned(),
         }
     }
 }

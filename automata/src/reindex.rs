@@ -87,7 +87,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Transition<I, S, C> {
     /// Update index "pointers" in response to a reordered array.
     #[inline]
     #[must_use]
-    #[allow(clippy::missing_panics_doc, unused_unsafe)]
+    #[allow(clippy::missing_panics_doc)]
     pub fn reindex(
         &self,
         states: &[State<I, S, C>],

@@ -46,7 +46,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
         let accepting_tags = self
             .tags
             .iter()
-            .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
+            .filter(|&(_, i)| accepting_indices.contains(i))
             .map(|(k, _)| k.clone())
             .collect();
         let mut out = Graph {

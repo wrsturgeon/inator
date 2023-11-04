@@ -70,7 +70,7 @@ impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
         let accepting_tags: BTreeSet<String> = self
             .tags
             .iter()
-            .filter(|&(_, v)| v.iter().any(|i| accepting_indices.contains(i)))
+            .filter(|&(_, v)| accepting_indices.contains(v))
             .map(|(k, _)| k.clone())
             .collect();
 

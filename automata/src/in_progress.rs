@@ -112,18 +112,15 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
             .ok_or(ParseError::BadParser(IllFormed::TagDNE(tag.to_owned()))),
     })?;
     let mut states = ctrl.view().map(|r| match r {
-        Ok(i) => vec![get!(graph.states, i)],
-        Err(tag) => graph
-            .tags
-            .get(tag)
-            .unwrap_or_else(|| never!())
-            .iter()
-            .map(|&i| get!(graph.states, i))
-            .collect(),
+        Ok(i) => get!(graph.states, i),
+        Err(tag) => get!(
+            graph.states,
+            *graph.tags.get(tag).unwrap_or_else(|| never!())
+        ),
     });
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
-            if states.any(|set| set.into_iter().any(|s| s.non_accepting.is_empty())) {
+            if states.any(|s| s.non_accepting.is_empty()) {
                 Ok((None, output_t.to_owned()))
             } else {
                 Err(ParseError::BadInput(InputError::NotAccepting))
@@ -133,12 +130,9 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
         };
     };
     let maybe_stack_top = stack.last();
-    let transitions = states.flat_map(|set| {
-        set.into_iter()
-            .filter_map(|s| match s.transitions.get(maybe_stack_top, &token) {
-                Err(e) => Some(Err(e)),
-                Ok(opt) => opt.map(Ok),
-            })
+    let transitions = states.filter_map(|s| match s.transitions.get(maybe_stack_top, &token) {
+        Err(e) => Some(Err(e)),
+        Ok(opt) => opt.map(Ok),
     });
     try_merge(transitions).map_or(Err(ParseError::BadInput(InputError::Absurd)), |r| {
         r.map_or_else(
