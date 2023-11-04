@@ -431,8 +431,7 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
         match self.act {
             Action::Local => format!(
                 r#"match state_{dst}(input, context, ({f})(acc, token))? {{
-                (None, _) => todo!(),
-                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             }}"#,
             ),

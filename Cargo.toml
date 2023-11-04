@@ -1,4 +1,3 @@
-workspace = { members = ["examples/digit"] }
 [package]
 name = "inator"
 authors = ["Will Sturgeon <willstrgn@gmail.com>"]
@@ -8,6 +7,15 @@ description = "An evil parsing library."
 license = "MPL-2.0"
 repository = "https://github.com/wrsturgeon/inator"
 build = "build.rs"
+
+[workspace]
+members = [
+  "automata",
+  "automata/examples/matched_parentheses_codegen",
+  "examples/digit",
+  "examples/integer",
+  "examples/json",
+]
 
 [dependencies]
 inator-automata = { path = "automata" }

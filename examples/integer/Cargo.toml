@@ -1,5 +1,5 @@
 [package]
-name = "inator-digit-test"
+name = "inator-integer-test"
 version = "0.1.0"
 edition = "2021"
 

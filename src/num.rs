@@ -12,24 +12,15 @@ use inator_automata::*;
 /// Any digit character (0, 1, 2, 3, 4, 5, 6, 7, 8, 9).
 #[inline]
 #[must_use]
-#[allow(
-    clippy::missing_assert_message,
-    clippy::missing_panics_doc,
-    clippy::panic
-)] // <-- FIXME
+#[allow(clippy::arithmetic_side_effects)]
 pub fn digit<S: Stack>() -> Deterministic<u8, S> {
-    let out = any_of(
+    any_of(
         Range {
             first: b'0',
             last: b'9',
         },
-        update!(|_: u16, i| i),
-    );
-    match out.output_type() {
-        Ok(maybe) => assert_eq!(maybe.as_deref(), Some("u8")),
-        Err(e) => panic!("{e}"),
-    }
-    out
+        update!(|_: u16, i| i - b'0'),
+    )
 }
 
 /// An unsigned integer consisting only of digits (e.g., no sign, no decimal point, no commas, etc.).

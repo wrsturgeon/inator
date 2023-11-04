@@ -18,14 +18,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "digit"
-version = "0.1.0"
-dependencies = [
- "inator",
- "quickcheck",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -63,6 +55,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "inator-digit-test"
+version = "0.1.0"
+dependencies = [
+ "inator",
+ "quickcheck",
+]
+
+[[package]]
+name = "inator-integer-test"
+version = "0.1.0"
+dependencies = [
+ "inator",
+ "quickcheck",
+]
+
+[[package]]
+name = "json-inator"
+version = "0.1.0"
+dependencies = [
+ "inator",
+ "types",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -73,6 +89,15 @@ name = "log"
 version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
+
+[[package]]
+name = "matched_parentheses_codegen"
+version = "0.1.0"
+dependencies = [
+ "inator-automata",
+ "rand",
+ "symbols",
+]
 
 [[package]]
 name = "memchr"
@@ -155,6 +180,20 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
+
+[[package]]
+name = "symbols"
+version = "0.1.0"
+dependencies = [
+ "inator-automata",
+]
+
+[[package]]
+name = "types"
+version = "0.1.0"
+dependencies = [
+ "inator",
+]
 
 [[package]]
 name = "wasi"

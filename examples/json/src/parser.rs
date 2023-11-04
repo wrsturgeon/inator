@@ -75,26 +75,29 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
     acc: (),
 ) -> R<I> {
     match input.next() {
-        None => Err(Error::UserDefined { messages: &["Expected only a single token on [b\' \'..=b\' \'] but got another token after it", "Expected only a single token on [b\'\\n\'..=b\'\\n\'] but got another token after it", "Expected only a single token on [b\'\\r\'..=b\'\\r\'] but got another token after it", "Expected only a single token on [b\'\\t\'..=b\'\\t\'] but got another token after it"] }),
+        None => Err(Error::UserDefined {
+            messages: &[
+                "Expected a token in the range [b\' \'..=b\' \'] but input ended",
+                "Expected a token in the range [b\'\\n\'..=b\'\\n\'] but input ended",
+                "Expected a token in the range [b\'\\r\'..=b\'\\r\'] but input ended",
+                "Expected a token in the range [b\'\\t\'..=b\'\\t\'] but input ended",
+            ],
+        }),
         Some((index, token)) => match (&context, &token) {
             (&_, &(b'\t'..=b'\t')) => match state_0(input, context, (|(), _| {})(acc, token))? {
-                (None, _) => todo!(),
-                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             },
             (&_, &(b'\n'..=b'\n')) => match state_0(input, context, (|(), _| {})(acc, token))? {
-                (None, _) => todo!(),
-                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             },
             (&_, &(b'\r'..=b'\r')) => match state_0(input, context, (|(), _| {})(acc, token))? {
-                (None, _) => todo!(),
-                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             },
             (&_, &(b' '..=b' ')) => match state_0(input, context, (|(), _| {})(acc, token))? {
-                (None, _) => todo!(),
-                (done @ Some((_, _, None)), acc) => Ok((done, acc)),
+                (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
             },
             _ => Err(Error::Absurd { index, token }),
