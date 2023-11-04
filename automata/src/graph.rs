@@ -7,8 +7,8 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
-    RangeMap, Stack, State, ToSrc, Transition,
+    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Merge,
+    ParseError, RangeMap, Stack, State, ToSrc, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -319,6 +319,61 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 } else {
                     Ok(acc)
                 }
+            })
+    }
+
+    /// Compute the input type of any successful run.
+    /// # Errors
+    /// If multiple accepting states attempt to return different types.
+    #[inline]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
+        self.initial
+            .view()
+            .map(|r| {
+                r.map_or_else(
+                    |tag| get!(self.states, *unwrap!(self.tags.get(tag))),
+                    |i| get!(self.states, i),
+                )
+            })
+            .try_fold(None, |acc, state| {
+                let shit =
+                    acc.merge(state.transitions.values().try_fold(None, |accc, curry| {
+                        accc.merge({
+                            curry.values().try_fold(None, |acccc, t| {
+                                acccc.merge(Some(t.update.input_t.clone())).map_or_else(
+                                    |(a, b)| {
+                                        if a == b {
+                                            Ok(Some(a))
+                                        } else {
+                                            Err(IllFormed::TypeMismatch(a, b))
+                                        }
+                                    },
+                                    Ok,
+                                )
+                            })?
+                        })
+                        .map_or_else(
+                            |(a, b)| {
+                                if a == b {
+                                    Ok(Some(a))
+                                } else {
+                                    Err(IllFormed::TypeMismatch(a, b))
+                                }
+                            },
+                            Ok,
+                        )
+                    })?);
+                shit.map_or_else(
+                    |(a, b)| {
+                        if a == b {
+                            Ok(Some(a))
+                        } else {
+                            Err(IllFormed::TypeMismatch(a, b))
+                        }
+                    },
+                    Ok,
+                )
             })
     }
 
