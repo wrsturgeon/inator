@@ -72,7 +72,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for State<I, S, C> {}
 impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for State<I, S, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.non_accepting == other.non_accepting && self.transitions == other.transitions
+        self.transitions == other.transitions && self.non_accepting == other.non_accepting
     }
 }
 

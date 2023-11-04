@@ -8,7 +8,7 @@
 
 use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
-    RangeMap, Stack, State, Transition,
+    RangeMap, Stack, State, ToSrc, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -337,7 +337,14 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             .clone()
             .map_indices(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))));
         for i in self.tags.values_mut() {
-            *i = unwrap!(self.states.binary_search(unwrap!(index_map.get(i))));
+            // *i = unwrap!(self.states.binary_search(unwrap!(index_map.get(i)))); // <-- TODO: reinstate
+            *i = unwrap!(self
+                .states
+                .binary_search(if let Some(found) = index_map.get(i) {
+                    found
+                } else {
+                    panic!("Couldn't find {i:?} in {:?}", index_map.to_src());
+                }));
         }
         // Can't do this in-place since the entire state array is required as an argument.
         self.states = self
