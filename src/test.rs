@@ -101,6 +101,12 @@ mod reduced {
     use super::*;
     use std::panic;
 
+    fn fixpoint_unused(parser: Deterministic<u8, u8>, input: Vec<u8>) {
+        let pre = parser.accept(input.iter().copied());
+        let post = (fixpoint("unused") >> parser).accept(input);
+        assert_eq!(pre, post);
+    }
+
     fn fixpoint_repeat(parser: Deterministic<u8, u8>, both: Vec<u8>) {
         parser.check().unwrap();
         if parser.accept(iter::empty()).is_err() {
@@ -158,6 +164,176 @@ mod reduced {
         assert_eq!(output.is_ok(), sliceable, "{output:?}");
     }
     */
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn fixpoint_unused_1() {
+        fixpoint_unused(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: BTreeMap::new(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: None,
+                            map_none: None,
+                            map_some: [
+                                (
+                                    65,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: iter::once((
+                                            Range {
+                                                first: 61,
+                                                last: 227,
+                                            },
+                                            Transition {
+                                                dst: 2,
+                                                act: Action::Local,
+                                                update: update!(|(), _| {}),
+                                            },
+                                        ))
+                                        .collect(),
+                                    }),
+                                ),
+                                (
+                                    140,
+                                    CurryInput::Wildcard(Transition {
+                                        dst: 0,
+                                        act: Action::Local,
+                                        update: update!(|(), _| {}),
+                                    }),
+                                ),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        },
+                        non_accepting: [
+                            "\u{19}",
+                            "%\u{9d}\u{f}#\u{fff8}",
+                            "1\u{8771}%\u{17}",
+                            "\u{a4}+\u{b372}",
+                        ]
+                        .into_iter()
+                        .map(str::to_owned)
+                        .collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: 0,
+                                act: Action::Pop,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: Some(CurryInput::Scrutinize(RangeMap {
+                                entries: BTreeMap::new(),
+                            })),
+                            map_some: [
+                                (
+                                    18,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    71,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    76,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    116,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    164,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        },
+                        non_accepting: ["", "#", "-\u{80}0", "["]
+                            .into_iter()
+                            .map(str::to_owned)
+                            .collect(),
+                    },
+                    State {
+                        transitions: CurryStack {
+                            wildcard: Some(CurryInput::Wildcard(Transition {
+                                dst: 1,
+                                act: Action::Pop,
+                                update: update!(|(), _| {}),
+                            })),
+                            map_none: None,
+                            map_some: [
+                                (
+                                    71,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    164,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    205,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    213,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                                (
+                                    220,
+                                    CurryInput::Scrutinize(RangeMap {
+                                        entries: BTreeMap::new(),
+                                    }),
+                                ),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: 0,
+                tags: [
+                    ("!/", 0),
+                    ("`\u{602}\u{206d}", 0),
+                    ("m\u{5920}\u{99}\u{61c}", 0),
+                    ("u\u{8b}", 1),
+                    ("\u{c4c8}\u{8a}\u{98}\u{e}", 4),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v))
+                .collect(),
+            },
+            vec![],
+        );
+    }
 
     #[test]
     fn fixpoint_repeat_1() {

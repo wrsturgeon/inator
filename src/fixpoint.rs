@@ -18,22 +18,12 @@ impl<I: Input, S: Stack> ops::Shr<Deterministic<I, S>> for Fixpoint {
     type Output = Deterministic<I, S>;
     #[inline]
     #[allow(clippy::manual_assert, clippy::panic)]
-    fn shr(self, rhs: Deterministic<I, S>) -> Self::Output {
-        let Graph {
-            states,
-            initial,
-            mut tags,
-        } = rhs;
-        if tags.insert(self.0, initial).is_some() {
+    fn shr(self, mut rhs: Deterministic<I, S>) -> Self::Output {
+        if rhs.tags.insert(self.0, rhs.initial).is_some() {
             panic!("Fixpoint name already in use");
         }
-        let mut out = Graph {
-            states,
-            initial,
-            tags,
-        };
-        out.sort();
-        out
+        // rhs.sort();
+        rhs
     }
 }
 
