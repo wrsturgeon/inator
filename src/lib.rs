@@ -76,6 +76,7 @@
     clippy::implicit_return,
     clippy::inline_always,
     clippy::let_underscore_untyped,
+    clippy::manual_assert,
     clippy::min_ident_chars,
     clippy::missing_trait_methods,
     clippy::mod_module_files,
@@ -155,11 +156,30 @@ macro_rules! get_mut {
 }
 */
 
+/// Unreachable state, but checked if we're debugging.
+#[cfg(any(debug_assertions, test))]
+macro_rules! never {
+    () => {
+        unreachable!()
+    };
+}
+
+/// Unreachable state, but checked if we're debugging.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! never {
+    () => {{
+        #[allow(unsafe_code, unused_unsafe)]
+        unsafe {
+            core::hint::unreachable_unchecked()
+        }
+    }};
+}
+
 /// One-argument function.
 #[macro_export]
 macro_rules! f {
     ($ex:expr) => {
-        $crate::F1::_from_macro(stringify!($ex).to_owned(), $ex)
+        $crate::F::_from_macro(stringify!($ex).to_owned(), $ex)
     };
 }
 
@@ -167,7 +187,7 @@ macro_rules! f {
 #[macro_export]
 macro_rules! ff {
     ($ex:expr) => {
-        $crate::F2::_from_macro(stringify!($ex).to_owned(), $ex)
+        $crate::FF::_from_macro(stringify!($ex).to_owned(), $ex)
     };
 }
 
@@ -182,10 +202,10 @@ mod recurse;
 mod test;
 
 pub use {
-    f::{F1, F2},
+    f::{F, FF},
     fixpoint::{fixpoint, Fixpoint},
     inator_automata::*,
-    num::integer,
+    num::{digit, integer},
     recurse::{recurse, Recurse},
 };
 
@@ -278,16 +298,20 @@ pub fn toss_range<I: Input, S: Stack>(range: Range<I>) -> Deterministic<I, S> {
 }
 
 /// Run this parser, then apply this function to the result.
+/// # Panics
+/// FIXME
 #[inline]
 #[must_use]
+#[allow(clippy::needless_pass_by_value, clippy::todo)] // <-- TODO
+#[allow(clippy::panic)]
 pub fn process<I: Input, S: Stack, C: Ctrl<I, S>>(
     parser: Graph<I, S, C>,
-    combinator: F1,
+    combinator: F,
 ) -> Graph<I, S, C> {
     let Ok(parser_output_t) = parser.output_type() else {
         panic!("Inconsistent types in the parser argument to `process`.")
     };
-    if parser_output_t != Some(combinator.arg_t) {
+    if parser_output_t.as_ref() != Some(&combinator.arg_t) {
         panic!(
             "Called `process` with a function that wants an input of type `{}`, \
             but the parser {}.",
@@ -300,11 +324,15 @@ pub fn process<I: Input, S: Stack, C: Ctrl<I, S>>(
 }
 
 /// Save the current value and put it aside, run this second parser from scratch, then combine the results.
+/// # Panics
+/// FIXME
 #[inline]
 #[must_use]
+#[allow(clippy::needless_pass_by_value, clippy::todo)] // <-- TODO
+#[allow(clippy::panic)]
 pub fn combine<I: Input, S: Stack, C: Ctrl<I, S>>(
     parser: Graph<I, S, C>,
-    combinator: F2,
+    _combinator: FF,
 ) -> Graph<I, S, C> {
     let Ok(maybe_parser_input_t) = parser.input_type() else {
         panic!("Inconsistent types in the parser argument to `combine`.")

@@ -31,7 +31,7 @@ fn will_accept(
 impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
     type Output = Deterministic<I, S>;
     #[inline]
-    #[allow(clippy::manual_assert, clippy::panic)]
+    #[allow(clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
         let accepting_indices =
             self.states

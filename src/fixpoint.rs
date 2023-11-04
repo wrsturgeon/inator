@@ -22,7 +22,7 @@ pub struct Fixpoint<I: Input, S: Stack> {
 impl<I: Input, S: Stack> ops::Shr<Deterministic<I, S>> for Fixpoint<I, S> {
     type Output = Deterministic<I, S>;
     #[inline]
-    #[allow(clippy::arithmetic_side_effects, clippy::manual_assert, clippy::panic)]
+    #[allow(clippy::arithmetic_side_effects, clippy::panic)]
     fn shr(self, mut rhs: Deterministic<I, S>) -> Self::Output {
         if let Some(lhs) = self.etc {
             rhs = lhs >> rhs;
@@ -37,7 +37,7 @@ impl<I: Input, S: Stack> ops::Shr<Deterministic<I, S>> for Fixpoint<I, S> {
 impl<I: Input, S: Stack> ops::Shr<Fixpoint<I, S>> for Deterministic<I, S> {
     type Output = Fixpoint<I, S>;
     #[inline]
-    #[allow(clippy::manual_assert, clippy::panic)]
+    #[allow(clippy::panic)]
     fn shr(self, mut rhs: Fixpoint<I, S>) -> Self::Output {
         assert!(
             rhs.etc.is_none(),

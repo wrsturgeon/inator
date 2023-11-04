@@ -11,6 +11,7 @@ use inator_automata::*;
 
 /// Any digit character (0, 1, 2, 3, 4, 5, 6, 7, 8, 9).
 #[inline]
+#[must_use]
 pub fn digit<S: Stack>() -> Deterministic<u8, S> {
     any_of(
         Range {
@@ -23,13 +24,12 @@ pub fn digit<S: Stack>() -> Deterministic<u8, S> {
 
 /// An unsigned integer consisting only of digits (e.g., no sign, no decimal point, no commas, etc.).
 #[inline]
+#[must_use]
+#[allow(clippy::arithmetic_side_effects)]
 pub fn integer<S: Stack>() -> Deterministic<u8, S> {
     let shape = process(digit(), f!(|i: u8| usize::from(i)))
         >> fixpoint("integer")
         >> combine(digit(), ff!(|a: usize, b: usize| a * 10 + b))
         >> recurse("integer");
-    match shape.determinize() {
-        Ok(d) => d.sort(),
-        Err(_) => unreachable!(),
-    }
+    shape.determinize().unwrap_or_else(|_| never!())
 }

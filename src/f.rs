@@ -6,24 +6,38 @@
 
 //! Function representations.
 
+#![allow(clippy::module_name_repetitions)]
+
 use inator_automata::ToSrc;
 
 /// One-argument function.
-pub struct F1 {
+#[non_exhaustive]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct F {
+    /// Source-code representation of this function.
     pub src: String,
+    /// Argument type.
     pub arg_t: String,
+    /// Output type.
     pub output_t: String,
 }
 
 /// Two-argument function.
-pub struct F2 {
+#[non_exhaustive]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct FF {
+    /// Source-code representation of this function.
     pub src: String,
+    /// Type of the first argument.
     pub lhs_t: String,
+    /// Type of the second argument.
     pub rhs_t: String,
+    /// Output type.
     pub output_t: String,
 }
 
-impl F1 {
+impl F {
+    /// Internals of the `f!(...)` macro.
     #[inline]
     #[must_use]
     pub fn _from_macro<Arg: ToSrc, Output: ToSrc>(src: String, _: fn(Arg) -> Output) -> Self {
@@ -35,7 +49,8 @@ impl F1 {
     }
 }
 
-impl F2 {
+impl FF {
+    /// Internals of the `ff!(...)` macro.
     #[inline]
     #[must_use]
     pub fn _from_macro<Lhs: ToSrc, Rhs: ToSrc, Output: ToSrc>(

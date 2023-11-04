@@ -64,6 +64,7 @@
     clippy::implicit_return,
     clippy::inline_always,
     clippy::let_underscore_untyped,
+    clippy::manual_assert,
     clippy::min_ident_chars,
     clippy::missing_trait_methods,
     clippy::mod_module_files,
