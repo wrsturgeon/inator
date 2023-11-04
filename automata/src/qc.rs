@@ -72,9 +72,9 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S
                         continue 'sort_again;
                     }
                 }
-                let mut tags = BTreeMap::<String, BTreeSet<usize>>::arbitrary(g);
-                for set in tags.values_mut() {
-                    *set = set.iter().map(|&i| i % nz_post).collect();
+                let mut tags = BTreeMap::arbitrary(g);
+                for i in tags.values_mut() {
+                    *i = *i % nz;
                 }
                 return Self {
                     states,

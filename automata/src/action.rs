@@ -70,4 +70,14 @@ impl<S: Stack> Action<S> {
         }
         Some(())
     }
+
+    /// Write this as a verb in natural language.
+    #[inline]
+    pub fn in_english(&self) -> String {
+        match *self {
+            Self::Local => "leave the stack untouched".to_owned(),
+            Self::Push(ref s) => format!("push `{}` onto the stack", s.to_src()),
+            Self::Pop => "pop from the stack".to_owned(),
+        }
+    }
 }
