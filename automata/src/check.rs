@@ -123,10 +123,16 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
                 write!(
                     f,
                     "When the stack top is {} and the token is {}, \
-                    a wildcard match succeeds ({}), \
-                    but so does a specific match ({}).",
+                    a wildcard match succeeds (`{}`), \
+                    but so does a specific match (`{}`).",
                     arg_stack.to_src(),
-                    arg_token.to_src(),
+                    arg_token
+                        .as_ref()
+                        .map_or("None".to_owned(), |r| if r.first == r.last {
+                            r.first.to_src()
+                        } else {
+                            r.to_src()
+                        }),
                     possibility_1.to_src(),
                     possibility_2.to_src(),
                 )
@@ -139,7 +145,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
             Self::IncompatibleStackActions(ref a, ref b) => {
                 write!(
                     f,
-                    "Can't {} and {} the stack at the same time.",
+                    "Can't {} and {} at the same time.",
                     a.in_english(),
                     b.in_english(),
                 )
