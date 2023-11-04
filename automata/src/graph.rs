@@ -8,7 +8,7 @@
 
 use crate::{
     try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
-    RangeMap, Stack, State, Transition,
+    RangeMap, Stack, State, ToSrc, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -355,6 +355,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
+    #[allow(clippy::panic)] // <-- TODO
     #[allow(clippy::missing_panics_doc)]
     pub fn sort(&mut self) {
         // Associate each original index with a concrete state instead of just an index,
@@ -368,7 +369,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             .clone()
             .map_indices(|i| unwrap!(self.states.binary_search(unwrap!(index_map.get(&i)))));
         for i in self.tags.values_mut() {
-            *i = unwrap!(self.states.binary_search(unwrap!(index_map.get(i))));
+            // *i = unwrap!(self.states.binary_search(unwrap!(index_map.get(i)))); // <-- TODO: reinstate
+            *i = unwrap!(self.states.binary_search(
+                index_map
+                    .get(i)
+                    .unwrap_or_else(|| panic!("Couldn't find {i:?} in {:?}", index_map.to_src()))
+            ));
         }
         // Can't do this in-place since the entire state array is required as an argument.
         self.states = self
