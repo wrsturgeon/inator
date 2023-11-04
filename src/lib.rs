@@ -112,7 +112,7 @@ macro_rules! unwrap {
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! unwrap {
     ($expr:expr) => {{
-        #[allow(unsafe_code)]
+        #[allow(unsafe_code, unused_unsafe)]
         let result = unsafe { $expr.unwrap_unchecked() };
         result
     }};
@@ -130,7 +130,7 @@ macro_rules! get {
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! get {
     ($expr:expr, $index:expr) => {{
-        #[allow(unsafe_code)]
+        #[allow(unsafe_code, unused_unsafe)]
         let result = unsafe { $expr.get_unchecked($index) };
         result
     }};
@@ -178,7 +178,7 @@ use quickcheck as _; // <-- TODO: remove if we write some implementations
 /// Parser that accepts only the empty string.
 #[inline]
 #[must_use]
-pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
+pub fn empty<I: Input, S: Stack>() -> Deterministic<I, S> {
     Graph {
         states: vec![State {
             transitions: CurryStack {
@@ -188,7 +188,7 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
             },
             non_accepting: BTreeSet::new(),
         }],
-        initial: iter::once(Ok(0)).collect(),
+        initial: 0,
         tags: BTreeMap::new(),
     }
 }
@@ -196,7 +196,7 @@ pub fn empty<I: Input, S: Stack>() -> Nondeterministic<I, S> {
 /// Accept exactly this token and do exactly these things.
 #[inline]
 #[must_use]
-pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondeterministic<I, S> {
+pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Deterministic<I, S> {
     Graph {
         states: vec![
             State {
@@ -219,7 +219,7 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                         entries: iter::once((
                             range,
                             Transition {
-                                dst: iter::once(Ok(0)).collect(),
+                                dst: 0,
                                 act: Action::Local,
                                 update,
                             },
@@ -231,7 +231,7 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
                 },
             },
         ],
-        initial: iter::once(Ok(1)).collect(),
+        initial: 1,
         tags: BTreeMap::new(),
     }
 }
@@ -239,20 +239,20 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Nondete
 /// Accept exactly this token and do exactly these things.
 #[inline]
 #[must_use]
-pub fn tok<I: Input, S: Stack>(token: I, update: Update<I>) -> Nondeterministic<I, S> {
+pub fn tok<I: Input, S: Stack>(token: I, update: Update<I>) -> Deterministic<I, S> {
     any_of(Range::unit(token), update)
 }
 
 /// Accept exactly this token and do nothing.
 #[inline]
 #[must_use]
-pub fn toss<I: Input, S: Stack>(token: I) -> Nondeterministic<I, S> {
+pub fn toss<I: Input, S: Stack>(token: I) -> Deterministic<I, S> {
     tok(token, update!(|(), _| {}))
 }
 
 /// Accept exactly this token and do nothing.
 #[inline]
 #[must_use]
-pub fn toss_range<I: Input, S: Stack>(range: Range<I>) -> Nondeterministic<I, S> {
+pub fn toss_range<I: Input, S: Stack>(range: Range<I>) -> Deterministic<I, S> {
     any_of(range, update!(|(), _| {}))
 }
