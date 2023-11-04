@@ -63,49 +63,6 @@ mod prop {
             assert_eq!(nd.check(), Ok(()), "{nd:?}");
         }
     }
-    /* FAILURE:
-    Graph {
-        states: vec![
-            State {
-                transitions: CurryStack {
-                    wildcard: None,
-                    map_none: None,
-                    map_some: {},
-                },
-                non_accepting: {},
-            },
-            State {
-                transitions: CurryStack {
-                    wildcard: Some(Wildcard(Transition {
-                        dst: {Ok(1)},
-                        act: Push(242),
-                        update: update!(|(), _| {}),
-                    })),
-                    map_none: None,
-                    map_some: {},
-                },
-                non_accepting: {"", "=-F", "[;", "\\8"},
-            },
-            State {
-                transitions: CurryStack {
-                    wildcard: Some(Scrutinize(RangeMap {
-                        entries: {
-                            Range { first: 56, last: 177 }: Transition { dst: {Ok(0)}, act: Pop, update: update!(|(), _| {}) }
-                        },
-                    })),
-                    map_none: Some(Scrutinize(RangeMap { entries: {} })),
-                    map_some: {
-                        129: Scrutinize(RangeMap { entries: {} }),
-                        167: Scrutinize(RangeMap { entries: {} }),
-                    },
-                },
-                non_accepting: {"\u{13}!\u{19}x", "\u{1d}-", "~2", "\u{6ae09}"},
-            },
-        ],
-        initial: {Ok(0), Ok(2)},
-        tags: {"\u{1a}#\u{1}\u{f609}": 1, "¨\u{6}A": 3, "硔": 0},
-    }
-    */
 
     #[test]
     fn arbitrary_implies_check_state() {

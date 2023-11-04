@@ -74,7 +74,7 @@ impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S
                 }
                 let mut tags = BTreeMap::arbitrary(g);
                 for i in tags.values_mut() {
-                    *i = *i % nz;
+                    *i = *i % nz_post;
                 }
                 return Self {
                     states,
