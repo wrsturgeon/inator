@@ -36,6 +36,58 @@ impl ToSrc for () {
     }
 }
 
+impl ToSrc for u16 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u16".to_owned()
+    }
+}
+
+impl ToSrc for u32 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u32".to_owned()
+    }
+}
+
+impl ToSrc for u64 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u64".to_owned()
+    }
+}
+
+impl ToSrc for u128 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u128".to_owned()
+    }
+}
+
 impl ToSrc for usize {
     #[inline]
     #[must_use]
@@ -53,7 +105,6 @@ impl ToSrc for u8 {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        // format!("{self}")
         format!("b'{}'", self.escape_ascii())
     }
     #[inline]
@@ -183,8 +234,9 @@ impl<I: Input, S: Stack> Deterministic<I, S> {
     pub fn to_src(&self) -> Result<String, IllFormed<I, S, usize>> {
         let input_t = I::src_type();
         let output_t = self.output_type()?.unwrap_or_else(|| {
-            /* "core::convert::Infallible" */
-            "()".to_owned()
+            "core::convert::Infallible"
+                // "()"
+                .to_owned()
         });
         let stack_t = S::src_type();
         Ok(format!(
@@ -247,7 +299,9 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
             self.states
                 .iter()
                 .enumerate()
-                .try_fold(String::new(), |acc, (i, s)| Ok(acc + &s.to_src(i)?))?,
+                .try_fold(String::new(), |acc, (i, s)| Ok(
+                    acc + &s.to_src(i, &self.states, &self.tags)?
+                ))?,
         ))
     }
 }
@@ -255,10 +309,16 @@ pub fn parse<I: IntoIterator<Item = {input_t}>>(input: I) -> Result<{output_t}, 
 impl<I: Input, S: Stack> State<I, S, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
-    fn to_src(&self, i: usize) -> Result<String, IllFormed<I, S, usize>> {
-        let input_t = self.input_type()?.unwrap_or_else(|| {
-            /* "core::convert::Infallible" */
-            "()".to_owned()
+    fn to_src(
+        &self,
+        i: usize,
+        all_states: &[Self],
+        all_tags: &BTreeMap<String, usize>,
+    ) -> Result<String, IllFormed<I, S, usize>> {
+        let input_t = self.input_type(all_states, all_tags)?.unwrap_or_else(|| {
+            "core::convert::Infallible"
+                // "()"
+                .to_owned()
         });
         Ok(format!(
             r#"
@@ -399,7 +459,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for Graph<I, S, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "Nondeterministic {{ states: {}, initial: {}, tags: {} }}",
+            "{} {{ states: {}, initial: {}, tags: {} }}",
+            Self::src_type(),
             self.states.to_src(),
             self.initial.to_src(),
             self.tags.to_src(),
@@ -407,7 +468,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ToSrc for Graph<I, S, C> {
     }
     #[inline]
     fn src_type() -> String {
-        format!("Nondeterministic::<{}, {}>", I::src_type(), S::src_type())
+        format!(
+            "Graph::<{}, {}, {}>",
+            I::src_type(),
+            S::src_type(),
+            C::src_type(),
+        )
     }
 }
 
@@ -584,7 +650,7 @@ impl<I: Input> ToSrc for Update<I> {
         //     self.output_t.to_src(),
         //     self.src.to_src(),
         // )
-        format!("update!({})", self.src.to_src())
+        format!("update!({})", self.src.escape_default())
     }
     #[inline]
     fn src_type() -> String {

@@ -84,7 +84,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                     .map(|&i| get!(self.states, i))
                     .ok_or(IllFormed::TagDNE(tag.to_owned()))?,
             };
-            if let Some(t) = state.input_type()? {
+            if let Some(t) = state.input_type(&self.states, &self.tags)? {
                 if t != "()" {
                     return Err(IllFormed::InitialNotUnit(t));
                 }
@@ -300,25 +300,23 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     /// # Errors
     /// If multiple accepting states attempt to return different types.
     #[inline]
+    #[allow(clippy::missing_panics_doc)]
     pub fn output_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
         self.states
             .iter()
-            .try_fold(None, |acc: Option<String>, state| {
-                if state.non_accepting.is_empty() {
-                    acc.map_or_else(
-                        || state.input_type(),
-                        |t| {
-                            if let Some(input_t) = state.input_type()? {
-                                if input_t != t {
-                                    return Err(IllFormed::WrongReturnType(t, input_t));
-                                }
+            .filter(|&state| state.non_accepting.is_empty())
+            .try_fold(None, |acc, state| {
+                acc.merge(state.input_type(&self.states, &self.tags)?)
+                    .map_or_else(
+                        |(a, b)| {
+                            if a == b {
+                                Ok(Some(a))
+                            } else {
+                                Err(IllFormed::TypeMismatch(a, b))
                             }
-                            Ok(Some(t))
                         },
+                        Ok,
                     )
-                } else {
-                    Ok(acc)
-                }
             })
     }
 
@@ -337,43 +335,17 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 )
             })
             .try_fold(None, |acc, state| {
-                let shit =
-                    acc.merge(state.transitions.values().try_fold(None, |accc, curry| {
-                        accc.merge({
-                            curry.values().try_fold(None, |acccc, t| {
-                                acccc.merge(Some(t.update.input_t.clone())).map_or_else(
-                                    |(a, b)| {
-                                        if a == b {
-                                            Ok(Some(a))
-                                        } else {
-                                            Err(IllFormed::TypeMismatch(a, b))
-                                        }
-                                    },
-                                    Ok,
-                                )
-                            })?
-                        })
-                        .map_or_else(
-                            |(a, b)| {
-                                if a == b {
-                                    Ok(Some(a))
-                                } else {
-                                    Err(IllFormed::TypeMismatch(a, b))
-                                }
-                            },
-                            Ok,
-                        )
-                    })?);
-                shit.map_or_else(
-                    |(a, b)| {
-                        if a == b {
-                            Ok(Some(a))
-                        } else {
-                            Err(IllFormed::TypeMismatch(a, b))
-                        }
-                    },
-                    Ok,
-                )
+                acc.merge(state.input_type(&self.states, &self.tags)?)
+                    .map_or_else(
+                        |(a, b)| {
+                            if a == b {
+                                Ok(Some(a))
+                            } else {
+                                Err(IllFormed::TypeMismatch(a, b))
+                            }
+                        },
+                        Ok,
+                    )
             })
     }
 

@@ -193,6 +193,8 @@ macro_rules! ff {
 
 // TODO: derive ToSrc
 
+// TODO: Macro that isn't context-aware but just dumps the codegen right there
+
 mod f;
 mod fixpoint;
 mod num;
@@ -249,7 +251,7 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Determi
             },
             State {
                 non_accepting: iter::once(format!(
-                    "Expected only a single token on [{}..={}] but got another token after it",
+                    "Expected a token in the range [{}..={}] but input ended",
                     range.first.to_src(),
                     range.last.to_src(),
                 ))
@@ -311,7 +313,7 @@ pub fn process<I: Input, S: Stack, C: Ctrl<I, S>>(
     let Ok(parser_output_t) = parser.output_type() else {
         panic!("Inconsistent types in the parser argument to `process`.")
     };
-    if parser_output_t.as_ref() != Some(&combinator.arg_t) {
+    if parser_output_t.as_deref() != Some(&combinator.arg_t) {
         panic!(
             "Called `process` with a function that wants an input of type `{}`, \
             but the parser {}.",

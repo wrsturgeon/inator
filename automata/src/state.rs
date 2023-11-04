@@ -6,9 +6,9 @@
 
 //! State, i.e. a node in an automaton graph.
 
-use crate::{Ctrl, CurryStack, IllFormed, Input, Stack};
-use core::cmp;
-use std::collections::BTreeSet;
+use crate::{Ctrl, CurryStack, IllFormed, Input, Merge, Stack};
+use core::{cmp, convert::identity as id};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// State, i.e. a node in an automaton graph.
 #[allow(clippy::exhaustive_structs)]
@@ -26,22 +26,74 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     /// # Errors
     /// If multiple transitions expect different types.
     #[inline]
-    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
-        self.transitions
-            .values()
-            .flat_map(|c| c.values())
-            .try_fold(None, |acc, t| {
-                acc.map_or_else(
-                    || Ok(Some(t.update.input_t.clone())),
-                    |other| {
-                        if t.update.input_t == other {
-                            Ok(Some(other))
-                        } else {
-                            Err(IllFormed::TypeMismatch(other, t.update.input_t.clone()))
-                        }
-                    },
-                )
+    #[allow(clippy::missing_panics_doc)]
+    pub fn input_type(
+        &self,
+        all_states: &[Self],
+        all_tags: &BTreeMap<String, usize>,
+    ) -> Result<Option<String>, IllFormed<I, S, C>> {
+        // Look at the input types of all update functions.
+        // If this works, it'll be easiest and fastest.
+        let mut best_guess = self.transitions.values().try_fold(None, |acc, curry| {
+            acc.merge({
+                curry.values().try_fold(None, |accc, t| {
+                    accc.merge(Some(t.update.input_t.clone())).map_or_else(
+                        |(a, b)| {
+                            if a == b {
+                                Ok(Some(a))
+                            } else {
+                                Err(IllFormed::TypeMismatch(a, b))
+                            }
+                        },
+                        Ok,
+                    )
+                })?
             })
+            .map_or_else(
+                |(a, b)| {
+                    if a == b {
+                        Ok(Some(a))
+                    } else {
+                        Err(IllFormed::TypeMismatch(a, b))
+                    }
+                },
+                Ok,
+            )
+        })?;
+
+        // Next, look at all states that transition into this one.
+        for state in all_states {
+            for curry in state.transitions.values() {
+                for transition in curry.values() {
+                    let to_here = transition
+                        .dst
+                        .view()
+                        .map(|r| {
+                            get!(
+                                all_states,
+                                r.map_or_else(|tag| *unwrap!(all_tags.get(tag)), id)
+                            )
+                        })
+                        .any(|s| s == self);
+                    if !to_here {
+                        continue;
+                    }
+                    best_guess = best_guess
+                        .merge(Some(transition.update.output_t.clone()))
+                        .map_or_else(
+                            |(a, b)| {
+                                if a == b {
+                                    Ok(Some(a))
+                                } else {
+                                    Err(IllFormed::TypeMismatch(a, b))
+                                }
+                            },
+                            Ok,
+                        )?;
+                }
+            }
+        }
+        Ok(best_guess)
     }
 }
 

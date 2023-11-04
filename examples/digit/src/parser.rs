@@ -36,13 +36,13 @@ pub enum Error {
     },
 }
 
-type R<I> = Result<(Option<(usize, (), Option<F<I>>)>, ()), Error>;
+type R<I> = Result<(Option<(usize, (), Option<F<I>>)>, u8), Error>;
 
 #[repr(transparent)]
-struct F<I>(fn(&mut I, Option<()>, ()) -> R<I>);
+struct F<I>(fn(&mut I, Option<()>, u8) -> R<I>);
 
 #[inline]
-pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
+pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<u8, Error> {
     match state_1(&mut input.into_iter().enumerate(), None, Default::default())? {
         (None, out) => Ok(out),
         (Some((index, context, None)), out) => panic!("Some(({index:?}, {context:?}, None))"),
@@ -55,7 +55,7 @@ pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
 }
 
 #[inline]
-fn state_0<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: ()) -> R<I> {
+fn state_0<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: u8) -> R<I> {
     match input.next() {
         None => Ok((None, acc)),
         Some((index, token)) => match (&context, &token) {
@@ -65,15 +65,13 @@ fn state_0<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, 
 }
 
 #[inline]
-fn state_1<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: ()) -> R<I> {
+fn state_1<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: u16) -> R<I> {
     match input.next() {
         None => Err(Error::UserDefined {
-            messages: &[
-                "Expected only a single token on [b\'0\'..=b\'9\'] but got another token after it",
-            ],
+            messages: &["Expected a token in the range [b\'0\'..=b\'9\'] but input ended"],
         }),
         Some((index, token)) => match (&context, &token) {
-            (&_, &(b'0'..=b'9')) => match state_0(input, context, (|(), i| i)(acc, token))? {
+            (&_, &(b'0'..=b'9')) => match state_0(input, context, (|_: u16, i| i)(acc, token))? {
                 (None, _) => todo!(),
                 (done @ Some((_, _, None)), acc) => Ok((done, acc)),
                 (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
