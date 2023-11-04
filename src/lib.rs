@@ -157,15 +157,15 @@ macro_rules! get_mut {
 
 /// One-argument function.
 #[macro_export]
-macro_rules! f1 {
+macro_rules! f {
     ($ex:expr) => {
         $crate::F1::_from_macro(stringify!($ex).to_owned(), $ex)
     };
 }
 
-/// One-argument function.
+/// Two-argument function.
 #[macro_export]
-macro_rules! f2 {
+macro_rules! ff {
     ($ex:expr) => {
         $crate::F2::_from_macro(stringify!($ex).to_owned(), $ex)
     };

@@ -7,8 +7,8 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, ParseError,
-    RangeMap, Stack, State, ToSrc, Transition,
+    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Merge,
+    ParseError, RangeMap, Stack, State, ToSrc, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -322,37 +322,58 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             })
     }
 
-    /// Compute the output type of any successful run.
+    /// Compute the input type of any successful run.
     /// # Errors
     /// If multiple accepting states attempt to return different types.
     #[inline]
     pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
-        self.states
-            .iter()
-            .try_fold(None, |acc: Option<String>, state| {
-                Ok(state.input_type()?.or(acc))
+        self.initial
+            .view()
+            .map(|r| {
+                r.map_or_else(
+                    |tag| get!(self.states, *unwrap!(self.tags.get(tag))),
+                    |i| get!(self.states, i),
+                )
+            })
+            .try_fold(None, |acc, state| {
+                let shit = acc.merge(state.transitions.values().try_fold(None, |acc, curry| {
+                    acc.merge({
+                        curry.values().try_fold(None, |acc, t| {
+                            acc.merge(Some(t.update.input_t.clone())).map_or_else(
+                                |(a, b)| {
+                                    if a == b {
+                                        Ok(Some(a))
+                                    } else {
+                                        Err(IllFormed::TypeMismatch(a, b))
+                                    }
+                                },
+                                Ok,
+                            )
+                        })?
+                    })
+                    .map_or_else(
+                        |(a, b)| {
+                            if a == b {
+                                Ok(Some(a))
+                            } else {
+                                Err(IllFormed::TypeMismatch(a, b))
+                            }
+                        },
+                        Ok,
+                    )
+                })?);
+                shit.map_or_else(
+                    |(a, b)| {
+                        if a == b {
+                            Ok(Some(a))
+                        } else {
+                            Err(IllFormed::TypeMismatch(a, b))
+                        }
+                    },
+                    Ok,
+                )
             })
     }
-
-    /// Check if states are sorted.
-    /// # Errors
-    /// If there are duplicate states or any out of order.
-    #[inline]
-    pub fn check_sorted(&self) -> Result<(), IllFormed<I, S, C>> {
-        self.states
-            .iter()
-            .try_fold(None, |mlast, curr| {
-                mlast.map_or(Ok(Some(curr)), |last: &State<I, S, C>| {
-                    match last.cmp(curr) {
-                        Ordering::Less => Ok(Some(curr)),
-                        Ordering::Equal => Err(IllFormed::DuplicateState),
-                        Ordering::Greater => Err(IllFormed::UnsortedStates),
-                    }
-                })
-            })
-            .map(|_| {})
-    }
-
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
     #[allow(clippy::panic)] // <-- TODO
