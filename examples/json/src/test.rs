@@ -24,12 +24,11 @@ fn all_test_cases() -> impl Iterator<Item = (PathBuf, Vec<u8>, bool)> {
 
 #[test]
 fn entire_test_suite() {
-    /*
-        for (filename, input, should_pass) in all_test_cases() {
-            assert_eq!(
-                crate::parser::parse(input).is_ok(),
-                should_pass,
-                "
+    for (filename, input, should_pass) in all_test_cases() {
+        assert_eq!(
+            crate::parser::parse(input).is_ok(),
+            should_pass,
+            "
 
     FILE:
     {}
@@ -39,9 +38,8 @@ fn entire_test_suite() {
     {}
     ```
     ",
-                filename.to_str().unwrap(),
-                fs::read_to_string(filename.clone()).unwrap(),
-            );
-        }
-        */
+            filename.to_str().unwrap(),
+            fs::read_to_string(filename.clone()).unwrap(),
+        );
+    }
 }
