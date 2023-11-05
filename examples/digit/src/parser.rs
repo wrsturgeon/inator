@@ -65,14 +65,14 @@ fn state_0<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, 
 }
 
 #[inline]
-fn state_1<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: u16) -> R<I> {
+fn state_1<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: ()) -> R<I> {
     match input.next() {
         None => Err(Error::UserDefined {
             messages: &["Expected a token in the range [b\'0\'..=b\'9\'] but input ended"],
         }),
         Some((index, token)) => match (&context, &token) {
             (&_, &(b'0'..=b'9')) => {
-                match state_0(input, context, (|_: u16, i| i - b'0')(acc, token))? {
+                match state_0(input, context, (|(), i| i - b'0')(acc, token))? {
                     (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
                     (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
                 }

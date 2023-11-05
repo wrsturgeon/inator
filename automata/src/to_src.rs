@@ -427,7 +427,7 @@ impl<I: Input, S: Stack> Transition<I, S, usize> {
     #[allow(clippy::todo)] // TODO: what the fuck does the last case mean?
     fn to_src(&self, stack_symbol: Option<Option<&str>>) -> String {
         let dst = self.dst;
-        let f = self.update.src;
+        let f = self.update.src.as_str();
         match self.act {
             Action::Local => format!(
                 r#"match state_{dst}(input, context, ({f})(acc, token))? {{

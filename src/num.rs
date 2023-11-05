@@ -6,7 +6,7 @@
 
 //! Numeric utilities.
 
-use crate::{any_of, combine, fixpoint, process, recurse};
+use crate::{any_of, call, fixpoint, recurse};
 use inator_automata::*;
 
 /// Any digit character (0, 1, 2, 3, 4, 5, 6, 7, 8, 9).
@@ -19,7 +19,7 @@ pub fn digit<S: Stack>() -> Deterministic<u8, S> {
             first: b'0',
             last: b'9',
         },
-        update!(|_: u16, i| i - b'0'),
+        update!(|(), i| i - b'0'),
     )
 }
 
@@ -28,9 +28,12 @@ pub fn digit<S: Stack>() -> Deterministic<u8, S> {
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
 pub fn integer<S: Stack>() -> Deterministic<u8, S> {
-    let shape = process(digit(), f!(|i: u8| usize::from(i)))
+    digit()
+        >> f!(|i: u8| Some(usize::from(i)))
         >> fixpoint("integer")
-        >> combine(digit(), ff!(|a: usize, b: usize| a * 10 + b))
-        >> recurse("integer");
-    shape.determinize().unwrap_or_else(|_| never!())
+        >> call(
+            digit(),
+            ff!(|a: Option<usize>, b| a?.checked_mul(10)?.checked_add(b)),
+        )
+        >> recurse("integer")
 }

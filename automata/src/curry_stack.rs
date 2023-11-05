@@ -109,6 +109,15 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
             .chain(self.map_none.iter())
             .chain(self.map_some.values())
     }
+
+    /// All values in this collection, without their associated keys.
+    #[inline]
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut CurryInput<I, S, C>> {
+        self.wildcard
+            .iter_mut()
+            .chain(self.map_none.iter_mut())
+            .chain(self.map_some.values_mut())
+    }
 }
 
 impl<I: Input, S: Stack> CurryStack<I, S, usize> {

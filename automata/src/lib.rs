@@ -94,7 +94,7 @@
 #[macro_export]
 macro_rules! update {
     ($ex:expr) => {
-        $crate::Update::_update_macro(stringify!($ex), $ex)
+        $crate::Update::_update_macro(stringify!($ex).to_owned(), $ex)
     };
 }
 
