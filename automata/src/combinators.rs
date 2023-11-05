@@ -8,14 +8,11 @@
 
 #![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
 
-use crate::{
-    Ctrl, CurryInput, CurryStack, Deterministic, Graph, Input, Merge, RangeMap, Stack, State,
-    Transition,
-};
+use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition};
 use core::{iter, ops};
 use std::collections::BTreeSet;
 
-impl<I: Input, S: Stack> ops::BitOr for Deterministic<I, S> {
+impl<I: Input> ops::BitOr for Deterministic<I> {
     type Output = Self;
     #[inline]
     fn bitor(self, rhs: Self) -> Self {
@@ -40,7 +37,7 @@ impl<I: Input, S: Stack> ops::BitOr for Deterministic<I, S> {
     }
 }
 
-impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
+impl<I: Input> ops::Shr for Deterministic<I> {
     type Output = Self;
     #[inline]
     fn shr(mut self, other: Self) -> Self::Output {
@@ -49,7 +46,7 @@ impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
             curry.wildcard.clone().merge(curry.map_none.clone())
         }
         .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))))
-        .map(CurryInput::generalize);
+        .map(Curry::generalize);
 
         let accepting_indices =
             self.states
@@ -131,14 +128,14 @@ impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: State<I, S, C>,
+fn add_tail_call_state<I: Input, C: Ctrl<I>>(
+    s: State<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> State<I, S, BTreeSet<Result<usize, String>>> {
+) -> State<I, BTreeSet<Result<usize, String>>> {
     State {
-        transitions: add_tail_call_curry_stack(
+        transitions: add_tail_call_curry(
             s.transitions,
             other_init,
             accepting_indices,
@@ -151,49 +148,20 @@ fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_curry_stack<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: CurryStack<I, S, C>,
+fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
+    s: Curry<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> CurryStack<I, S, BTreeSet<Result<usize, String>>> {
-    CurryStack {
-        wildcard: s
-            .wildcard
-            .map(|w| add_tail_call_curry_input(w, other_init, accepting_indices, accepting_tags)),
-        map_none: s
-            .map_none
-            .map(|m| add_tail_call_curry_input(m, other_init, accepting_indices, accepting_tags)),
-        map_some: s
-            .map_some
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    k,
-                    add_tail_call_curry_input(v, other_init, accepting_indices, accepting_tags),
-                )
-            })
-            .collect(),
-    }
-}
-
-/// Add a tail call to any accepting state.
-#[inline]
-#[must_use]
-fn add_tail_call_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: CurryInput<I, S, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
-    accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+) -> Curry<I, BTreeSet<Result<usize, String>>> {
     match s {
-        CurryInput::Wildcard(t) => CurryInput::Wildcard(add_tail_call_transition(
+        Curry::Wildcard(t) => Curry::Wildcard(add_tail_call_transition(
             t,
             other_init,
             accepting_indices,
             accepting_tags,
         )),
-        CurryInput::Scrutinize(rm) => CurryInput::Scrutinize(add_tail_call_range_map(
+        Curry::Scrutinize(rm) => Curry::Scrutinize(add_tail_call_range_map(
             rm,
             other_init,
             accepting_indices,
@@ -205,12 +173,12 @@ fn add_tail_call_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: RangeMap<I, S, C>,
+fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
+    s: RangeMap<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> RangeMap<I, S, BTreeSet<Result<usize, String>>> {
+) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
     RangeMap {
         entries: s
             .entries
@@ -228,12 +196,12 @@ fn add_tail_call_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: Transition<I, S, C>,
+fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
+    s: Transition<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> Transition<I, S, BTreeSet<Result<usize, String>>> {
+) -> Transition<I, BTreeSet<Result<usize, String>>> {
     let good = s
         .dst
         .view()

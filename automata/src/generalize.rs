@@ -6,16 +6,13 @@
 
 //! Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
 
-use crate::{
-    Ctrl, CurryInput, CurryStack, Graph, Input, Nondeterministic, RangeMap, Stack, State,
-    Transition,
-};
+use crate::{Ctrl, Curry, Graph, Input, Nondeterministic, RangeMap, State, Transition};
 use std::collections::BTreeSet;
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
-    pub fn generalize(self) -> Nondeterministic<I, S> {
+    pub fn generalize(self) -> Nondeterministic<I> {
         Nondeterministic {
             states: self.states.into_iter().map(State::generalize).collect(),
             initial: self
@@ -28,10 +25,10 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
+impl<I: Input, C: Ctrl<I>> State<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
-    pub fn generalize(self) -> State<I, S, BTreeSet<Result<usize, String>>> {
+    pub fn generalize(self) -> State<I, BTreeSet<Result<usize, String>>> {
         State {
             transitions: self.transitions.generalize(),
             non_accepting: self.non_accepting,
@@ -39,38 +36,22 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
-    pub fn generalize(self) -> CurryStack<I, S, BTreeSet<Result<usize, String>>> {
-        CurryStack {
-            wildcard: self.wildcard.map(CurryInput::generalize),
-            map_none: self.map_none.map(CurryInput::generalize),
-            map_some: self
-                .map_some
-                .into_iter()
-                .map(|(k, v)| (k, v.generalize()))
-                .collect(),
-        }
-    }
-}
-
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
-    /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
-    #[inline]
-    pub fn generalize(self) -> CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+    pub fn generalize(self) -> Curry<I, BTreeSet<Result<usize, String>>> {
         match self {
-            Self::Wildcard(w) => CurryInput::Wildcard(w.generalize()),
-            Self::Scrutinize(s) => CurryInput::Scrutinize(s.generalize()),
+            Self::Wildcard(w) => Curry::Wildcard(w.generalize()),
+            Self::Scrutinize(s) => Curry::Scrutinize(s.generalize()),
         }
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
+impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
     #[must_use]
-    pub fn generalize(self) -> RangeMap<I, S, BTreeSet<Result<usize, String>>> {
+    pub fn generalize(self) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
         RangeMap {
             entries: self
                 .entries
@@ -81,13 +62,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Transition<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
-    pub fn generalize(self) -> Transition<I, S, BTreeSet<Result<usize, String>>> {
+    pub fn generalize(self) -> Transition<I, BTreeSet<Result<usize, String>>> {
         Transition {
             dst: self.dst.view().map(|r| r.map_err(str::to_owned)).collect(),
-            act: self.act,
             update: self.update,
         }
     }

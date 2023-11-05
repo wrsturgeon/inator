@@ -7,8 +7,7 @@
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
 use crate::{
-    Action, Ctrl, CtrlMergeConflict, CurryInput, CurryStack, IllFormed, Input, RangeMap, Stack,
-    State, Transition, Update,
+    Ctrl, CtrlMergeConflict, Curry, IllFormed, Input, RangeMap, State, Transition, Update,
 };
 use core::convert::Infallible;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
@@ -98,8 +97,8 @@ impl<K: Clone + Ord, V: Merge> Merge for BTreeMap<K, V> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for State<I, S, C> {
-    type Error = IllFormed<I, S, C>;
+impl<I: Input, C: Ctrl<I>> Merge for State<I, C> {
+    type Error = IllFormed<I, C>;
     #[inline]
     #[allow(clippy::unwrap_in_result)]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
@@ -124,43 +123,8 @@ impl<T> Merge for Vec<T> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryStack<I, S, C> {
-    type Error = IllFormed<I, S, C>;
-    #[inline]
-    #[allow(clippy::wildcard_enum_match_arm)]
-    fn merge(self, other: Self) -> Result<Self, Self::Error> {
-        Ok(Self {
-            wildcard: self
-                .wildcard
-                .merge(other.wildcard)
-                .or_else(|(a, b)| Ok(Some(a.merge(b)?)))?,
-            map_none: self
-                .map_none
-                .merge(other.map_none)
-                .or_else(|(a, b)| Ok(Some(a.merge(b)?)))?,
-            map_some: self
-                .map_some
-                .merge(other.map_some)
-                .map_err(|(lk, e)| match e {
-                    IllFormed::WildcardMask {
-                        arg_stack: None,
-                        arg_token,
-                        possibility_1,
-                        possibility_2,
-                    } => IllFormed::WildcardMask {
-                        arg_stack: Some(lk),
-                        arg_token,
-                        possibility_1,
-                        possibility_2,
-                    },
-                    anything_else => anything_else,
-                })?,
-        })
-    }
-}
-
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryInput<I, S, C> {
-    type Error = IllFormed<I, S, C>;
+impl<I: Input, C: Ctrl<I>> Merge for Curry<I, C> {
+    type Error = IllFormed<I, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         match (self, other) {
@@ -169,7 +133,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryInput<I, S, C> {
                 match s.entries.first_key_value() {
                     None => Ok(Self::Wildcard(w)),
                     Some((k, v)) => Err(IllFormed::WildcardMask {
-                        arg_stack: None,
                         arg_token: Some(k.clone()),
                         possibility_1: Box::new(w),
                         possibility_2: Box::new(v.clone()),
@@ -181,8 +144,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for RangeMap<I, S, C> {
-    type Error = IllFormed<I, S, C>;
+impl<I: Input, C: Ctrl<I>> Merge for RangeMap<I, C> {
+    type Error = IllFormed<I, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -191,46 +154,34 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for RangeMap<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Merge for Transition<I, S, C> {
-    type Error = IllFormed<I, S, C>;
+impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
+    type Error = IllFormed<I, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
-        Ok(Self {
-            dst: self
-                .dst
-                .merge(other.dst)
-                .map_err(|e: CtrlMergeConflict| match e {
+        match (self, other) {
+            (
+                Self::Lateral {
+                    dst: l_dst,
+                    update: l_update,
+                },
+                Self::Lateral {
+                    dst: r_dst,
+                    update: r_update,
+                },
+            ) => Ok(Self::Lateral {
+                dst: l_dst.merge(r_dst).map_err(|e| match e {
                     CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
                 })?,
-            act: self
-                .act
-                .merge(other.act)
-                .map_err(|(a, b): (Action<S>, Action<S>)| {
-                    IllFormed::IncompatibleStackActions(a, b)
-                })?,
-            update: self
-                .update
-                .merge(other.update)
-                .map_err(|(a, b): (Update<I>, Update<I>)| {
-                    IllFormed::IncompatibleCallbacks(Box::new(a), Box::new(b))
-                })?,
-        })
-    }
-}
-
-impl<I: Input> Merge for Update<I> {
-    type Error = (Self, Self);
-    #[inline]
-    fn merge(self, other: Self) -> Result<Self, Self::Error> {
-        if self == other {
-            Ok(self)
-        } else {
-            Err((self, other))
+                update: l_update
+                    .merge(r_update)
+                    .map_err(|(a, b)| IllFormed::IncompatibleCallbacks(Box::new(a), Box::new(b)))?,
+            }),
+            _ => todo!(),
         }
     }
 }
 
-impl<S: Stack> Merge for Action<S> {
+impl<I: Input> Merge for Update<I> {
     type Error = (Self, Self);
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {

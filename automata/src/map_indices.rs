@@ -6,9 +6,9 @@
 
 //! Apply a function to each index in a structure.
 
-use crate::{Ctrl, CurryInput, CurryStack, Graph, Input, RangeMap, Stack, State, Transition};
+use crate::{Ctrl, Curry, Graph, Input, RangeMap, State, Transition};
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -25,7 +25,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
+impl<I: Input, C: Ctrl<I>> State<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -37,24 +37,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
-    /// Apply a function to each index.
-    #[inline]
-    #[must_use]
-    pub fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
-        Self {
-            wildcard: self.wildcard.map(|c| c.map_indices(&mut f)),
-            map_none: self.map_none.map(|c| c.map_indices(&mut f)),
-            map_some: self
-                .map_some
-                .into_iter()
-                .map(|(k, v)| (k, v.map_indices(&mut f)))
-                .collect(),
-        }
-    }
-}
-
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -66,7 +49,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
+impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
@@ -81,14 +64,18 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Transition<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
     pub fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
-        Self {
-            dst: self.dst.map_indices(f),
-            ..self
+        match self {
+            Self::Lateral { dst, update } => Self::Lateral {
+                dst: dst.map_indices(f),
+                update,
+            },
+            Self::Call {} => Self::Call {},
+            Self::Return {} => Self::Return {},
         }
     }
 }

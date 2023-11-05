@@ -152,12 +152,10 @@ macro_rules! get {
     }};
 }
 
-mod action;
 mod check;
 mod combinators;
 mod ctrl;
-mod curry_input;
-mod curry_stack;
+mod curry;
 mod generalize;
 mod graph;
 mod in_progress;
@@ -168,7 +166,6 @@ mod range;
 mod range_map;
 mod reindex;
 mod run;
-mod stack;
 mod state;
 mod to_src;
 mod transition;
@@ -178,11 +175,9 @@ mod update;
 mod qc;
 
 pub use {
-    action::Action,
     check::{Check, IllFormed},
     ctrl::{Ctrl, CtrlMergeConflict},
-    curry_input::CurryInput,
-    curry_stack::CurryStack,
+    curry::Curry,
     graph::{Deterministic, Graph, Nondeterministic},
     in_progress::{InProgress, InputError, ParseError},
     input::Input,
@@ -190,7 +185,6 @@ pub use {
     range::Range,
     range_map::RangeMap,
     run::Run,
-    stack::Stack,
     state::State,
     to_src::ToSrc,
     transition::Transition,
