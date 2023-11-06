@@ -70,8 +70,39 @@ impl<I: Input, C: Ctrl<I>> Eq for Transition<I, C> {}
 
 impl<I: Input, C: Ctrl<I>> Ord for Transition<I, C> {
     #[inline]
-    fn cmp(&self, _other: &Self) -> cmp::Ordering {
-        todo!()
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match (self, other) {
+            (&Self::Return, &Self::Return) => cmp::Ordering::Equal,
+            (&Self::Return, _) => cmp::Ordering::Less,
+            (_, &Self::Return) => cmp::Ordering::Greater,
+            (
+                &Self::Lateral {
+                    dst: ref l_dst,
+                    update: ref l_update,
+                },
+                &Self::Lateral {
+                    dst: ref r_dst,
+                    update: ref r_update,
+                },
+            ) => l_dst.cmp(r_dst).then_with(|| l_update.cmp(r_update)),
+            (&Self::Lateral { .. }, _) => cmp::Ordering::Less,
+            (_, &Self::Lateral { .. }) => cmp::Ordering::Greater,
+            (
+                &Self::Call {
+                    detour: ref l_detour,
+                    dst: ref l_dst,
+                    combine: ref l_combine,
+                },
+                &Self::Call {
+                    detour: ref r_detour,
+                    dst: ref r_dst,
+                    combine: ref r_combine,
+                },
+            ) => l_detour
+                .cmp(r_detour)
+                .then_with(|| l_dst.cmp(r_dst))
+                .then_with(|| l_combine.cmp(r_combine)),
+        }
     }
 }
 
