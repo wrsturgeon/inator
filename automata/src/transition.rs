@@ -138,7 +138,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 Ok(Some((detour.clone(), "()".to_owned())))
             }
             Self::Return => {
-                let rtn_to = stack.pop().ok_or_else(|| todo!())?;
+                let rtn_to = stack.pop().ok_or(IllFormed::ReturnIntoNothing)?;
                 Ok(Some((rtn_to, output_t.to_owned())))
             }
         }

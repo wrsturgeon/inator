@@ -51,6 +51,9 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
     TypeMismatch(String, String),
     /// An accepting state returns the wrong type.
     WrongReturnType(String, String),
+    /// Tried to `Return` but there was nothing to return into.
+    /// E.g. parsing a right-paren without a left-paren before it.
+    ReturnIntoNothing,
 }
 
 impl<I: Input> IllFormed<I, usize> {
@@ -79,6 +82,7 @@ impl<I: Input> IllFormed<I, usize> {
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
             IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
+            IllFormed::ReturnIntoNothing => IllFormed::ReturnIntoNothing,
         }
     }
 }
@@ -148,6 +152,10 @@ impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
             ),
             Self::TypeMismatch(ref a, ref b) => write!(f, "Type mismatch: `{a}` =/= `{b}`."),
             Self::WrongReturnType(ref a, ref b) => write!(f, "Wrong output type: `{a}` =/= `{b}`"),
+            Self::ReturnIntoNothing => write!(
+                f,
+                "Tried to return from a sub-parser, but there was no enclosing context to return to."
+            ),
         }
     }
 }
