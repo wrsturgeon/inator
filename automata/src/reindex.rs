@@ -80,8 +80,8 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                     .map_indices(|i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))))),
                 update: update.clone(),
             },
-            Self::Call {} => Self::Call {},
-            Self::Return {} => Self::Return {},
+            Self::Call { .. } => todo!(),
+            Self::Return => Self::Return,
         }
     }
 }

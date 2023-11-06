@@ -89,11 +89,10 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                     return Err(IllFormed::InitialNotUnit(t));
                 }
             }
-            for curry in state.transitions.values() {
-                for transition in curry.values() {
-                    if transition.update.input_t != "()" {
-                        return Err(IllFormed::InitialNotUnit(transition.update.input_t.clone()));
-                    }
+            for transition in state.transitions.values() {
+                let in_t = transition.input_type();
+                if in_t != "()" {
+                    return Err(IllFormed::InitialNotUnit(in_t));
                 }
             }
         }
@@ -245,6 +244,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
 
     /// Associate each subset of states with a merged state.
     #[inline]
+    #[allow(clippy::diverging_sub_expression, unreachable_code)] // <-- FIXME
     fn explore(
         &self,
         subsets_as_states: &mut BTreeMap<C, State<I, C>>,
@@ -263,7 +263,8 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                 |&i| Ok(get!(self.states, i).clone()),
             ),
         });
-        let mega_state: State<I, C> = match try_merge(result_iterator) {
+
+        let mega_state = match try_merge(result_iterator) {
             // If no state follows, reject immediately.
             None => State {
                 transitions: todo!(),
@@ -275,19 +276,19 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             Some(Err(e)) => return Err(e),
         };
 
-        // Cache all possible next states
-        #[allow(clippy::needless_collect)] // <-- false positive: couldn't move `mega_state` below
-        let dsts: BTreeSet<C> = mega_state
+        // Necessary before we move `mega_state`
+        let all_dsts: BTreeSet<C> = mega_state
             .transitions
             .values()
-            .map(|transition| transition.dst.clone())
+            .filter_map(|t| t.dst().cloned())
             .collect();
 
-        // Associate this subset of states with the merged state
+        // Insert the finished value (also to tell all below iterations that we've covered this case)
         let _ = entry.insert(mega_state);
 
-        // Recurse on all destinations
-        dsts.into_iter()
+        // Recurse on all possible next states
+        all_dsts
+            .into_iter()
             .try_fold((), |(), dst| self.explore(subsets_as_states, &dst))
     }
 
@@ -332,33 +333,18 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                 )
             })
             .try_fold(None, |acc, state| {
-                let shit =
-                    acc.merge(state.transitions.values().try_fold(None, |accc, curry| {
-                        accc.merge({
-                            curry.values().try_fold(None, |acccc, t| {
-                                acccc.merge(Some(t.update.input_t.clone())).map_or_else(
-                                    |(a, b)| {
-                                        if a == b {
-                                            Ok(Some(a))
-                                        } else {
-                                            Err(IllFormed::TypeMismatch(a, b))
-                                        }
-                                    },
-                                    Ok,
-                                )
-                            })?
-                        })
-                        .map_or_else(
-                            |(a, b)| {
-                                if a == b {
-                                    Ok(Some(a))
-                                } else {
-                                    Err(IllFormed::TypeMismatch(a, b))
-                                }
-                            },
-                            Ok,
-                        )
-                    })?);
+                let shit = acc.merge(state.transitions.values().try_fold(None, |accc, t| {
+                    accc.merge(Some(t.input_type())).map_or_else(
+                        |(a, b)| {
+                            if a == b {
+                                Ok(Some(a))
+                            } else {
+                                Err(IllFormed::TypeMismatch(a, b))
+                            }
+                        },
+                        Ok,
+                    )
+                })?);
                 shit.map_or_else(
                     |(a, b)| {
                         if a == b {
@@ -442,8 +428,8 @@ fn fix_indices_transition<I: Input, C: Ctrl<I>>(
             dst: unwrap!(ordering.binary_search(&dst)),
             update,
         },
-        Transition::Call {} => Transition::Call {},
-        Transition::Return {} => Transition::Return {},
+        Transition::Call { .. } => todo!(),
+        Transition::Return => Transition::Return,
     }
 }
 

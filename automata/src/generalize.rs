@@ -66,9 +66,21 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
     pub fn generalize(self) -> Transition<I, BTreeSet<Result<usize, String>>> {
-        Transition {
-            dst: self.dst.view().map(|r| r.map_err(str::to_owned)).collect(),
-            update: self.update,
+        match self {
+            Self::Lateral { dst, update } => Transition::Lateral {
+                dst: dst.view().map(|r| r.map_err(str::to_owned)).collect(),
+                update,
+            },
+            Self::Call {
+                detour,
+                dst,
+                combine,
+            } => Transition::Call {
+                detour: detour.view().map(|r| r.map_err(str::to_owned)).collect(),
+                dst: dst.view().map(|r| r.map_err(str::to_owned)).collect(),
+                combine,
+            },
+            Self::Return => Transition::Return,
         }
     }
 }

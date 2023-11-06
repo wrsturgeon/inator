@@ -9,7 +9,7 @@
 #![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
 
 use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition};
-use core::{iter, ops};
+use core::{iter, mem, ops};
 use std::collections::BTreeSet;
 
 impl<I: Input> ops::BitOr for Deterministic<I> {
@@ -37,16 +37,14 @@ impl<I: Input> ops::BitOr for Deterministic<I> {
     }
 }
 
-impl<I: Input> ops::Shr for Deterministic<I> {
+impl<I: Input> ops::Shr<Self> for Deterministic<I> {
     type Output = Self;
     #[inline]
     fn shr(mut self, other: Self) -> Self::Output {
-        let rhs_init = {
-            let curry = &get!(other.states, other.initial).transitions;
-            curry.wildcard.clone().merge(curry.map_none.clone())
-        }
-        .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))))
-        .map(Curry::generalize);
+        let rhs_init = get!(other.states, other.initial)
+            .transitions
+            .clone()
+            .generalize();
 
         let accepting_indices =
             self.states
@@ -91,12 +89,10 @@ impl<I: Input> ops::Shr for Deterministic<I> {
         // For every transition that an empty stack can take from the initial state of the right-hand parser,
         // add that transition (only on the empty stack) to each accepting state of the left-hand parser.
         for state in &mut s.states {
-            state.transitions.map_none = state
-                .transitions
-                .map_none
-                .take()
-                .merge(rhs_init.clone())
-                .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))));
+            state.transitions =
+                mem::replace(&mut state.transitions, Curry::Wildcard(Transition::Return))
+                    .merge(rhs_init.clone())
+                    .unwrap_or_else(|e| panic!("{e}"));
         }
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.
@@ -196,27 +192,29 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
+#[allow(clippy::needless_pass_by_value)] // <-- FIXME
 fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
-    s: Transition<I, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
-    accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
+    _s: Transition<I, C>,
+    _other_init: &BTreeSet<Result<usize, String>>,
+    _accepting_indices: &BTreeSet<usize>,
+    _accepting_tags: &BTreeSet<String>,
 ) -> Transition<I, BTreeSet<Result<usize, String>>> {
-    let good = s
-        .dst
-        .view()
-        .any(|result| will_accept(result, accepting_indices, accepting_tags));
-    let iter = s.dst.view().map(|result| result.map_err(str::to_owned));
-    let dst = if good {
-        iter.chain(other_init.iter().cloned()).collect()
-    } else {
-        iter.collect()
-    };
-    Transition {
-        dst,
-        act: s.act,
-        update: s.update,
-    }
+    // let good = s
+    //     .dst
+    //     .view()
+    //     .any(|result| will_accept(result, accepting_indices, accepting_tags));
+    // let iter = s.dst.view().map(|result| result.map_err(str::to_owned));
+    // let dst = if good {
+    //     iter.chain(other_init.iter().cloned()).collect()
+    // } else {
+    //     iter.collect()
+    // };
+    // Transition {
+    //     dst,
+    //     act: s.act,
+    //     update: s.update,
+    // }
+    todo!()
 }
 
 /// Check if this state corresponds to an accepting state.

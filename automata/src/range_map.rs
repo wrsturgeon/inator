@@ -115,6 +115,12 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
         self.entries
             .retain(|k, _| key.clone().intersection(k.clone()).is_none());
     }
+
+    /// All values in this collection, without their associated keys.
+    #[inline]
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transition<I, C>> {
+        self.entries.values_mut()
+    }
 }
 
 impl<I: Input> RangeMap<I, usize> {

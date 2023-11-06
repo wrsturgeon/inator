@@ -74,7 +74,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 dst: dst.map_indices(f),
                 update,
             },
-            Self::Call {} => Self::Call {},
+            Self::Call { .. } => todo!(),
             Self::Return {} => Self::Return {},
         }
     }

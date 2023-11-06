@@ -322,8 +322,11 @@ impl<I: Input> Transition<I, usize> {
     #[must_use]
     #[allow(clippy::todo)] // TODO: what the fuck does the last case mean?
     fn to_src(&self) -> String {
-        match self {
-            Self::Lateral { dst, update } => format!(
+        match *self {
+            Self::Lateral {
+                ref dst,
+                ref update,
+            } => format!(
                 r#"match state_{dst}(input, context, ({})(acc, token))? {{
                 (None, _) => todo!(),
                 (done @ Some((_, _, None)), acc) => Ok((done, acc)),
@@ -331,7 +334,7 @@ impl<I: Input> Transition<I, usize> {
             }}"#,
                 update.src,
             ),
-            _ => todo!(),
+            Self::Call { .. } | Self::Return => todo!(),
         }
     }
 }
@@ -470,7 +473,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Transition<I, C> {
                 dst.to_src(),
                 update.to_src(),
             ),
-            Self::Call {} | Self::Return {} => todo!(),
+            Self::Call { .. } | Self::Return {} => todo!(),
         }
     }
     #[inline]

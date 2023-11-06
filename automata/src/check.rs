@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 const _MAX_ILL_FORMED_BYTES: usize = 64;
 /// Check that the above holds by throwing a compile-time out-of-bounds error if it doesn't.
 #[allow(clippy::indexing_slicing)] // <-- that's the point
-const _: () = [(); _MAX_ILL_FORMED_BYTES][mem::size_of::<IllFormed<(), (), usize>>()];
+const _: () = [(); _MAX_ILL_FORMED_BYTES][mem::size_of::<IllFormed<(), usize>>()];
 
 /// Witness to an ill-formed automaton (or part thereof).
 #[non_exhaustive]
@@ -73,7 +73,6 @@ impl<I: Input> IllFormed<I, usize> {
                 possibility_2: Box::new(possibility_2.convert_ctrl()),
             },
             IllFormed::Superposition(a, b) => IllFormed::Superposition(a, b),
-            IllFormed::IncompatibleStackActions(a, b) => IllFormed::IncompatibleStackActions(a, b),
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
             IllFormed::DuplicateState(s) => IllFormed::DuplicateState(Box::new(s.convert_ctrl())),
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
@@ -131,14 +130,6 @@ impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
                 "Tried to visit two different deterministic states \
                 ({a} and {b}) at the same time.",
             ),
-            Self::IncompatibleStackActions(ref a, ref b) => {
-                write!(
-                    f,
-                    "Can't {} and {} at the same time.",
-                    a.in_english(),
-                    b.in_english(),
-                )
-            }
             Self::IncompatibleCallbacks(ref a, ref b) => {
                 write!(
                     f,
@@ -167,13 +158,6 @@ pub trait Check<I: Input, C: Ctrl<I>> {
     /// # Errors
     /// When not well-formed (with a witness).
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>>;
-}
-
-impl<I: Input, C: Ctrl<I>> Check<I, C> for Action {
-    #[inline]
-    fn check(&self, _: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
-        Ok(())
-    }
 }
 
 impl<I: Input> Check<I, BTreeSet<Result<usize, String>>> for BTreeSet<Result<usize, String>> {
@@ -244,8 +228,10 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for State<I, C> {
 impl<I: Input, C: Ctrl<I>> Check<I, C> for Transition<I, C> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
-        self.dst.check(n_states)?;
-        self.act.check(n_states)
+        match *self {
+            Self::Lateral { ref dst, .. } | Self::Call { ref dst, .. } => dst.check(n_states),
+            Self::Return => Ok(()),
+        }
     }
 }
 

@@ -6,7 +6,7 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{try_merge, Ctrl, Graph, IllFormed, Input};
+use crate::{try_merge, Ctrl, Graph, IllFormed, Input, ToSrc};
 use core::fmt;
 
 /// Execute an automaton on an input sequence.
@@ -17,7 +17,7 @@ pub struct InProgress<'graph, I: Input, C: Ctrl<I>, In: Iterator<Item = I>> {
     /// Iterator over input tokens.
     pub input: In,
     /// Internal stack.
-    pub stack: Vec<usize>,
+    pub stack: Vec<C>,
     /// Internal state.
     pub ctrl: C,
     /// Output type as we go.
@@ -31,7 +31,7 @@ impl<I: Input, C: Ctrl<I>, In: Iterator<Item = I>> fmt::Debug for InProgress<'_,
         write!(
             f,
             "In progress: {:?} @ {:?} -> {:?}",
-            self.stack,
+            self.stack.to_src(),
             self.ctrl.view().collect::<Vec<_>>(),
             self.output_t,
         )
@@ -90,7 +90,7 @@ fn step<I: Input, C: Ctrl<I>>(
     graph: &Graph<I, C>,
     ctrl: &C,
     maybe_token: Option<I>,
-    stack: &mut Vec<usize>,
+    stack: &mut Vec<C>,
     output_t: &str,
 ) -> Result<(Option<C>, String), ParseError<I, C>> {
     ctrl.view().try_fold((), |(), r| match r {
@@ -125,22 +125,20 @@ fn step<I: Input, C: Ctrl<I>>(
             Err(ParseError::BadInput(InputError::Unclosed))
         };
     };
-    let transitions = states.filter_map(|s| match s.transitions.get(&token) {
+
+    // Merge into a huge aggregate transition and act on that instead of individual transitions
+    match try_merge(states.filter_map(|s| match s.transitions.get(&token) {
         Err(e) => Some(Err(e)),
         Ok(opt) => opt.map(|t| Ok(t.clone())),
-    });
-    try_merge(transitions).map_or(Err(ParseError::BadInput(InputError::Absurd)), |r| {
-        r.map_or_else(
-            |e| Err(ParseError::BadParser(e)),
-            |mega_transition| {
-                mega_transition
-                    .invoke(output_t)
-                    .map_err(ParseError::BadParser)?
-                    .map_or(
-                        Err(ParseError::BadInput(InputError::Unopened)),
-                        |(c, out)| Ok((Some(c), out)),
-                    )
-            },
-        )
-    })
+    })) {
+        None => Err(ParseError::BadInput(InputError::Absurd)),
+        Some(Err(e)) => Err(ParseError::BadParser(e)),
+        Some(Ok(mega_transition)) => mega_transition
+            .invoke(output_t, stack)
+            .map_err(ParseError::BadParser)?
+            .map_or(
+                Err(ParseError::BadInput(InputError::Unopened)),
+                |(c, out)| Ok((Some(c), out)),
+            ),
+    }
 }

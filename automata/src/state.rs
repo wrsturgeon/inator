@@ -29,16 +29,16 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
     pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, C>> {
         self.transitions.values().try_fold(None, |acc, t| {
             let in_t = t.input_type();
-            acc.map_or_else(
-                || Ok(Some(in_t)),
-                |other| {
+            match acc {
+                None => Ok(Some(in_t)),
+                Some(other) => {
                     if in_t == other {
                         Ok(Some(in_t))
                     } else {
                         Err(IllFormed::TypeMismatch(other, in_t))
                     }
-                },
-            )
+                }
+            }
         })
     }
 }

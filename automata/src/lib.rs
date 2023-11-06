@@ -88,6 +88,7 @@
     clippy::use_self,
     clippy::wildcard_imports
 )]
+#![allow(clippy::todo)] // <-- FIXME
 
 /// Call a function that will also be available to the compiled parser.
 #[macro_export]
@@ -152,10 +153,27 @@ macro_rules! get {
     }};
 }
 
+/// One-argument function.
+#[macro_export]
+macro_rules! f {
+    ($ex:expr) => {
+        $crate::F::_from_macro(stringify!($ex).to_owned(), $ex)
+    };
+}
+
+/// Two-argument function.
+#[macro_export]
+macro_rules! ff {
+    ($ex:expr) => {
+        $crate::FF::_from_macro(stringify!($ex).to_owned(), $ex)
+    };
+}
+
 mod check;
 mod combinators;
 mod ctrl;
 mod curry;
+mod f;
 mod generalize;
 mod graph;
 mod in_progress;
@@ -178,6 +196,7 @@ pub use {
     check::{Check, IllFormed},
     ctrl::{Ctrl, CtrlMergeConflict},
     curry::Curry,
+    f::{F, FF},
     graph::{Deterministic, Graph, Nondeterministic},
     in_progress::{InProgress, InputError, ParseError},
     input::Input,
