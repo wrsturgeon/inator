@@ -215,3 +215,64 @@ mod test;
 
 #[cfg(test)]
 use rand as _; // <-- needed in examples
+
+use {
+    core::iter,
+    std::collections::{BTreeMap, BTreeSet},
+};
+
+/// Language of matched parentheses and concatenations thereof.
+#[inline]
+#[must_use]
+pub fn dyck_d() -> Deterministic<char> {
+    Graph {
+        states: vec![State {
+            transitions: Curry::Scrutinize(RangeMap {
+                entries: [
+                    (
+                        Range::unit('('),
+                        Transition::Call {
+                            detour: 0,
+                            dst: 0,
+                            combine: ff!(|(), ()| ()),
+                        },
+                    ),
+                    (Range::unit(')'), Transition::Return),
+                ]
+                .into_iter()
+                .collect(),
+            }),
+            non_accepting: BTreeSet::new(),
+        }],
+        initial: 0,
+        tags: BTreeMap::new(),
+    }
+}
+
+/// Language of matched parentheses and concatenations thereof.
+#[inline]
+#[must_use]
+pub fn dyck_nd() -> Nondeterministic<char> {
+    Graph {
+        states: vec![State {
+            transitions: Curry::Scrutinize(RangeMap {
+                entries: [
+                    (
+                        Range::unit('('),
+                        Transition::Call {
+                            detour: iter::once(Ok(0)).collect(),
+                            dst: iter::once(Ok(0)).collect(),
+                            combine: ff!(|(), ()| ()),
+                        },
+                    ),
+                    (Range::unit(')'), Transition::Return),
+                ]
+                .into_iter()
+                .collect(),
+            }),
+            non_accepting: BTreeSet::new(),
+        }],
+        initial: iter::once(Ok(0)).collect(),
+        tags: BTreeMap::new(),
+    }
+}

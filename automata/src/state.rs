@@ -17,7 +17,6 @@ pub struct State<I: Input, C: Ctrl<I>> {
     /// Map from input tokens to actions.
     pub transitions: Curry<I, C>,
     /// If input ends while in this state, should we accept?
-    // TODO: use a `BTreeSet`.
     pub non_accepting: BTreeSet<String>,
 }
 
@@ -26,20 +25,17 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
     /// # Errors
     /// If multiple transitions expect different types.
     #[inline]
-    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, C>> {
-        self.transitions.values().try_fold(None, |acc, t| {
-            let in_t = t.input_type();
-            match acc {
-                None => Ok(Some(in_t)),
-                Some(other) => {
-                    if in_t == other {
-                        Ok(Some(in_t))
-                    } else {
-                        Err(IllFormed::TypeMismatch(other, in_t))
-                    }
-                }
-            }
-        })
+    pub fn input_type(&self) -> Result<Option<&str>, IllFormed<I, C>> {
+        self.transitions
+            .values()
+            .try_fold(None, |acc: Option<&str>, t| {
+                let in_t = t.input_type();
+                acc.map_or(Ok(in_t), |other| match in_t {
+                    None => Ok(Some(other)),
+                    Some(ty) if ty == other => Ok(Some(other)),
+                    Some(ty) => Err(IllFormed::TypeMismatch(other.to_owned(), ty.to_owned())),
+                })
+            })
     }
 }
 

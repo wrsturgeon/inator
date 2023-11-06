@@ -181,10 +181,7 @@ impl<I: Input> Deterministic<I> {
     #[allow(clippy::arithmetic_side_effects)] // <-- String concatenation with `+`
     pub fn to_src(&self) -> Result<String, IllFormed<I, usize>> {
         let input_t = I::src_type();
-        let output_t = self.output_type()?.unwrap_or_else(|| {
-            /* "core::convert::Infallible" */
-            "()".to_owned()
-        });
+        let output_t = self.output_type()?.unwrap_or("core::convert::Infallible");
         Ok(format!(
             r#"//! Automatically generated with [inator](https://crates.io/crates/inator).
 
@@ -248,10 +245,7 @@ impl<I: Input> State<I, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     fn to_src(&self, i: usize) -> Result<String, IllFormed<I, usize>> {
-        let input_t = self.input_type()?.unwrap_or_else(|| {
-            /* "core::convert::Infallible" */
-            "()".to_owned()
-        });
+        let input_t = self.input_type()?.unwrap_or("core::convert::Infallible");
         Ok(format!(
             r#"
 

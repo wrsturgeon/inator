@@ -48,7 +48,7 @@ mod prop {
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            let d = Deterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into()));
+            let d = Deterministic::<u8>::arbitrary(&mut Gen::new(curved.into()));
             assert_eq!(d.check(), Ok(()), "{d:?}");
         }
     }
@@ -59,7 +59,7 @@ mod prop {
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            let nd = Nondeterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into()));
+            let nd = Nondeterministic::<u8>::arbitrary(&mut Gen::new(curved.into()));
             assert_eq!(nd.check(), Ok(()), "{nd:?}");
         }
     }
@@ -71,7 +71,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                State::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                State::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -105,7 +105,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                RangeMap::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                RangeMap::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -122,7 +122,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Transition::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                Transition::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -139,8 +139,8 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                <usize as Check<u8, u8, usize>>::check(
-                    &<usize as Ctrl<u8, u8>>::arbitrary_given(curved, &mut Gen::new(curved.into())),
+                <usize as Check<u8, usize>>::check(
+                    &<usize as Ctrl<u8>>::arbitrary_given(curved, &mut Gen::new(curved.into())),
                     curved
                 ),
                 Ok(())
@@ -157,10 +157,9 @@ mod prop {
             assert_eq!(
                 <BTreeSet<Result<usize, String>> as Check<
                     u8,
-                    u8,
                     BTreeSet<Result<usize, String>>,
                 >>::check(
-                    &<BTreeSet<Result<usize, String>> as Ctrl<u8, u8>>::arbitrary_given(
+                    &<BTreeSet<Result<usize, String>> as Ctrl<u8>>::arbitrary_given(
                         curved,
                         &mut Gen::new(curved.into())
                     ),
@@ -191,18 +190,18 @@ mod prop {
         // Determinization takes exactly as long as checking if determinzation will succeed,
         // and determinization is the only way to check a priori for runtime errors.
         // fn check_implies_no_runtime_errors(
-        //     nd: Nondeterministic<u8, u8>,
+        //     nd: Nondeterministic<u8>,
         //     input: Vec<u8>
         // ) -> bool {
         //     !matches!(nd.accept(input), Err(ParseError::BadParser(..)))
         // }
         //
-        // fn check_implies_determinize(nd: Nondeterministic<u8, u8>) -> bool {
+        // fn check_implies_determinize(nd: Nondeterministic<u8>) -> bool {
         //     nd.determinize().is_ok()
         // }
 
         fn determinize_implies_no_runtime_errors(
-            nd: Nondeterministic<u8, u8>,
+            nd: Nondeterministic<u8>,
             input: Vec<u8>
         ) -> bool {
             let Ok(d) = nd.determinize() else {
@@ -212,19 +211,19 @@ mod prop {
         }
 
         fn deterministic_implies_no_runtime_errors(
-            d: Deterministic<u8, u8>,
+            d: Deterministic<u8>,
             input: Vec<u8>
         ) -> bool {
             !matches!(d.accept(input), Err(ParseError::BadParser(..)))
         }
 
-        fn determinize_identity(d: Deterministic<u8, u8>, input: Vec<u8>) -> bool {
+        fn determinize_identity(d: Deterministic<u8>, input: Vec<u8>) -> bool {
             d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
         }
 
         fn union(
-            lhs: Deterministic<u8, u8>,
-            rhs: Deterministic<u8, u8>,
+            lhs: Deterministic<u8>,
+            rhs: Deterministic<u8>,
             input: Vec<u8>
         ) -> bool {
             let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
@@ -262,7 +261,7 @@ mod prop {
             }
         }
 
-        fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
+        fn sort(parser: Nondeterministic<u8>, input: Vec<u8>) -> bool {
             let pre = parser.accept(input.iter().copied());
             let mut sorted = parser;
             sorted.sort();
@@ -276,7 +275,7 @@ mod prop {
             }
         }
 
-        fn shr(lhs: Deterministic<u8, u8>, rhs: Deterministic<u8, u8>, input: Vec<u8>) -> bool {
+        fn shr(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) -> bool {
             let splittable = (0..=input.len()).any(|i| {
                 lhs.accept(input[..i].iter().copied()).is_ok() &&
                 rhs.accept(input[i..].iter().copied()).is_ok()

@@ -1,68 +1,5 @@
-use core::iter;
-use inator_automata::{
-    update, Action, CurryInput, CurryStack, Graph, Nondeterministic, Range, RangeMap, Run, State,
-    ToSrc, Transition,
-};
+use inator_automata::{dyck_nd, Run};
 use rand::{thread_rng, RngCore};
-use std::collections::{BTreeMap, BTreeSet};
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-enum Symbol {
-    Paren, // Just one value, but e.g. if we had parens and brackets, we would use two.
-}
-
-impl ToSrc for Symbol {
-    #[inline]
-    fn to_src(&self) -> String {
-        match *self {
-            Self::Paren => "Symbol::Paren".to_owned(),
-        }
-    }
-    #[inline]
-    fn src_type() -> String {
-        "Symbol".to_owned()
-    }
-}
-
-/// Very manually constructed parser recognizing only valid parentheses.
-fn parser() -> Nondeterministic<char, Symbol> {
-    Graph {
-        states: vec![State {
-            transitions: CurryStack {
-                wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: iter::once((
-                        Range::unit('('),
-                        Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            update: update!(|(), _| ()),
-                            act: Action::Push(Symbol::Paren),
-                        },
-                    ))
-                    .collect(),
-                })),
-                map_none: None,
-                map_some: iter::once((
-                    Symbol::Paren,
-                    CurryInput::Scrutinize(RangeMap {
-                        entries: iter::once((
-                            Range::unit(')'),
-                            Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                update: update!(|(), _| ()),
-                                act: Action::Pop,
-                            },
-                        ))
-                        .collect(),
-                    }),
-                ))
-                .collect(),
-            },
-            non_accepting: BTreeSet::new(),
-        }],
-        initial: iter::once(Ok(0)).collect(),
-        tags: BTreeMap::new(),
-    }
-}
 
 /// Generate test cases (has nothing to do with automata!).
 fn generate<R: RngCore>(rng: &mut R, fuel: u8) -> String {
@@ -109,7 +46,7 @@ fn shitpost<R: RngCore>(rng: &mut R) -> String {
 }
 
 pub fn main() {
-    let parser = parser();
+    let parser = dyck_nd();
 
     let mut rng = thread_rng();
 

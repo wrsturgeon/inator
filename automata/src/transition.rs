@@ -98,8 +98,12 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Compute the input type of any run that reaches this state.
     #[inline]
     #[must_use]
-    pub fn input_type(&self) -> String {
-        todo!()
+    pub fn input_type(&self) -> Option<&str> {
+        match *self {
+            Self::Lateral { ref update, .. } => Some(&update.input_t),
+            Self::Call { ref combine, .. } => Some(&combine.lhs_t),
+            Self::Return => None,
+        }
     }
 
     /// Immediate next destination (as a state index).

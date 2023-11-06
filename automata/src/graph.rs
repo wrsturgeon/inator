@@ -86,17 +86,19 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             };
             if let Some(t) = state.input_type()? {
                 if t != "()" {
-                    return Err(IllFormed::InitialNotUnit(t));
+                    return Err(IllFormed::InitialNotUnit(t.to_owned()));
                 }
             }
             for transition in state.transitions.values() {
                 let in_t = transition.input_type();
-                if in_t != "()" {
-                    return Err(IllFormed::InitialNotUnit(in_t));
+                if let Some(t) = in_t {
+                    if t != "()" {
+                        return Err(IllFormed::InitialNotUnit(t.to_owned()));
+                    }
                 }
             }
         }
-        drop(self.output_type()?);
+        let _ = self.output_type()?;
         for (i, state) in self.states.iter().enumerate() {
             if get!(self.states, ..i).contains(state) {
                 return Err(IllFormed::DuplicateState(Box::new(state.clone())));
@@ -296,17 +298,20 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// # Errors
     /// If multiple accepting states attempt to return different types.
     #[inline]
-    pub fn output_type(&self) -> Result<Option<String>, IllFormed<I, C>> {
+    pub fn output_type(&self) -> Result<Option<&str>, IllFormed<I, C>> {
         self.states
             .iter()
-            .try_fold(None, |acc: Option<String>, state| {
+            .try_fold(None, |acc: Option<&str>, state| {
                 if state.non_accepting.is_empty() {
                     acc.map_or_else(
                         || state.input_type(),
                         |t| {
                             if let Some(input_t) = state.input_type()? {
                                 if input_t != t {
-                                    return Err(IllFormed::WrongReturnType(t, input_t));
+                                    return Err(IllFormed::WrongReturnType(
+                                        t.to_owned(),
+                                        input_t.to_owned(),
+                                    ));
                                 }
                             }
                             Ok(Some(t))
@@ -323,7 +328,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// If multiple accepting states attempt to return different types.
     #[inline]
     #[allow(clippy::missing_panics_doc)]
-    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, C>> {
+    pub fn input_type(&self) -> Result<Option<&str>, IllFormed<I, C>> {
         self.initial
             .view()
             .map(|r| {
@@ -334,12 +339,12 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             })
             .try_fold(None, |acc, state| {
                 let shit = acc.merge(state.transitions.values().try_fold(None, |accc, t| {
-                    accc.merge(Some(t.input_type())).map_or_else(
+                    accc.merge(t.input_type()).map_or_else(
                         |(a, b)| {
                             if a == b {
                                 Ok(Some(a))
                             } else {
-                                Err(IllFormed::TypeMismatch(a, b))
+                                Err(IllFormed::TypeMismatch(a.to_owned(), b.to_owned()))
                             }
                         },
                         Ok,
@@ -350,7 +355,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                         if a == b {
                             Ok(Some(a))
                         } else {
-                            Err(IllFormed::TypeMismatch(a, b))
+                            Err(IllFormed::TypeMismatch(a.to_owned(), b.to_owned()))
                         }
                     },
                     Ok,
