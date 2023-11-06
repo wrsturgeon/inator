@@ -14,10 +14,19 @@ fi
 
 set -u
 
+# Recurse on the automata library
+if [ -d automata ]
+then
+  cd automata
+  ../ci.sh
+  cd ..
+fi
+
 # Update our workbench
 rustup update || :
 rustup toolchain install nightly || :
 rustup component add miri --toolchain nightly
+cargo install cargo-careful
 git submodule update --init --recursive --remote
 
 # Housekeeping
@@ -26,17 +35,17 @@ cargo clippy --all-targets --no-default-features
 cargo clippy --all-targets --all-features
 
 # Non-property tests
-cargo test --no-default-features
-cargo test --no-default-features --examples
+cargo +nightly careful test --no-default-features
+cargo +nightly careful test --no-default-features --examples
 cargo test -r --no-default-features
 cargo test -r --no-default-features --examples
 
 # Property tests
 for i in $(seq 2 8)
 do
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 50) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test --all-features
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test --all-features -r
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test --all-features -r --examples
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 50) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo +nightly careful test --all-features
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test -r --all-features
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test -r --all-features --examples
 done
 
 # Run examples
@@ -55,7 +64,7 @@ do
   then
     cd examples/$dir
     cargo +nightly miri run
-    cargo test
+    cargo +nightly miri test
     cd ../..
   fi
 done
@@ -69,14 +78,6 @@ cargo +nightly miri test -r --no-default-features --examples
 # Nix build status
 git add -A
 nix build
-
-# Recurse on the automata library
-if [ -d automata ]
-then
-  cd automata
-  ../ci.sh
-  cd ..
-fi
 
 # Check for remaining `FIXME`s
 grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir='*JSONTestSuite*' --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result
