@@ -68,13 +68,21 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
-    pub fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
+    pub fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
         match self {
             Self::Lateral { dst, update } => Self::Lateral {
                 dst: dst.map_indices(f),
                 update,
             },
-            Self::Call { .. } => todo!(),
+            Self::Call {
+                detour,
+                dst,
+                combine,
+            } => Self::Call {
+                detour: detour.map_indices(&mut f),
+                dst: dst.map_indices(f),
+                combine,
+            },
             Self::Return {} => Self::Return {},
         }
     }

@@ -38,7 +38,25 @@ pub enum Transition<I: Input, C: Ctrl<I>> {
 impl<I: Input, C: Ctrl<I>> Clone for Transition<I, C> {
     #[inline]
     fn clone(&self) -> Self {
-        todo!()
+        match *self {
+            Self::Lateral {
+                ref dst,
+                ref update,
+            } => Self::Lateral {
+                dst: dst.clone(),
+                update: update.clone(),
+            },
+            Self::Call {
+                ref detour,
+                ref dst,
+                ref combine,
+            } => Self::Call {
+                detour: detour.clone(),
+                dst: dst.clone(),
+                combine: combine.clone(),
+            },
+            Self::Return => Self::Return,
+        }
     }
 }
 
