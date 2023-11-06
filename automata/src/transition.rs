@@ -6,7 +6,7 @@
 
 //! Transition in an automaton: an action and a destination state.
 
-use crate::{Ctrl, IllFormed, Input, Update, FF};
+use crate::{Ctrl, Input, InputError, ParseError, Update, FF};
 use core::cmp;
 
 /// Transition in an automaton: an action and a destination state.
@@ -62,8 +62,8 @@ impl<I: Input, C: Ctrl<I>> Clone for Transition<I, C> {
 
 impl<I: Input, C: Ctrl<I>> PartialEq for Transition<I, C> {
     #[inline]
-    fn eq(&self, _other: &Self) -> bool {
-        todo!()
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq() // <-- TODO: faster
     }
 }
 impl<I: Input, C: Ctrl<I>> Eq for Transition<I, C> {}
@@ -123,12 +123,15 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
         &self,
         output_t: &str,
         stack: &mut Vec<C>,
-    ) -> Result<Option<(C, String)>, IllFormed<I, C>> {
+    ) -> Result<Option<(C, String)>, ParseError<I, C>> {
         match *self {
             Self::Lateral {
                 ref dst,
                 ref update,
-            } => Ok(Some((dst.clone(), update.invoke(output_t)?))),
+            } => Ok(Some((
+                dst.clone(),
+                update.invoke(output_t).map_err(ParseError::BadParser)?,
+            ))),
             Self::Call {
                 ref detour,
                 ref dst,
@@ -138,7 +141,9 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 Ok(Some((detour.clone(), "()".to_owned())))
             }
             Self::Return => {
-                let rtn_to = stack.pop().ok_or(IllFormed::ReturnIntoNothing)?;
+                let rtn_to = stack
+                    .pop()
+                    .ok_or(ParseError::BadInput(InputError::Unopened))?;
                 Ok(Some((rtn_to, output_t.to_owned())))
             }
         }
@@ -157,17 +162,30 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
 
     /// Immediate next destination (as a state index).
     /// For local transitions, it's what you would expect.
-    /// For calls, it's the call, not the continuation after the call.
+    /// For calls, it's both the call and the continuation after the call.
     /// For returns, it's nothing.
     #[inline]
     #[must_use]
-    pub const fn dst(&self) -> Option<&C> {
+    pub fn dsts(&self) -> Vec<&C> {
         match *self {
-            Self::Lateral { ref dst, .. }
-            | Self::Call {
-                detour: ref dst, ..
-            } => Some(dst),
-            Self::Return => None,
+            Self::Lateral { ref dst, .. } => vec![dst],
+            Self::Call {
+                ref detour,
+                ref dst,
+                ..
+            } => vec![detour, dst],
+            Self::Return => vec![],
+        }
+    }
+
+    /// Natural-language representation of the action we're taking on the stack.
+    #[inline]
+    #[must_use]
+    pub const fn in_english(&self) -> &'static str {
+        match *self {
+            Self::Lateral { .. } => "leave the stack alone",
+            Self::Call { .. } => "push a call onto the stack",
+            Self::Return => "return (i.e. pop from the stack)",
         }
     }
 }
@@ -177,6 +195,21 @@ impl<I: Input> Transition<I, usize> {
     #[inline]
     #[must_use]
     pub fn convert_ctrl<C: Ctrl<I>>(self) -> Transition<I, C> {
-        todo!()
+        match self {
+            Self::Lateral { dst, update } => Transition::Lateral {
+                dst: C::from_usize(dst),
+                update,
+            },
+            Self::Call {
+                detour,
+                dst,
+                combine,
+            } => Transition::Call {
+                detour: C::from_usize(detour),
+                dst: C::from_usize(dst),
+                combine,
+            },
+            Self::Return => Transition::Return,
+        }
     }
 }

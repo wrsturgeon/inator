@@ -26,7 +26,6 @@ fi
 rustup update || :
 rustup toolchain install nightly || :
 rustup component add miri --toolchain nightly
-cargo install cargo-careful
 git submodule update --init --recursive --remote
 
 # Housekeeping
@@ -35,15 +34,15 @@ cargo clippy --all-targets --no-default-features
 cargo clippy --all-targets --all-features
 
 # Non-property tests
-cargo +nightly careful test --no-default-features
-cargo +nightly careful test --no-default-features --examples
+cargo test --no-default-features
+cargo test --no-default-features --examples
 cargo test -r --no-default-features
 cargo test -r --no-default-features --examples
 
 # Property tests
 for i in $(seq 2 8)
 do
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 50) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo +nightly careful test --all-features
+  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 50) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test --all-features
   QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test -r --all-features
   QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')') cargo test -r --all-features --examples
 done
@@ -54,7 +53,7 @@ export EXAMPLES=$(cargo run --example 2>&1 | grep '^ ')
 set -e
 if [ ! -z "$EXAMPLES" ]
 then
-  echo $EXAMPLES | xargs -n 1 cargo +nightly miri run --example
+  echo $EXAMPLES | xargs -n 1 cargo miri run --example
 fi
 
 # Examples that are crates themselves
@@ -63,17 +62,17 @@ do
   if [ -d examples/$dir ]
   then
     cd examples/$dir
-    cargo +nightly miri run
-    cargo +nightly miri test
+    cargo miri run
+    cargo miri test
     cd ../..
   fi
 done
 
 # Extremely slow (but lovely) UB checks
-cargo +nightly miri test --no-default-features
-cargo +nightly miri test --no-default-features --examples
-cargo +nightly miri test -r --no-default-features
-cargo +nightly miri test -r --no-default-features --examples
+cargo miri test --no-default-features
+cargo miri test --no-default-features --examples
+cargo miri test -r --no-default-features
+cargo miri test -r --no-default-features --examples
 
 # Nix build status
 git add -A

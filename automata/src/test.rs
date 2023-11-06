@@ -9,7 +9,6 @@
     clippy::indexing_slicing,
     clippy::integer_division,
     clippy::panic,
-    clippy::todo,
     clippy::unreachable,
     clippy::unwrap_used
 )]
@@ -218,7 +217,10 @@ mod prop {
         }
 
         fn determinize_identity(d: Deterministic<u8>, input: Vec<u8>) -> bool {
-            d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
+            let Ok(dd) = d.determinize() else {
+                return false;
+            };
+            dd.accept(input.iter().copied()) == d.accept(input)
         }
 
         fn union(
@@ -291,5 +293,83 @@ mod prop {
             }
             concat.accept(input).is_ok() == splittable
         }
+    }
+}
+
+mod reduced {
+    use crate::*;
+
+    fn deterministic_implies_no_runtime_errors(d: &Deterministic<u8>, input: Vec<u8>) {
+        if let Err(ParseError::BadParser(e)) = d.accept(input) {
+            panic!("{e}");
+        }
+    }
+
+    fn determinize_identity(d: &Deterministic<u8>, input: Vec<u8>) {
+        let dd = match d.determinize() {
+            Ok(dd) => dd,
+            Err(e) => panic!("{e}"),
+        };
+        assert_eq!(dd.accept(input.iter().copied()), d.accept(input));
+    }
+
+    #[test]
+    fn deterministic_implies_no_runtime_errors_1() {
+        deterministic_implies_no_runtime_errors(
+            &Graph {
+                states: vec![State {
+                    transitions: Curry::Wildcard(Transition::Return),
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+                tags: BTreeMap::new(),
+            },
+            vec![0],
+        );
+    }
+
+    #[test]
+    fn determinize_identity_1() {
+        determinize_identity(
+            &Graph {
+                states: vec![
+                    State {
+                        transitions: Curry::Wildcard(Transition::Lateral {
+                            dst: 4,
+                            update: update!(|(), _| {}),
+                        }),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Wildcard(Transition::Return),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Wildcard(Transition::Return),
+                        non_accepting: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: Curry::Wildcard(Transition::Call {
+                            detour: 0,
+                            dst: 1,
+                            combine: FF {
+                                src: "|(), ()| ()".to_owned(),
+                                lhs_t: "()".to_owned(),
+                                rhs_t: "()".to_owned(),
+                                output_t: "()".to_owned(),
+                            },
+                        }),
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: 0,
+                tags: BTreeMap::new(),
+            },
+            vec![],
+        );
     }
 }

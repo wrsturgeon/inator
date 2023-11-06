@@ -137,12 +137,12 @@ shrink_only!(|self: &State| Box::new(
         })
 ));
 
-shrink_only!(|self: &RangeMap| Box::new(self.entries.shrink().map(|entries| Self { entries })));
+shrink_only!(|self: &RangeMap| Box::new(self.0.shrink().map(Self)));
 
 shrink_only!(|self: &Curry| match *self {
     Self::Wildcard(ref etc) => Box::new(etc.shrink().map(Self::Wildcard)),
     Self::Scrutinize(ref etc) => Box::new(
-        etc.entries
+        etc.0
             .first_key_value()
             .map(|(_, transition)| Self::Wildcard(transition.clone()))
             .into_iter()
@@ -237,7 +237,7 @@ impl<C: Ctrl<u8>> RangeMap<u8, C> {
         }) {
             drop(entries.remove(&key));
         }
-        Self { entries }
+        Self(entries)
     }
 }
 
@@ -259,7 +259,7 @@ impl<C: Ctrl<u8>> Transition<u8, C> {
             },
             |_, _| Self::Return,
         ];
-        unwrap!(g.choose(&choices))(n_states, g)
+        g.choose(&choices).expect("impossible")(n_states, g)
     }
 }
 

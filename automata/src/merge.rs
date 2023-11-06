@@ -7,7 +7,7 @@
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
 use crate::{
-    Ctrl, CtrlMergeConflict, Curry, IllFormed, Input, RangeMap, State, Transition, Update,
+    Ctrl, CtrlMergeConflict, Curry, IllFormed, Input, RangeMap, State, Transition, Update, FF,
 };
 use core::convert::Infallible;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
@@ -130,7 +130,7 @@ impl<I: Input, C: Ctrl<I>> Merge for Curry<I, C> {
         match (self, other) {
             (Self::Wildcard(lhs), Self::Wildcard(rhs)) => Ok(Self::Wildcard(lhs.merge(rhs)?)),
             (Self::Wildcard(w), Self::Scrutinize(s)) | (Self::Scrutinize(s), Self::Wildcard(w)) => {
-                match s.entries.first_key_value() {
+                match s.0.first_key_value() {
                     None => Ok(Self::Wildcard(w)),
                     Some((k, v)) => Err(IllFormed::WildcardMask {
                         arg_token: Some(k.clone()),
@@ -148,9 +148,7 @@ impl<I: Input, C: Ctrl<I>> Merge for RangeMap<I, C> {
     type Error = IllFormed<I, C>;
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
-        Ok(Self {
-            entries: self.entries.merge(other.entries).map_err(|(_, e)| e)?,
-        })
+        Ok(Self(self.0.merge(other.0).map_err(|(_, e)| e)?))
     }
 }
 
@@ -176,12 +174,47 @@ impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
                     .merge(r_update)
                     .map_err(|(a, b)| IllFormed::IncompatibleCallbacks(Box::new(a), Box::new(b)))?,
             }),
-            _ => todo!(),
+            (
+                Self::Call {
+                    detour: l_detour,
+                    dst: l_dst,
+                    combine: l_combine,
+                },
+                Self::Call {
+                    detour: r_detour,
+                    dst: r_dst,
+                    combine: r_combine,
+                },
+            ) => Ok(Self::Call {
+                detour: l_detour.merge(r_detour).map_err(|e| match e {
+                    CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
+                })?,
+                dst: l_dst.merge(r_dst).map_err(|e| match e {
+                    CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
+                })?,
+                combine: l_combine.merge(r_combine).map_err(|(a, b)| {
+                    IllFormed::IncompatibleCombinators(Box::new(a), Box::new(b))
+                })?,
+            }),
+            (Self::Return, Self::Return) => Ok(Self::Return),
+            (a, b) => Err(IllFormed::IncompatibleActions(Box::new(a), Box::new(b))),
         }
     }
 }
 
 impl<I: Input> Merge for Update<I> {
+    type Error = (Self, Self);
+    #[inline]
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        if self == other {
+            Ok(self)
+        } else {
+            Err((self, other))
+        }
+    }
+}
+
+impl Merge for FF {
     type Error = (Self, Self);
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {

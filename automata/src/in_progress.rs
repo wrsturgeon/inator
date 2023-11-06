@@ -133,12 +133,9 @@ fn step<I: Input, C: Ctrl<I>>(
     })) {
         None => Err(ParseError::BadInput(InputError::Absurd)),
         Some(Err(e)) => Err(ParseError::BadParser(e)),
-        Some(Ok(mega_transition)) => mega_transition
-            .invoke(output_t, stack)
-            .map_err(ParseError::BadParser)?
-            .map_or(
-                Err(ParseError::BadInput(InputError::Unopened)),
-                |(c, out)| Ok((Some(c), out)),
-            ),
+        Some(Ok(mega_transition)) => mega_transition.invoke(output_t, stack)?.map_or(
+            Err(ParseError::BadInput(InputError::Unopened)),
+            |(c, out)| Ok((Some(c), out)),
+        ),
     }
 }

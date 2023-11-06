@@ -14,18 +14,16 @@ use std::collections::BTreeMap;
 #[repr(transparent)]
 #[allow(clippy::exhaustive_structs)]
 #[derive(Debug, Default)]
-pub struct RangeMap<I: Input, C: Ctrl<I>> {
+pub struct RangeMap<I: Input, C: Ctrl<I>>(
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
-    pub entries: BTreeMap<Range<I>, Transition<I, C>>,
-}
+    pub BTreeMap<Range<I>, Transition<I, C>>,
+);
 
 impl<I: Input, C: Ctrl<I>> Clone for RangeMap<I, C> {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            entries: self.entries.clone(),
-        }
+        Self(self.0.clone())
     }
 }
 
@@ -34,14 +32,14 @@ impl<I: Input, C: Ctrl<I>> Eq for RangeMap<I, C> {}
 impl<I: Input, C: Ctrl<I>> PartialEq for RangeMap<I, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.entries == other.entries
+        self.0 == other.0
     }
 }
 
 impl<I: Input, C: Ctrl<I>> Ord for RangeMap<I, C> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.entries.cmp(&other.entries)
+        self.0.cmp(&other.0)
     }
 }
 
@@ -56,7 +54,7 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     /// Iterate over references to keys and values without consuming anything.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&Range<I>, &Transition<I, C>)> {
-        self.entries.iter()
+        self.0.iter()
     }
 
     /// Look up an argument; fit any range that contains it.
@@ -70,7 +68,7 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     )]
     pub fn get(&self, key: &I) -> Result<Option<&Transition<I, C>>, IllFormed<I, C>> {
         let mut acc = None;
-        for (range, transition) in &self.entries {
+        for (range, transition) in &self.0 {
             if range.contains(key) {
                 match acc {
                     None => acc = Some((range, transition)),
@@ -94,8 +92,8 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
         &self,
         other: &Self,
     ) -> Result<(), (Range<I>, Transition<I, C>, Transition<I, C>)> {
-        self.entries.iter().try_fold((), |(), (lk, lv)| {
-            other.entries.iter().try_fold((), |(), (rk, rv)| {
+        self.0.iter().try_fold((), |(), (lk, lv)| {
+            other.0.iter().try_fold((), |(), (rk, rv)| {
                 rk.clone()
                     .intersection(lk.clone())
                     .map_or(Ok(()), |range| Err((range, lv.clone(), rv.clone())))
@@ -106,20 +104,20 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     /// All values in this collection, without their associated keys.
     #[inline]
     pub fn values(&self) -> impl Iterator<Item = &Transition<I, C>> {
-        self.entries.values()
+        self.0.values()
     }
 
     /// Remove an entry by key.
     #[inline]
     pub fn remove(&mut self, key: &Range<I>) {
-        self.entries
+        self.0
             .retain(|k, _| key.clone().intersection(k.clone()).is_none());
     }
 
     /// All values in this collection, without their associated keys.
     #[inline]
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transition<I, C>> {
-        self.entries.values_mut()
+        self.0.values_mut()
     }
 }
 
@@ -128,12 +126,11 @@ impl<I: Input> RangeMap<I, usize> {
     #[inline]
     #[must_use]
     pub fn convert_ctrl<C: Ctrl<I>>(self) -> RangeMap<I, C> {
-        RangeMap {
-            entries: self
-                .entries
+        RangeMap(
+            self.0
                 .into_iter()
                 .map(|(k, v)| (k, v.convert_ctrl()))
                 .collect(),
-        }
+        )
     }
 }

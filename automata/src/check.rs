@@ -6,7 +6,7 @@
 
 //! Check well-formedness.
 
-use crate::{Ctrl, Curry, Input, Range, RangeMap, State, ToSrc, Transition, Update};
+use crate::{Ctrl, Curry, Input, Range, RangeMap, State, ToSrc, Transition, Update, FF};
 use core::{fmt, mem, num::NonZeroUsize};
 use std::collections::BTreeSet;
 
@@ -41,6 +41,10 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
     Superposition(usize, usize),
     /// Can't call two different functions on half-constructed outputs at the same time.
     IncompatibleCallbacks(Box<Update<I>>, Box<Update<I>>),
+    /// Can't call two different functions to combine a returned value with a saved one at the same time.
+    IncompatibleCombinators(Box<FF>, Box<FF>),
+    /// Can't e.g. push to the stack and pop from it at the same time.
+    IncompatibleActions(Box<Transition<I, C>>, Box<Transition<I, C>>),
     /// Two identical states at different indices.
     DuplicateState(Box<State<I, C>>),
     /// Reference to a tagged state, but no state has that tag.
@@ -51,9 +55,6 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
     TypeMismatch(String, String),
     /// An accepting state returns the wrong type.
     WrongReturnType(String, String),
-    /// Tried to `Return` but there was nothing to return into.
-    /// E.g. parsing a right-paren without a left-paren before it.
-    ReturnIntoNothing,
 }
 
 impl<I: Input> IllFormed<I, usize> {
@@ -77,12 +78,16 @@ impl<I: Input> IllFormed<I, usize> {
             },
             IllFormed::Superposition(a, b) => IllFormed::Superposition(a, b),
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
+            IllFormed::IncompatibleCombinators(a, b) => IllFormed::IncompatibleCombinators(a, b),
+            IllFormed::IncompatibleActions(a, b) => IllFormed::IncompatibleActions(
+                Box::new(a.convert_ctrl()),
+                Box::new(b.convert_ctrl()),
+            ),
             IllFormed::DuplicateState(s) => IllFormed::DuplicateState(Box::new(s.convert_ctrl())),
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
             IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
-            IllFormed::ReturnIntoNothing => IllFormed::ReturnIntoNothing,
         }
     }
 }
@@ -141,6 +146,19 @@ impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
                     a.src, b.src,
                 )
             }
+            Self::IncompatibleCombinators(ref a, ref b) => {
+                write!(
+                    f,
+                    "Tried to call both `{}` and `{}` at the same time.",
+                    a.src, b.src,
+                )
+            }
+            Self::IncompatibleActions(ref a, ref b) => write!(
+                f,
+                "Tried to {} and {} at the same time.",
+                a.in_english(),
+                b.in_english()
+            ),
             Self::DuplicateState(ref s) => write!(f, "Duplicate state: {}", s.to_src()),
             Self::TagDNE(ref tag) => write!(
                 f,
@@ -152,10 +170,6 @@ impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
             ),
             Self::TypeMismatch(ref a, ref b) => write!(f, "Type mismatch: `{a}` =/= `{b}`."),
             Self::WrongReturnType(ref a, ref b) => write!(f, "Wrong output type: `{a}` =/= `{b}`"),
-            Self::ReturnIntoNothing => write!(
-                f,
-                "Tried to return from a sub-parser, but there was no enclosing context to return to."
-            ),
         }
     }
 }
@@ -213,7 +227,7 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for RangeMap<I, C> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         self.iter().try_fold((), |(), (k, v)| {
-            self.entries
+            self.0
                 .range(..k.clone())
                 .fold(None, |acc, (range, _)| {
                     acc.or_else(|| range.clone().intersection(k.clone()))

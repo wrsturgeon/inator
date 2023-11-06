@@ -88,7 +88,6 @@
     clippy::use_self,
     clippy::wildcard_imports
 )]
-#![allow(clippy::todo)] // <-- FIXME
 
 /// Call a function that will also be available to the compiled parser.
 #[macro_export]
@@ -227,8 +226,8 @@ use {
 pub fn dyck_d() -> Deterministic<char> {
     Graph {
         states: vec![State {
-            transitions: Curry::Scrutinize(RangeMap {
-                entries: [
+            transitions: Curry::Scrutinize(RangeMap(
+                [
                     (
                         Range::unit('('),
                         Transition::Call {
@@ -241,7 +240,7 @@ pub fn dyck_d() -> Deterministic<char> {
                 ]
                 .into_iter()
                 .collect(),
-            }),
+            )),
             non_accepting: BTreeSet::new(),
         }],
         initial: 0,
@@ -255,8 +254,8 @@ pub fn dyck_d() -> Deterministic<char> {
 pub fn dyck_nd() -> Nondeterministic<char> {
     Graph {
         states: vec![State {
-            transitions: Curry::Scrutinize(RangeMap {
-                entries: [
+            transitions: Curry::Scrutinize(RangeMap(
+                [
                     (
                         Range::unit('('),
                         Transition::Call {
@@ -269,7 +268,7 @@ pub fn dyck_nd() -> Nondeterministic<char> {
                 ]
                 .into_iter()
                 .collect(),
-            }),
+            )),
             non_accepting: BTreeSet::new(),
         }],
         initial: iter::once(Ok(0)).collect(),

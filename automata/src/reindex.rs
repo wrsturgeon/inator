@@ -50,13 +50,12 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
         states: &[State<I, C>],
         index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
-        RangeMap {
-            entries: self
-                .entries
+        RangeMap(
+            self.0
                 .iter()
                 .map(|(k, v)| (k.clone(), v.reindex(states, index_map)))
                 .collect(),
-        }
+        )
     }
 }
 
@@ -70,17 +69,24 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
         states: &[State<I, C>],
         index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
+        let update_fn = |i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))));
         match *self {
             Self::Lateral {
                 ref dst,
                 ref update,
             } => Self::Lateral {
-                dst: dst
-                    .clone()
-                    .map_indices(|i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))))),
+                dst: dst.clone().map_indices(update_fn),
                 update: update.clone(),
             },
-            Self::Call { .. } => todo!(),
+            Self::Call {
+                ref detour,
+                ref dst,
+                ref combine,
+            } => Self::Call {
+                detour: detour.clone().map_indices(update_fn),
+                dst: dst.clone().map_indices(update_fn),
+                combine: combine.clone(),
+            },
             Self::Return => Self::Return,
         }
     }

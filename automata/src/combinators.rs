@@ -175,10 +175,8 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
 ) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
-    RangeMap {
-        entries: s
-            .entries
-            .into_iter()
+    RangeMap(
+        s.0.into_iter()
             .map(|(k, v)| {
                 (
                     k,
@@ -186,13 +184,13 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
                 )
             })
             .collect(),
-    }
+    )
 }
 
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-#[allow(clippy::needless_pass_by_value)] // <-- FIXME
+#[allow(clippy::needless_pass_by_value, clippy::todo)] // <-- FIXME
 fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
     _s: Transition<I, C>,
     _other_init: &BTreeSet<Result<usize, String>>,

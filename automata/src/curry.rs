@@ -93,7 +93,7 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
             (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
             | (&Self::Scrutinize(ref s), &Self::Wildcard(ref w)) => {
-                s.entries.first_key_value().map_or(Ok(()), |(k, v)| {
+                s.0.first_key_value().map_or(Ok(()), |(k, v)| {
                     Err((Some(k.clone()), w.clone(), v.clone()))
                 })
             }
@@ -124,9 +124,7 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
                 //     "Asked to remove a specific value \
                 //     but the map took a wildcard",
                 // );
-                *self = Self::Scrutinize(RangeMap {
-                    entries: BTreeMap::new(),
-                });
+                *self = Self::Scrutinize(RangeMap(BTreeMap::new()));
             }
             Self::Scrutinize(ref mut etc) => etc.remove(&key.expect(
                 "Asked to remove a wildcard \

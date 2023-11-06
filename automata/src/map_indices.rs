@@ -54,13 +54,12 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     #[inline]
     #[must_use]
     pub fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
-        Self {
-            entries: self
-                .entries
+        Self(
+            self.0
                 .into_iter()
                 .map(|(k, v)| (k, v.map_indices(&mut f)))
                 .collect(),
-        }
+        )
     }
 }
 

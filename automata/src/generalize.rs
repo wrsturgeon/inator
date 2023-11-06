@@ -52,13 +52,12 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     #[inline]
     #[must_use]
     pub fn generalize(self) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
-        RangeMap {
-            entries: self
-                .entries
+        RangeMap(
+            self.0
                 .into_iter()
                 .map(|(k, v)| (k, v.generalize()))
                 .collect(),
-        }
+        )
     }
 }
 

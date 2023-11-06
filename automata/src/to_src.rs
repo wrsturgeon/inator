@@ -299,7 +299,7 @@ impl<I: Input> RangeMap<I, usize> {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        self.entries.iter().fold(String::new(), |acc, (k, v)| {
+        self.0.iter().fold(String::new(), |acc, (k, v)| {
             format!(
                 r#"{acc}
             &({}) => {},"#,
@@ -314,7 +314,6 @@ impl<I: Input> Transition<I, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
-    #[allow(clippy::todo)] // TODO: what the fuck does the last case mean?
     fn to_src(&self) -> String {
         match *self {
             Self::Lateral {
@@ -328,7 +327,7 @@ impl<I: Input> Transition<I, usize> {
             }}"#,
                 update.src,
             ),
-            Self::Call { .. } | Self::Return => todo!(),
+            Self::Call { .. } | Self::Return => "TODO".to_owned(),
         }
     }
 }
@@ -409,7 +408,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Curry<I, C> {
 impl<I: Input, C: Ctrl<I>> ToSrc for RangeMap<I, C> {
     #[inline]
     fn to_src(&self) -> String {
-        format!("RangeMap {{ entries: {} }}", self.entries.to_src())
+        format!("RangeMap({})", self.0.to_src())
     }
     #[inline]
     fn src_type() -> String {
@@ -467,7 +466,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Transition<I, C> {
                 dst.to_src(),
                 update.to_src(),
             ),
-            Self::Call { .. } | Self::Return {} => todo!(),
+            Self::Call { .. } | Self::Return {} => "TODO".to_owned(),
         }
     }
     #[inline]

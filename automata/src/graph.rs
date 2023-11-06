@@ -157,6 +157,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         clippy::type_complexity,
         clippy::unwrap_in_result
     )]
+    #[allow(clippy::print_stdout)] // <-- FIXME
     pub fn determinize(&self) -> Result<Deterministic<I>, IllFormed<I, C>> {
         // Check that the source graph is well-formed
         self.check()?;
@@ -169,9 +170,9 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         }
 
         // Fix an ordering on those subsets
-        let mut ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
-        ordering.sort_unstable();
-        ordering.dedup();
+        let ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
+        // Don't need to sort--that's guaranteed in `BTreeMap::keys`
+        println!("Ordering: {}", ordering.to_src());
 
         let mut output = Deterministic {
             initial: unwrap!(ordering.binary_search(&self.initial)),
@@ -269,7 +270,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         let mega_state = match try_merge(result_iterator) {
             // If no state follows, reject immediately.
             None => State {
-                transitions: todo!(),
+                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
                 non_accepting: iter::once("Unexpected token".to_owned()).collect(),
             },
             // If they successfully merged, return the merged state
@@ -282,7 +283,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         let all_dsts: BTreeSet<C> = mega_state
             .transitions
             .values()
-            .filter_map(|t| t.dst().cloned())
+            .flat_map(|t| t.dsts().into_iter().cloned())
             .collect();
 
         // Insert the finished value (also to tell all below iterations that we've covered this case)
@@ -412,18 +413,19 @@ fn fix_indices_range_map<I: Input, C: Ctrl<I>>(
     value: RangeMap<I, C>,
     ordering: &[C],
 ) -> RangeMap<I, usize> {
-    RangeMap {
-        entries: value
-            .entries
+    RangeMap(
+        value
+            .0
             .into_iter()
             .map(|(k, v)| (k, fix_indices_transition(v, ordering)))
             .collect(),
-    }
+    )
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.
 #[inline]
 #[allow(clippy::type_complexity)]
+#[allow(clippy::print_stdout)] // <-- FIXME
 fn fix_indices_transition<I: Input, C: Ctrl<I>>(
     value: Transition<I, C>,
     ordering: &[C],
@@ -437,11 +439,18 @@ fn fix_indices_transition<I: Input, C: Ctrl<I>>(
             detour,
             dst,
             combine,
-        } => Transition::Call {
-            detour: unwrap!(ordering.binary_search(&detour)),
-            dst: unwrap!(ordering.binary_search(&dst)),
-            combine,
-        },
+        } => {
+            println!(
+                "Searching for {} in {}",
+                dst.to_src(),
+                ordering.to_vec().to_src()
+            );
+            Transition::Call {
+                detour: unwrap!(ordering.binary_search(&detour)),
+                dst: unwrap!(ordering.binary_search(&dst)),
+                combine,
+            }
+        }
         Transition::Return => Transition::Return,
     }
 }
