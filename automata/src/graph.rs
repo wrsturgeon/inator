@@ -433,7 +433,15 @@ fn fix_indices_transition<I: Input, C: Ctrl<I>>(
             dst: unwrap!(ordering.binary_search(&dst)),
             update,
         },
-        Transition::Call { .. } => todo!(),
+        Transition::Call {
+            detour,
+            dst,
+            combine,
+        } => Transition::Call {
+            detour: unwrap!(ordering.binary_search(&detour)),
+            dst: unwrap!(ordering.binary_search(&dst)),
+            combine,
+        },
         Transition::Return => Transition::Return,
     }
 }

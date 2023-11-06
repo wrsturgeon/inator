@@ -168,10 +168,10 @@ shrink_only!(|self: &Transition| {
         } => {
             Box::new(
                 Self::Lateral {
-                    dst,
+                    dst: dst.clone(),
                     update: Update {
-                        input_t: todo!(),
-                        output_t: todo!(),
+                        input_t: "()".to_owned(),
+                        output_t: "()".to_owned(),
                         ghost: PhantomData,
                         src: "/* FAKE SOURCE CODE */",
                     },
