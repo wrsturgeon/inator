@@ -157,7 +157,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         clippy::type_complexity,
         clippy::unwrap_in_result
     )]
-    #[allow(clippy::print_stdout)] // <-- FIXME
     pub fn determinize(&self) -> Result<Deterministic<I>, IllFormed<I, C>> {
         // Check that the source graph is well-formed
         self.check()?;
@@ -172,7 +171,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         // Fix an ordering on those subsets
         let ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
         // Don't need to sort--that's guaranteed in `BTreeMap::keys`
-        println!("Ordering: {}", ordering.to_src());
 
         let mut output = Deterministic {
             initial: unwrap!(ordering.binary_search(&self.initial)),
@@ -247,7 +245,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
 
     /// Associate each subset of states with a merged state.
     #[inline]
-    #[allow(clippy::diverging_sub_expression, unreachable_code)] // <-- FIXME
     fn explore(
         &self,
         subsets_as_states: &mut BTreeMap<C, State<I, C>>,
@@ -425,7 +422,6 @@ fn fix_indices_range_map<I: Input, C: Ctrl<I>>(
 /// Use an ordering on subsets to translate each subset into a specific state.
 #[inline]
 #[allow(clippy::type_complexity)]
-#[allow(clippy::print_stdout)] // <-- FIXME
 fn fix_indices_transition<I: Input, C: Ctrl<I>>(
     value: Transition<I, C>,
     ordering: &[C],
@@ -436,22 +432,17 @@ fn fix_indices_transition<I: Input, C: Ctrl<I>>(
             update,
         },
         Transition::Call {
+            region,
             detour,
             dst,
             combine,
-        } => {
-            println!(
-                "Searching for {} in {}",
-                dst.to_src(),
-                ordering.to_vec().to_src()
-            );
-            Transition::Call {
-                detour: unwrap!(ordering.binary_search(&detour)),
-                dst: unwrap!(ordering.binary_search(&dst)),
-                combine,
-            }
-        }
-        Transition::Return => Transition::Return,
+        } => Transition::Call {
+            region,
+            detour: unwrap!(ordering.binary_search(&detour)),
+            dst: unwrap!(ordering.binary_search(&dst)),
+            combine,
+        },
+        Transition::Return { region } => Transition::Return { region },
     }
 }
 

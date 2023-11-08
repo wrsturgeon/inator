@@ -70,6 +70,18 @@ impl Merge for usize {
     }
 }
 
+impl<'s> Merge for &'s str {
+    type Error = (&'s str, &'s str);
+    #[inline]
+    fn merge(self, other: Self) -> Result<Self, Self::Error> {
+        if self == other {
+            Ok(self)
+        } else {
+            Err((self, other))
+        }
+    }
+}
+
 impl<T: Ord> Merge for BTreeSet<T> {
     type Error = CtrlMergeConflict;
     #[inline]
@@ -176,16 +188,21 @@ impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
             }),
             (
                 Self::Call {
+                    region: l_region,
                     detour: l_detour,
                     dst: l_dst,
                     combine: l_combine,
                 },
                 Self::Call {
+                    region: r_region,
                     detour: r_detour,
                     dst: r_dst,
                     combine: r_combine,
                 },
             ) => Ok(Self::Call {
+                region: l_region
+                    .merge(r_region)
+                    .map_err(|(a, b)| IllFormed::AmbiguousRegions(a, b))?,
                 detour: l_detour.merge(r_detour).map_err(|e| match e {
                     CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
                 })?,
@@ -196,7 +213,13 @@ impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
                     IllFormed::IncompatibleCombinators(Box::new(a), Box::new(b))
                 })?,
             }),
-            (Self::Return, Self::Return) => Ok(Self::Return),
+            (Self::Return { region: l_region }, Self::Return { region: r_region }) => {
+                Ok(Self::Return {
+                    region: l_region
+                        .merge(r_region)
+                        .map_err(|(a, b)| IllFormed::AmbiguousRegions(a, b))?,
+                })
+            }
             (a, b) => Err(IllFormed::IncompatibleActions(Box::new(a), Box::new(b))),
         }
     }

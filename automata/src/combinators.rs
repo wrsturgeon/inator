@@ -89,10 +89,12 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
         // For every transition that an empty stack can take from the initial state of the right-hand parser,
         // add that transition (only on the empty stack) to each accepting state of the left-hand parser.
         for state in &mut s.states {
-            state.transitions =
-                mem::replace(&mut state.transitions, Curry::Wildcard(Transition::Return))
-                    .merge(rhs_init.clone())
-                    .unwrap_or_else(|e| panic!("{e}"));
+            state.transitions = mem::replace(
+                &mut state.transitions,
+                Curry::Wildcard(Transition::Return { region: "" }),
+            )
+            .merge(rhs_init.clone())
+            .unwrap_or_else(|e| panic!("{e}"));
         }
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.

@@ -1,7 +1,0 @@
-[package]
-name = "symbols"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-inator-automata = { path = "../../.." }

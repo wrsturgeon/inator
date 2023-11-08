@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! Automata loosely based on visibly pushdown automata.
+//! Modified pushdown automata, the backbone of the `inator` crate.
 
 #![deny(warnings)]
 #![allow(unknown_lints)]
@@ -231,12 +231,18 @@ pub fn dyck_d() -> Deterministic<char> {
                     (
                         Range::unit('('),
                         Transition::Call {
+                            region: "parentheses",
                             detour: 0,
                             dst: 0,
                             combine: ff!(|(), ()| ()),
                         },
                     ),
-                    (Range::unit(')'), Transition::Return),
+                    (
+                        Range::unit(')'),
+                        Transition::Return {
+                            region: "parentheses",
+                        },
+                    ),
                 ]
                 .into_iter()
                 .collect(),
@@ -259,12 +265,18 @@ pub fn dyck_nd() -> Nondeterministic<char> {
                     (
                         Range::unit('('),
                         Transition::Call {
+                            region: "parentheses",
                             detour: iter::once(Ok(0)).collect(),
                             dst: iter::once(Ok(0)).collect(),
                             combine: ff!(|(), ()| ()),
                         },
                     ),
-                    (Range::unit(')'), Transition::Return),
+                    (
+                        Range::unit(')'),
+                        Transition::Return {
+                            region: "parentheses",
+                        },
+                    ),
                 ]
                 .into_iter()
                 .collect(),

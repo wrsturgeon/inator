@@ -71,15 +71,17 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 update,
             },
             Self::Call {
+                region,
                 detour,
                 dst,
                 combine,
             } => Transition::Call {
+                region,
                 detour: detour.view().map(|r| r.map_err(str::to_owned)).collect(),
                 dst: dst.view().map(|r| r.map_err(str::to_owned)).collect(),
                 combine,
             },
-            Self::Return => Transition::Return,
+            Self::Return { region } => Transition::Return { region },
         }
     }
 }

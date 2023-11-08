@@ -318,7 +318,7 @@ mod reduced {
         deterministic_implies_no_runtime_errors(
             &Graph {
                 states: vec![State {
-                    transitions: Curry::Wildcard(Transition::Return),
+                    transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                     non_accepting: BTreeSet::new(),
                 }],
                 initial: 0,
@@ -341,7 +341,7 @@ mod reduced {
                         non_accepting: BTreeSet::new(),
                     },
                     State {
-                        transitions: Curry::Wildcard(Transition::Return),
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                         non_accepting: BTreeSet::new(),
                     },
                     State {
@@ -349,11 +349,12 @@ mod reduced {
                         non_accepting: BTreeSet::new(),
                     },
                     State {
-                        transitions: Curry::Wildcard(Transition::Return),
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                         non_accepting: iter::once(String::new()).collect(),
                     },
                     State {
                         transitions: Curry::Wildcard(Transition::Call {
+                            region: "region",
                             detour: 0,
                             dst: 1,
                             combine: FF {

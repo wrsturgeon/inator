@@ -9,6 +9,8 @@
 use crate::{Ctrl, Input, InputError, ParseError, Update, FF};
 use core::cmp;
 
+// TODO: rename `Call` to `Open` and `Return` to `Close`
+
 /// Transition in an automaton: an action and a destination state.
 #[derive(Debug)]
 #[allow(clippy::exhaustive_enums)]
@@ -22,6 +24,8 @@ pub enum Transition<I: Input, C: Ctrl<I>> {
     },
     /// Call another function--i.e., push a pointer/index onto the stack.
     Call {
+        /// Region (user-defined name) that we're opening. Sensible to be e.g. "parentheses" for `(...)`.
+        region: &'static str,
         /// Call (and require a successful run from) this state before continuing.
         detour: C,
         /// After the call has succeeded, go to this state.
@@ -32,7 +36,10 @@ pub enum Transition<I: Input, C: Ctrl<I>> {
     /// Return into the function that called us.
     /// Note that this is NOT how we return from the overall parser:
     /// that happens only when input ends AND the stack is empty.
-    Return,
+    Return {
+        /// Region (user-defined name) that we're closing. Sensible to be e.g. "parentheses" for `(...)`.
+        region: &'static str,
+    },
 }
 
 impl<I: Input, C: Ctrl<I>> Clone for Transition<I, C> {
@@ -47,15 +54,17 @@ impl<I: Input, C: Ctrl<I>> Clone for Transition<I, C> {
                 update: update.clone(),
             },
             Self::Call {
+                region,
                 ref detour,
                 ref dst,
                 ref combine,
             } => Self::Call {
+                region,
                 detour: detour.clone(),
                 dst: dst.clone(),
                 combine: combine.clone(),
             },
-            Self::Return => Self::Return,
+            Self::Return { region } => Self::Return { region },
         }
     }
 }
@@ -72,9 +81,11 @@ impl<I: Input, C: Ctrl<I>> Ord for Transition<I, C> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
-            (&Self::Return, &Self::Return) => cmp::Ordering::Equal,
-            (&Self::Return, _) => cmp::Ordering::Less,
-            (_, &Self::Return) => cmp::Ordering::Greater,
+            (&Self::Return { region: l_region }, &Self::Return { region: r_region }) => {
+                l_region.cmp(r_region)
+            }
+            (&Self::Return { .. }, _) => cmp::Ordering::Less,
+            (_, &Self::Return { .. }) => cmp::Ordering::Greater,
             (
                 &Self::Lateral {
                     dst: ref l_dst,
@@ -89,17 +100,20 @@ impl<I: Input, C: Ctrl<I>> Ord for Transition<I, C> {
             (_, &Self::Lateral { .. }) => cmp::Ordering::Greater,
             (
                 &Self::Call {
+                    region: l_region,
                     detour: ref l_detour,
                     dst: ref l_dst,
                     combine: ref l_combine,
                 },
                 &Self::Call {
+                    region: r_region,
                     detour: ref r_detour,
                     dst: ref r_dst,
                     combine: ref r_combine,
                 },
-            ) => l_detour
-                .cmp(r_detour)
+            ) => l_region
+                .cmp(r_region)
+                .then_with(|| l_detour.cmp(r_detour))
                 .then_with(|| l_dst.cmp(r_dst))
                 .then_with(|| l_combine.cmp(r_combine)),
         }
@@ -140,7 +154,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 stack.push(dst.clone());
                 Ok(Some((detour.clone(), "()".to_owned())))
             }
-            Self::Return => {
+            Self::Return { .. } => {
                 let rtn_to = stack
                     .pop()
                     .ok_or(ParseError::BadInput(InputError::Unopened))?;
@@ -156,7 +170,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
         match *self {
             Self::Lateral { ref update, .. } => Some(&update.input_t),
             Self::Call { ref combine, .. } => Some(&combine.lhs_t),
-            Self::Return => None,
+            Self::Return { .. } => None,
         }
     }
 
@@ -174,7 +188,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 ref dst,
                 ..
             } => vec![detour, dst],
-            Self::Return => vec![],
+            Self::Return { .. } => vec![],
         }
     }
 
@@ -185,7 +199,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
         match *self {
             Self::Lateral { .. } => "leave the stack alone",
             Self::Call { .. } => "push a call onto the stack",
-            Self::Return => "return (i.e. pop from the stack)",
+            Self::Return { .. } => "return (i.e. pop from the stack)",
         }
     }
 }
@@ -201,15 +215,17 @@ impl<I: Input> Transition<I, usize> {
                 update,
             },
             Self::Call {
+                region,
                 detour,
                 dst,
                 combine,
             } => Transition::Call {
+                region,
                 detour: C::from_usize(detour),
                 dst: C::from_usize(dst),
                 combine,
             },
-            Self::Return => Transition::Return,
+            Self::Return { region } => Transition::Return { region },
         }
     }
 }

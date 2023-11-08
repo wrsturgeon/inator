@@ -79,15 +79,17 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 update: update.clone(),
             },
             Self::Call {
+                region,
                 ref detour,
                 ref dst,
                 ref combine,
             } => Self::Call {
+                region,
                 detour: detour.clone().map_indices(update_fn),
                 dst: dst.clone().map_indices(update_fn),
                 combine: combine.clone(),
             },
-            Self::Return => Self::Return,
+            Self::Return { region } => Self::Return { region },
         }
     }
 }

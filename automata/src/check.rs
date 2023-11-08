@@ -55,6 +55,8 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
     TypeMismatch(String, String),
     /// An accepting state returns the wrong type.
     WrongReturnType(String, String),
+    /// Ambiguous regions: e.g. claiming to be opening both parentheses and brackets at the same time.
+    AmbiguousRegions(&'static str, &'static str),
 }
 
 impl<I: Input> IllFormed<I, usize> {
@@ -88,6 +90,7 @@ impl<I: Input> IllFormed<I, usize> {
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
             IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
+            IllFormed::AmbiguousRegions(a, b) => IllFormed::AmbiguousRegions(a, b),
         }
     }
 }
@@ -170,6 +173,10 @@ impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
             ),
             Self::TypeMismatch(ref a, ref b) => write!(f, "Type mismatch: `{a}` =/= `{b}`."),
             Self::WrongReturnType(ref a, ref b) => write!(f, "Wrong output type: `{a}` =/= `{b}`"),
+            Self::AmbiguousRegions(a, b) => write!(
+                f,
+                "Claiming to open two different regions (\"{a}\" and \"{b}\") simultaneously."
+            ),
         }
     }
 }
@@ -252,7 +259,7 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for Transition<I, C> {
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         match *self {
             Self::Lateral { ref dst, .. } | Self::Call { ref dst, .. } => dst.check(n_states),
-            Self::Return => Ok(()),
+            Self::Return { .. } => Ok(()),
         }
     }
 }

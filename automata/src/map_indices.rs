@@ -74,15 +74,17 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 update,
             },
             Self::Call {
+                region,
                 detour,
                 dst,
                 combine,
             } => Self::Call {
+                region,
                 detour: detour.map_indices(&mut f),
                 dst: dst.map_indices(f),
                 combine,
             },
-            Self::Return {} => Self::Return {},
+            Self::Return { region } => Self::Return { region },
         }
     }
 }

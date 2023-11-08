@@ -153,15 +153,16 @@ shrink_only!(|self: &Curry| match *self {
 shrink_only!(|self: &Transition| {
     #[allow(clippy::shadow_unrelated, unreachable_code, unused_variables)]
     match self.clone() {
-        Self::Return => Box::new(iter::empty()),
+        Self::Return { region: _ } => Box::new(iter::empty()),
         Self::Lateral { dst, update } => Box::new(
-            iter::once(Self::Return).chain(
+            iter::once(Self::Return { region: "region" }).chain(
                 (dst, update)
                     .shrink()
                     .map(|(dst, update)| Self::Lateral { dst, update }),
             ),
         ),
         Self::Call {
+            region: _,
             detour,
             dst,
             combine,
@@ -179,6 +180,7 @@ shrink_only!(|self: &Transition| {
                 .shrink()
                 .chain((detour, dst, combine).shrink().map(
                     |(detour, dst, combine)| Self::Call {
+                        region: "region",
                         detour,
                         dst,
                         combine,
@@ -253,11 +255,12 @@ impl<C: Ctrl<u8>> Transition<u8, C> {
                 update: Arbitrary::arbitrary(r),
             },
             |n, r| Self::Call {
+                region: "region",
                 detour: C::arbitrary_given(n, r),
                 dst: C::arbitrary_given(n, r),
                 combine: Arbitrary::arbitrary(r),
             },
-            |_, _| Self::Return,
+            |_, _| Self::Return { region: "region" },
         ];
         g.choose(&choices).expect("impossible")(n_states, g)
     }
