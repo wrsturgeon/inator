@@ -17,7 +17,7 @@ set -u
 # Update our workbench
 rustup update || :
 rustup toolchain install nightly || :
-rustup component add miri rustfmt
+rustup component add clippy miri rustfmt
 git submodule update --init --recursive --remote
 
 # Housekeeping
