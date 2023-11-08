@@ -199,15 +199,15 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
                 non_accepting: BTreeSet::new(),
             },
             State {
-                transitions: Curry::Scrutinize(RangeMap(
-                    iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
-                )),
                 non_accepting: iter::once(format!(
                     "Expected only a single token on [{}..={}] but got another token after it",
                     range.first.to_src(),
                     range.last.to_src(),
                 ))
                 .collect(),
+                transitions: Curry::Scrutinize(RangeMap(
+                    iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
+                )),
             },
         ],
         initial: 1,
