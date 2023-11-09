@@ -6,7 +6,7 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{Ctrl, Graph, InProgress, Input, Stack};
+use crate::{Ctrl, Graph, InProgress, Input};
 
 /// Execute an automaton on an input sequence.
 pub trait Run: IntoIterator + Sized
@@ -17,10 +17,10 @@ where
     /// # Errors
     /// If the automaton is not well-formed (with a witness to why).
     #[allow(clippy::type_complexity)]
-    fn run<S: Stack, C: Ctrl<Self::Item, S>>(
+    fn run<C: Ctrl<Self::Item>>(
         self,
-        graph: &Graph<Self::Item, S, C>,
-    ) -> InProgress<'_, Self::Item, S, C, Self::IntoIter>;
+        graph: &Graph<Self::Item, C>,
+    ) -> InProgress<'_, Self::Item, C, Self::IntoIter>;
 }
 
 impl<In: IntoIterator> Run for In
@@ -28,10 +28,10 @@ where
     In::Item: Input,
 {
     #[inline]
-    fn run<S: Stack, C: Ctrl<Self::Item, S>>(
+    fn run<C: Ctrl<Self::Item>>(
         self,
-        graph: &Graph<Self::Item, S, C>,
-    ) -> InProgress<'_, Self::Item, S, C, Self::IntoIter> {
+        graph: &Graph<Self::Item, C>,
+    ) -> InProgress<'_, Self::Item, C, Self::IntoIter> {
         InProgress {
             graph,
             input: self.into_iter(),

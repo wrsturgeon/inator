@@ -6,21 +6,21 @@
 
 //! Read the next input symbol and decide an action.
 
-use crate::{Ctrl, IllFormed, Input, Range, RangeMap, Stack, Transition};
+use crate::{Ctrl, IllFormed, Input, Range, RangeMap, Transition};
 use core::{cmp, iter};
 use std::collections::BTreeMap;
 
 /// Read the next input symbol and decide an action.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Debug)]
-pub enum CurryInput<I: Input, S: Stack, C: Ctrl<I, S>> {
+pub enum Curry<I: Input, C: Ctrl<I>> {
     /// Throw away the input (without looking at it) and do this.
-    Wildcard(Transition<I, S, C>),
+    Wildcard(Transition<I, C>),
     /// Map specific ranges of inputs to actions.
-    Scrutinize(RangeMap<I, S, C>),
+    Scrutinize(RangeMap<I, C>),
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for CurryInput<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Clone for Curry<I, C> {
     #[inline]
     fn clone(&self) -> Self {
         match *self {
@@ -30,9 +30,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for CurryInput<I, S, C> {}
+impl<I: Input, C: Ctrl<I>> Eq for Curry<I, C> {}
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for CurryInput<I, S, C> {
+impl<I: Input, C: Ctrl<I>> PartialEq for Curry<I, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -44,7 +44,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for CurryInput<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Ord for Curry<I, C> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
@@ -56,20 +56,20 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Ord for CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialOrd for CurryInput<I, S, C> {
+impl<I: Input, C: Ctrl<I>> PartialOrd for Curry<I, C> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     /// Look up a transition based on an input token.
     /// # Errors
     /// If multiple ranges fit an argument.
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, S, C>>, IllFormed<I, S, C>> {
+    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, C>>, IllFormed<I, C>> {
         match *self {
             Self::Wildcard(ref transition) => Ok(Some(transition)),
             Self::Scrutinize(ref range_map) => range_map.get(key),
@@ -88,12 +88,12 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
     pub fn disjoint(
         &self,
         other: &Self,
-    ) -> Result<(), (Option<Range<I>>, Transition<I, S, C>, Transition<I, S, C>)> {
+    ) -> Result<(), (Option<Range<I>>, Transition<I, C>, Transition<I, C>)> {
         match (self, other) {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
             (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
             | (&Self::Scrutinize(ref s), &Self::Wildcard(ref w)) => {
-                s.entries.first_key_value().map_or(Ok(()), |(k, v)| {
+                s.0.first_key_value().map_or(Ok(()), |(k, v)| {
                     Err((Some(k.clone()), w.clone(), v.clone()))
                 })
             }
@@ -105,7 +105,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, S, C>>> {
+    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, C>>> {
         match *self {
             Self::Wildcard(ref etc) => Box::new(iter::once(etc)),
             Self::Scrutinize(ref etc) => Box::new(etc.values()),
@@ -124,9 +124,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
                 //     "Asked to remove a specific value \
                 //     but the map took a wildcard",
                 // );
-                *self = Self::Scrutinize(RangeMap {
-                    entries: BTreeMap::new(),
-                });
+                *self = Self::Scrutinize(RangeMap(BTreeMap::new()));
             }
             Self::Scrutinize(ref mut etc) => etc.remove(&key.expect(
                 "Asked to remove a wildcard \
@@ -134,16 +132,25 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
             )),
         };
     }
+
+    /// All values in this collection, without their associated keys.
+    #[inline]
+    pub fn values_mut(&mut self) -> Box<dyn '_ + Iterator<Item = &mut Transition<I, C>>> {
+        match *self {
+            Self::Wildcard(ref mut etc) => Box::new(iter::once(etc)),
+            Self::Scrutinize(ref mut etc) => Box::new(etc.values_mut()),
+        }
+    }
 }
 
-impl<I: Input, S: Stack> CurryInput<I, S, usize> {
+impl<I: Input> Curry<I, usize> {
     /// Convert the control parameter from `usize` to anything else.
     #[inline]
     #[must_use]
-    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> CurryInput<I, S, C> {
+    pub fn convert_ctrl<C: Ctrl<I>>(self) -> Curry<I, C> {
         match self {
-            CurryInput::Wildcard(w) => CurryInput::Wildcard(w.convert_ctrl()),
-            CurryInput::Scrutinize(s) => CurryInput::Scrutinize(s.convert_ctrl()),
+            Curry::Wildcard(w) => Curry::Wildcard(w.convert_ctrl()),
+            Curry::Scrutinize(s) => Curry::Scrutinize(s.convert_ctrl()),
         }
     }
 }

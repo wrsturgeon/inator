@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-//! Automata loosely based on visibly pushdown automata.
+//! Modified pushdown automata, the backbone of the `inator` crate.
 
 #![deny(warnings)]
 #![allow(unknown_lints)]
@@ -152,12 +152,27 @@ macro_rules! get {
     }};
 }
 
-mod action;
+/// One-argument function.
+#[macro_export]
+macro_rules! f {
+    ($ex:expr) => {
+        $crate::F::_from_macro(stringify!($ex).to_owned(), $ex)
+    };
+}
+
+/// Two-argument function.
+#[macro_export]
+macro_rules! ff {
+    ($ex:expr) => {
+        $crate::FF::_from_macro(stringify!($ex).to_owned(), $ex)
+    };
+}
+
 mod check;
 mod combinators;
 mod ctrl;
-mod curry_input;
-mod curry_stack;
+mod curry;
+mod f;
 mod generalize;
 mod graph;
 mod in_progress;
@@ -168,7 +183,6 @@ mod range;
 mod range_map;
 mod reindex;
 mod run;
-mod stack;
 mod state;
 mod to_src;
 mod transition;
@@ -178,11 +192,10 @@ mod update;
 mod qc;
 
 pub use {
-    action::Action,
     check::{Check, IllFormed},
     ctrl::{Ctrl, CtrlMergeConflict},
-    curry_input::CurryInput,
-    curry_stack::CurryStack,
+    curry::Curry,
+    f::{F, FF},
     graph::{Deterministic, Graph, Nondeterministic},
     in_progress::{InProgress, InputError, ParseError},
     input::Input,
@@ -190,7 +203,6 @@ pub use {
     range::Range,
     range_map::RangeMap,
     run::Run,
-    stack::Stack,
     state::State,
     to_src::ToSrc,
     transition::Transition,
@@ -202,3 +214,76 @@ mod test;
 
 #[cfg(test)]
 use rand as _; // <-- needed in examples
+
+use {
+    core::iter,
+    std::collections::{BTreeMap, BTreeSet},
+};
+
+/// Language of matched parentheses and concatenations thereof.
+#[inline]
+#[must_use]
+pub fn dyck_d() -> Deterministic<char> {
+    Graph {
+        states: vec![State {
+            transitions: Curry::Scrutinize(RangeMap(
+                [
+                    (
+                        Range::unit('('),
+                        Transition::Call {
+                            region: "parentheses",
+                            detour: 0,
+                            dst: 0,
+                            combine: ff!(|(), ()| ()),
+                        },
+                    ),
+                    (
+                        Range::unit(')'),
+                        Transition::Return {
+                            region: "parentheses",
+                        },
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            )),
+            non_accepting: BTreeSet::new(),
+        }],
+        initial: 0,
+        tags: BTreeMap::new(),
+    }
+}
+
+/// Language of matched parentheses and concatenations thereof.
+#[inline]
+#[must_use]
+pub fn dyck_nd() -> Nondeterministic<char> {
+    Graph {
+        states: vec![State {
+            transitions: Curry::Scrutinize(RangeMap(
+                [
+                    (
+                        Range::unit('('),
+                        Transition::Call {
+                            region: "parentheses",
+                            detour: iter::once(Ok(0)).collect(),
+                            dst: iter::once(Ok(0)).collect(),
+                            combine: ff!(|(), ()| ()),
+                        },
+                    ),
+                    (
+                        Range::unit(')'),
+                        Transition::Return {
+                            region: "parentheses",
+                        },
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            )),
+            non_accepting: BTreeSet::new(),
+        }],
+        initial: iter::once(Ok(0)).collect(),
+        tags: BTreeMap::new(),
+    }
+}

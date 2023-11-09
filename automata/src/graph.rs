@@ -7,8 +7,8 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    try_merge, Check, Ctrl, CurryInput, CurryStack, IllFormed, Input, InputError, Merge,
-    ParseError, RangeMap, Stack, State, ToSrc, Transition,
+    try_merge, Check, Ctrl, Curry, IllFormed, Input, InputError, Merge, ParseError, RangeMap,
+    State, ToSrc, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -20,27 +20,27 @@ use std::{
 };
 
 /// One token corresponds to at most one transition.
-pub type Deterministic<I, S> = Graph<I, S, usize>;
+pub type Deterministic<I> = Graph<I, usize>;
 
 /// One token corresponds to as many transitions as it would like;
 /// if any of these transitions eventually accept, the whole thing accepts.
-pub type Nondeterministic<I, S> = Graph<I, S, BTreeSet<Result<usize, String>>>;
+pub type Nondeterministic<I> = Graph<I, BTreeSet<Result<usize, String>>>;
 
 // TODO: make `states` a `BTreeSet`.
 
 /// Automaton loosely based on visibly pushdown automata.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Debug)]
-pub struct Graph<I: Input, S: Stack, C: Ctrl<I, S>> {
+pub struct Graph<I: Input, C: Ctrl<I>> {
     /// Every state, indexed.
-    pub states: Vec<State<I, S, C>>,
+    pub states: Vec<State<I, C>>,
     /// Initial state of the machine (before reading input).
     pub initial: C,
     /// Map string tags to the state or states they represent.
     pub tags: BTreeMap<String, usize>,
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for Graph<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Clone for Graph<I, C> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -51,23 +51,23 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Clone for Graph<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Eq for Graph<I, S, C> {}
+impl<I: Input, C: Ctrl<I>> Eq for Graph<I, C> {}
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> PartialEq for Graph<I, S, C> {
+impl<I: Input, C: Ctrl<I>> PartialEq for Graph<I, C> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.initial == other.initial && self.states == other.states
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// Check a subset of well-formedness.
     /// Note that this can't check if determinization will succeed in less time than actually trying;
     /// if you want to see if there can be any runtime errors, just try to determinize it.
     /// # Errors
     /// When ill-formed (with a witness).
     #[inline]
-    pub fn check(&self) -> Result<(), IllFormed<I, S, C>> {
+    pub fn check(&self) -> Result<(), IllFormed<I, C>> {
         let n_states = self.states.len();
         for r in self.initial.view() {
             let state = match r {
@@ -86,18 +86,19 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             };
             if let Some(t) = state.input_type()? {
                 if t != "()" {
-                    return Err(IllFormed::InitialNotUnit(t));
+                    return Err(IllFormed::InitialNotUnit(t.to_owned()));
                 }
             }
-            for curry in state.transitions.values() {
-                for transition in curry.values() {
-                    if transition.update.input_t != "()" {
-                        return Err(IllFormed::InitialNotUnit(transition.update.input_t.clone()));
+            for transition in state.transitions.values() {
+                let in_t = transition.input_type();
+                if let Some(t) = in_t {
+                    if t != "()" {
+                        return Err(IllFormed::InitialNotUnit(t.to_owned()));
                     }
                 }
             }
         }
-        drop(self.output_type()?);
+        let _ = self.output_type()?;
         for (i, state) in self.states.iter().enumerate() {
             if get!(self.states, ..i).contains(state) {
                 return Err(IllFormed::DuplicateState(Box::new(state.clone())));
@@ -121,7 +122,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     pub fn accept<In: IntoIterator<Item = I>>(
         &self,
         input: In,
-    ) -> Result<String, ParseError<I, S, C>> {
+    ) -> Result<String, ParseError<I, C>> {
         use crate::Run;
         let mut run = input.run(self);
         for r in &mut run {
@@ -156,7 +157,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         clippy::type_complexity,
         clippy::unwrap_in_result
     )]
-    pub fn determinize(&self) -> Result<Deterministic<I, S>, IllFormed<I, S, C>> {
+    pub fn determinize(&self) -> Result<Deterministic<I>, IllFormed<I, C>> {
         // Check that the source graph is well-formed
         self.check()?;
 
@@ -168,9 +169,8 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
         }
 
         // Fix an ordering on those subsets
-        let mut ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
-        ordering.sort_unstable();
-        ordering.dedup();
+        let ordering: Vec<C> = subsets_as_states.keys().cloned().collect();
+        // Don't need to sort--that's guaranteed in `BTreeMap::keys`
 
         let mut output = Deterministic {
             initial: unwrap!(ordering.binary_search(&self.initial)),
@@ -182,7 +182,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                         non_accepting,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
-                        transitions: fix_indices_curry_stack(transitions, &ordering),
+                        transitions: fix_indices_curry(transitions, &ordering),
                         non_accepting,
                     }
                 })
@@ -247,9 +247,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     #[inline]
     fn explore(
         &self,
-        subsets_as_states: &mut BTreeMap<C, State<I, S, C>>,
+        subsets_as_states: &mut BTreeMap<C, State<I, C>>,
         subset: &C,
-    ) -> Result<(), IllFormed<I, S, C>> {
+    ) -> Result<(), IllFormed<I, C>> {
         // Check if we've seen this subset already
         let btree_map::Entry::Vacant(entry) = subsets_as_states.entry(subset.clone()) else {
             return Ok(());
@@ -263,14 +263,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 |&i| Ok(get!(self.states, i).clone()),
             ),
         });
-        let mega_state: State<I, S, C> = match try_merge(result_iterator) {
+
+        let mega_state = match try_merge(result_iterator) {
             // If no state follows, reject immediately.
             None => State {
-                transitions: CurryStack {
-                    wildcard: None,
-                    map_none: None,
-                    map_some: BTreeMap::new(),
-                },
+                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
                 non_accepting: iter::once("Unexpected token".to_owned()).collect(),
             },
             // If they successfully merged, return the merged state
@@ -279,20 +276,19 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
             Some(Err(e)) => return Err(e),
         };
 
-        // Cache all possible next states
-        #[allow(clippy::needless_collect)] // <-- false positive: couldn't move `mega_state` below
-        let dsts: BTreeSet<C> = mega_state
+        // Necessary before we move `mega_state`
+        let all_dsts: BTreeSet<C> = mega_state
             .transitions
             .values()
-            .flat_map(CurryInput::values)
-            .map(|transition| transition.dst.clone())
+            .flat_map(|t| t.dsts().into_iter().cloned())
             .collect();
 
-        // Associate this subset of states with the merged state
+        // Insert the finished value (also to tell all below iterations that we've covered this case)
         let _ = entry.insert(mega_state);
 
-        // Recurse on all destinations
-        dsts.into_iter()
+        // Recurse on all possible next states
+        all_dsts
+            .into_iter()
             .try_fold((), |(), dst| self.explore(subsets_as_states, &dst))
     }
 
@@ -300,17 +296,20 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     /// # Errors
     /// If multiple accepting states attempt to return different types.
     #[inline]
-    pub fn output_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
+    pub fn output_type(&self) -> Result<Option<&str>, IllFormed<I, C>> {
         self.states
             .iter()
-            .try_fold(None, |acc: Option<String>, state| {
+            .try_fold(None, |acc: Option<&str>, state| {
                 if state.non_accepting.is_empty() {
                     acc.map_or_else(
                         || state.input_type(),
                         |t| {
                             if let Some(input_t) = state.input_type()? {
                                 if input_t != t {
-                                    return Err(IllFormed::WrongReturnType(t, input_t));
+                                    return Err(IllFormed::WrongReturnType(
+                                        t.to_owned(),
+                                        input_t.to_owned(),
+                                    ));
                                 }
                             }
                             Ok(Some(t))
@@ -327,7 +326,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     /// If multiple accepting states attempt to return different types.
     #[inline]
     #[allow(clippy::missing_panics_doc)]
-    pub fn input_type(&self) -> Result<Option<String>, IllFormed<I, S, C>> {
+    pub fn input_type(&self) -> Result<Option<&str>, IllFormed<I, C>> {
         self.initial
             .view()
             .map(|r| {
@@ -337,39 +336,24 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
                 )
             })
             .try_fold(None, |acc, state| {
-                let shit =
-                    acc.merge(state.transitions.values().try_fold(None, |accc, curry| {
-                        accc.merge({
-                            curry.values().try_fold(None, |acccc, t| {
-                                acccc.merge(Some(t.update.input_t.clone())).map_or_else(
-                                    |(a, b)| {
-                                        if a == b {
-                                            Ok(Some(a))
-                                        } else {
-                                            Err(IllFormed::TypeMismatch(a, b))
-                                        }
-                                    },
-                                    Ok,
-                                )
-                            })?
-                        })
-                        .map_or_else(
-                            |(a, b)| {
-                                if a == b {
-                                    Ok(Some(a))
-                                } else {
-                                    Err(IllFormed::TypeMismatch(a, b))
-                                }
-                            },
-                            Ok,
-                        )
-                    })?);
+                let shit = acc.merge(state.transitions.values().try_fold(None, |accc, t| {
+                    accc.merge(t.input_type()).map_or_else(
+                        |(a, b)| {
+                            if a == b {
+                                Ok(Some(a))
+                            } else {
+                                Err(IllFormed::TypeMismatch(a.to_owned(), b.to_owned()))
+                            }
+                        },
+                        Ok,
+                    )
+                })?);
                 shit.map_or_else(
                     |(a, b)| {
                         if a == b {
                             Ok(Some(a))
                         } else {
-                            Err(IllFormed::TypeMismatch(a, b))
+                            Err(IllFormed::TypeMismatch(a.to_owned(), b.to_owned()))
                         }
                     },
                     Ok,
@@ -384,7 +368,7 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
     pub fn sort(&mut self) {
         // Associate each original index with a concrete state instead of just an index,
         // since we're going to be swapping the indices around.
-        let index_map: BTreeMap<usize, State<_, _, _>> =
+        let index_map: BTreeMap<usize, State<_, _>> =
             self.states.iter().cloned().enumerate().collect();
         self.states.sort_unstable();
         self.states.dedup(); // <-- Cool that we can do this!
@@ -412,69 +396,57 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Graph<I, S, C> {
 /// Use an ordering on subsets to translate each subset into a specific state.
 #[inline]
 #[allow(clippy::type_complexity)]
-fn fix_indices_curry_stack<I: Input, S: Stack, C: Ctrl<I, S>>(
-    value: CurryStack<I, S, C>,
-    ordering: &[C],
-) -> CurryStack<I, S, usize> {
-    CurryStack {
-        wildcard: value
-            .wildcard
-            .map(|wild| fix_indices_curry_input(wild, ordering)),
-        map_none: value
-            .map_none
-            .map(|none| fix_indices_curry_input(none, ordering)),
-        map_some: value
-            .map_some
-            .into_iter()
-            .map(|(arg, etc)| (arg, fix_indices_curry_input(etc, ordering)))
-            .collect(),
-    }
-}
-
-/// Use an ordering on subsets to translate each subset into a specific state.
-#[inline]
-#[allow(clippy::type_complexity)]
-fn fix_indices_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
-    value: CurryInput<I, S, C>,
-    ordering: &[C],
-) -> CurryInput<I, S, usize> {
+fn fix_indices_curry<I: Input, C: Ctrl<I>>(value: Curry<I, C>, ordering: &[C]) -> Curry<I, usize> {
     match value {
-        CurryInput::Wildcard(etc) => CurryInput::Wildcard(fix_indices_transition(etc, ordering)),
-        CurryInput::Scrutinize(etc) => CurryInput::Scrutinize(fix_indices_range_map(etc, ordering)),
+        Curry::Wildcard(etc) => Curry::Wildcard(fix_indices_transition(etc, ordering)),
+        Curry::Scrutinize(etc) => Curry::Scrutinize(fix_indices_range_map(etc, ordering)),
     }
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.
 #[inline]
 #[allow(clippy::type_complexity)]
-fn fix_indices_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
-    value: RangeMap<I, S, C>,
+fn fix_indices_range_map<I: Input, C: Ctrl<I>>(
+    value: RangeMap<I, C>,
     ordering: &[C],
-) -> RangeMap<I, S, usize> {
-    RangeMap {
-        entries: value
-            .entries
+) -> RangeMap<I, usize> {
+    RangeMap(
+        value
+            .0
             .into_iter()
             .map(|(k, v)| (k, fix_indices_transition(v, ordering)))
             .collect(),
-    }
+    )
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.
 #[inline]
 #[allow(clippy::type_complexity)]
-fn fix_indices_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
-    value: Transition<I, S, C>,
+fn fix_indices_transition<I: Input, C: Ctrl<I>>(
+    value: Transition<I, C>,
     ordering: &[C],
-) -> Transition<I, S, usize> {
-    Transition {
-        dst: unwrap!(ordering.binary_search(&value.dst)),
-        act: value.act,
-        update: value.update,
+) -> Transition<I, usize> {
+    match value {
+        Transition::Lateral { dst, update } => Transition::Lateral {
+            dst: unwrap!(ordering.binary_search(&dst)),
+            update,
+        },
+        Transition::Call {
+            region,
+            detour,
+            dst,
+            combine,
+        } => Transition::Call {
+            region,
+            detour: unwrap!(ordering.binary_search(&detour)),
+            dst: unwrap!(ordering.binary_search(&dst)),
+            combine,
+        },
+        Transition::Return { region } => Transition::Return { region },
     }
 }
 
-impl<I: Input, S: Stack> Graph<I, S, usize> {
+impl<I: Input> Graph<I, usize> {
     /// Write this parser as a Rust source file.
     /// # Errors
     /// If file creation or formatting fails.
@@ -482,7 +454,7 @@ impl<I: Input, S: Stack> Graph<I, S, usize> {
     pub fn to_file<P: AsRef<OsStr> + AsRef<Path>>(
         &self,
         path: P,
-    ) -> Result<io::Result<()>, IllFormed<I, S, usize>> {
+    ) -> Result<io::Result<()>, IllFormed<I, usize>> {
         self.to_src().map(|src| {
             fs::write(&path, src)?;
             Command::new("rustfmt").arg(path).output().map(|_| {})

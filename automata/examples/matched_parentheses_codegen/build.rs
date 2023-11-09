@@ -1,52 +1,7 @@
-use core::iter;
-use inator_automata::{
-    update, Action, CurryInput, CurryStack, Deterministic, IllFormed, Range, RangeMap, State,
-    Transition,
-};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    io,
-};
-use symbols::Symbol;
+use inator_automata::{dyck_d, IllFormed};
+use std::io;
 
-pub fn main() -> Result<io::Result<()>, IllFormed<char, Symbol, usize>> {
+pub fn main() -> Result<io::Result<()>, IllFormed<char, usize>> {
     // Very manually constructed parser recognizing only valid parentheses.
-    let parser = Deterministic {
-        states: vec![State {
-            transitions: CurryStack {
-                wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                    entries: iter::once((
-                        Range::unit('('),
-                        Transition {
-                            dst: 0,
-                            update: update!(|(), _| ()),
-                            act: Action::Push(Symbol::Paren),
-                        },
-                    ))
-                    .collect(),
-                })),
-                map_none: None,
-                map_some: iter::once((
-                    Symbol::Paren,
-                    CurryInput::Scrutinize(RangeMap {
-                        entries: iter::once((
-                            Range::unit(')'),
-                            Transition {
-                                dst: 0,
-                                update: update!(|(), _| ()),
-                                act: Action::Pop,
-                            },
-                        ))
-                        .collect(),
-                    }),
-                ))
-                .collect(),
-            },
-            non_accepting: BTreeSet::new(),
-        }],
-        initial: 0,
-        tags: BTreeMap::new(),
-    };
-
-    parser.to_file("src/parser.rs")
+    dyck_d().to_file("src/parser.rs")
 }

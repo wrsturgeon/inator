@@ -16,8 +16,7 @@
 /////////////_________________________________________________________________________________/////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-//! An evil parsing library.
-
+#![doc = include_str!("../README.md")]
 #![deny(warnings)]
 #![allow(unknown_lints)]
 #![warn(
@@ -165,7 +164,7 @@ mod test;
 
 pub use {
     fixpoint::{fixpoint, Fixpoint},
-    inator_automata::*,
+    inator_automata::{Deterministic as Parser, *},
     recurse::{recurse, Recurse},
 };
 
@@ -178,14 +177,10 @@ use quickcheck as _; // <-- TODO: remove if we write some implementations
 /// Parser that accepts only the empty string.
 #[inline]
 #[must_use]
-pub fn empty<I: Input, S: Stack>() -> Deterministic<I, S> {
+pub fn empty<I: Input>() -> Deterministic<I> {
     Graph {
         states: vec![State {
-            transitions: CurryStack {
-                wildcard: None,
-                map_none: None,
-                map_some: BTreeMap::new(),
-            },
+            transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
             non_accepting: BTreeSet::new(),
         }],
         initial: 0,
@@ -196,15 +191,11 @@ pub fn empty<I: Input, S: Stack>() -> Deterministic<I, S> {
 /// Accept exactly this token and do exactly these things.
 #[inline]
 #[must_use]
-pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Deterministic<I, S> {
+pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> {
     Graph {
         states: vec![
             State {
-                transitions: CurryStack {
-                    wildcard: None,
-                    map_none: None,
-                    map_some: BTreeMap::new(),
-                },
+                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
                 non_accepting: BTreeSet::new(),
             },
             State {
@@ -214,21 +205,9 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Determi
                     range.last.to_src(),
                 ))
                 .collect(),
-                transitions: CurryStack {
-                    wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                        entries: iter::once((
-                            range,
-                            Transition {
-                                dst: 0,
-                                act: Action::Local,
-                                update,
-                            },
-                        ))
-                        .collect(),
-                    })),
-                    map_none: None,
-                    map_some: BTreeMap::new(),
-                },
+                transitions: Curry::Scrutinize(RangeMap(
+                    iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
+                )),
             },
         ],
         initial: 1,
@@ -239,20 +218,20 @@ pub fn any_of<I: Input, S: Stack>(range: Range<I>, update: Update<I>) -> Determi
 /// Accept exactly this token and do exactly these things.
 #[inline]
 #[must_use]
-pub fn tok<I: Input, S: Stack>(token: I, update: Update<I>) -> Deterministic<I, S> {
+pub fn tok<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
     any_of(Range::unit(token), update)
 }
 
 /// Accept exactly this token and do nothing.
 #[inline]
 #[must_use]
-pub fn toss<I: Input, S: Stack>(token: I) -> Deterministic<I, S> {
+pub fn toss<I: Input>(token: I) -> Deterministic<I> {
     tok(token, update!(|(), _| {}))
 }
 
 /// Accept exactly this token and do nothing.
 #[inline]
 #[must_use]
-pub fn toss_range<I: Input, S: Stack>(range: Range<I>) -> Deterministic<I, S> {
+pub fn toss_range<I: Input>(range: Range<I>) -> Deterministic<I> {
     any_of(range, update!(|(), _| {}))
 }

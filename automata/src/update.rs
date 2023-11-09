@@ -6,7 +6,7 @@
 
 //! A single-argument Rust function callable both in `build.rs` and in a source file.
 
-use crate::{Input, ToSrc};
+use crate::{Ctrl, IllFormed, Input, ToSrc};
 use core::{cmp, fmt, marker::PhantomData};
 
 /// A single-argument Rust function callable both in `build.rs` and in a source file.
@@ -33,6 +33,17 @@ impl<I: Input> Update<I> {
             ghost: PhantomData,
             src,
         }
+    }
+
+    /// Check types.
+    /// # Errors
+    /// If the argument type doesn't match the function's expected input type.
+    #[inline]
+    pub fn invoke<C: Ctrl<I>>(&self, input_t: &str) -> Result<String, IllFormed<I, C>> {
+        input_t
+            .eq(&self.input_t)
+            .then(|| self.output_t.clone())
+            .ok_or_else(|| IllFormed::TypeMismatch(input_t.to_owned(), self.input_t.clone()))
     }
 }
 

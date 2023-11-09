@@ -5,7 +5,7 @@ use std::io;
 
 type I = u8;
 
-fn main() -> Result<io::Result<()>, IllFormed<I, types::Stack, usize>> {
+fn main() -> Result<io::Result<()>, IllFormed<I, usize>> {
     let empty = toss(b'\x20') | toss(b'\x0A') | toss(b'\x0D') | toss(b'\x09');
 
     let parser = empty;

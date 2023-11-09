@@ -52,14 +52,14 @@ fn main() {
     let mut rng = thread_rng();
 
     // Accept all valid strings
-    for _ in 0..10 {
+    for _ in 0..50 {
         let s = generate(&mut rng, 32);
         println!("\"{s}\"");
         assert_eq!(parser::parse(s.chars()), Ok(()));
     }
 
     // Reject all invalid strings
-    for _ in 0..10 {
+    for _ in 0..50 {
         let s = shitpost(&mut rng);
         println!("\"{s}\"");
         if accept(s.chars()) {

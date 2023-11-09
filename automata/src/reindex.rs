@@ -9,14 +9,14 @@
 use crate::*;
 use std::collections::BTreeMap;
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
+impl<I: Input, C: Ctrl<I>> State<I, C> {
     /// Update index "pointers" in response to a reordered array.
     #[inline]
     #[must_use]
     pub fn reindex(
         &self,
-        states: &[State<I, S, C>],
-        index_map: &BTreeMap<usize, State<I, S, C>>,
+        states: &[State<I, C>],
+        index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
         State {
             transitions: self.transitions.reindex(states, index_map),
@@ -25,81 +25,71 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> State<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryStack<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     /// Update index "pointers" in response to a reordered array.
     #[inline]
     #[must_use]
     pub fn reindex(
         &self,
-        states: &[State<I, S, C>],
-        index_map: &BTreeMap<usize, State<I, S, C>>,
-    ) -> Self {
-        CurryStack {
-            wildcard: self.wildcard.as_ref().map(|w| w.reindex(states, index_map)),
-            map_none: self.map_none.as_ref().map(|m| m.reindex(states, index_map)),
-            map_some: self
-                .map_some
-                .iter()
-                .map(|(k, v)| (k.clone(), v.reindex(states, index_map)))
-                .collect(),
-        }
-    }
-}
-
-impl<I: Input, S: Stack, C: Ctrl<I, S>> CurryInput<I, S, C> {
-    /// Update index "pointers" in response to a reordered array.
-    #[inline]
-    #[must_use]
-    pub fn reindex(
-        &self,
-        states: &[State<I, S, C>],
-        index_map: &BTreeMap<usize, State<I, S, C>>,
+        states: &[State<I, C>],
+        index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
         match *self {
-            CurryInput::Wildcard(ref etc) => CurryInput::Wildcard(etc.reindex(states, index_map)),
-            CurryInput::Scrutinize(ref etc) => {
-                CurryInput::Scrutinize(etc.reindex(states, index_map))
-            }
+            Curry::Wildcard(ref etc) => Curry::Wildcard(etc.reindex(states, index_map)),
+            Curry::Scrutinize(ref etc) => Curry::Scrutinize(etc.reindex(states, index_map)),
         }
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> RangeMap<I, S, C> {
+impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     /// Update index "pointers" in response to a reordered array.
     #[inline]
     #[must_use]
     pub fn reindex(
         &self,
-        states: &[State<I, S, C>],
-        index_map: &BTreeMap<usize, State<I, S, C>>,
+        states: &[State<I, C>],
+        index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
-        RangeMap {
-            entries: self
-                .entries
+        RangeMap(
+            self.0
                 .iter()
                 .map(|(k, v)| (k.clone(), v.reindex(states, index_map)))
                 .collect(),
-        }
+        )
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Transition<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Update index "pointers" in response to a reordered array.
     #[inline]
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn reindex(
         &self,
-        states: &[State<I, S, C>],
-        index_map: &BTreeMap<usize, State<I, S, C>>,
+        states: &[State<I, C>],
+        index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
-        Transition {
-            dst: self
-                .dst
-                .clone()
-                .map_indices(|i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))))),
-            act: self.act.clone(),
-            update: self.update.clone(),
+        let update_fn = |i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))));
+        match *self {
+            Self::Lateral {
+                ref dst,
+                ref update,
+            } => Self::Lateral {
+                dst: dst.clone().map_indices(update_fn),
+                update: update.clone(),
+            },
+            Self::Call {
+                region,
+                ref detour,
+                ref dst,
+                ref combine,
+            } => Self::Call {
+                region,
+                detour: detour.clone().map_indices(update_fn),
+                dst: dst.clone().map_indices(update_fn),
+                combine: combine.clone(),
+            },
+            Self::Return { region } => Self::Return { region },
         }
     }
 }
