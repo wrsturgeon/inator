@@ -17,7 +17,7 @@ pub struct Recurse(String);
 
 /// Check if this state corresponds to an accepting state.
 #[inline]
-fn will_accept(
+fn accepting(
     r: Result<usize, &str>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
@@ -131,7 +131,6 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-#[allow(clippy::todo)] // <-- FIXME
 fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
     s: Transition<I, C>,
     r: &Recurse,
@@ -139,21 +138,22 @@ fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
     accepting_tags: &BTreeSet<String>,
 ) -> Transition<I, BTreeSet<Result<usize, String>>> {
     match s {
-        Transition::Lateral { dst, update } => {
-            let good = dst
-                .view()
-                .any(|rs| will_accept(rs, accepting_indices, accepting_tags));
-            let iter = dst.view().map(|rs| rs.map_err(str::to_owned));
-            Transition::Lateral {
-                dst: if good {
-                    iter.chain(iter::once(Err(r.0.clone()))).collect()
-                } else {
-                    iter.collect()
-                },
-                update,
-            }
-        }
-        Transition::Call { .. } | Transition::Return { .. } => todo!(),
+        Transition::Lateral { ref dst, update } => Transition::Lateral {
+            dst: add_tail_call_c(dst, r, accepting_indices, accepting_tags),
+            update,
+        },
+        Transition::Call {
+            region,
+            ref detour,
+            ref dst,
+            combine,
+        } => Transition::Call {
+            region,
+            detour: add_tail_call_c(detour, r, accepting_indices, accepting_tags),
+            dst: add_tail_call_c(dst, r, accepting_indices, accepting_tags),
+            combine,
+        },
+        Transition::Return { region } => Transition::Return { region },
     }
 }
 
@@ -161,4 +161,24 @@ fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
 #[inline]
 pub fn recurse(call_by_name: &str) -> Recurse {
     Recurse(call_by_name.to_owned())
+}
+
+/// Add a tail call only to accepting states.
+#[inline]
+#[must_use]
+fn add_tail_call_c<I: Input, C: Ctrl<I>>(
+    c: &C,
+    r: &Recurse,
+    accepting_indices: &BTreeSet<usize>,
+    accepting_tags: &BTreeSet<String>,
+) -> BTreeSet<Result<usize, String>> {
+    let accepts = c
+        .view()
+        .any(|rs| accepting(rs, accepting_indices, accepting_tags));
+    let iter = c.view().map(|rs| rs.map_err(str::to_owned));
+    if accepts {
+        iter.chain(iter::once(Err(r.0.clone()))).collect()
+    } else {
+        iter.collect()
+    }
 }

@@ -99,7 +99,7 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.
         if s.initial.iter().any(|r| {
-            will_accept(
+            accepting(
                 r.as_ref().map_or_else(|st| Err(st.as_str()), |&i| Ok(i)),
                 &accepting_indices,
                 &accepting_tags,
@@ -192,34 +192,35 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-#[allow(clippy::needless_pass_by_value, clippy::todo)] // <-- FIXME
 fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
-    _s: Transition<I, C>,
-    _other_init: &BTreeSet<Result<usize, String>>,
-    _accepting_indices: &BTreeSet<usize>,
-    _accepting_tags: &BTreeSet<String>,
+    s: Transition<I, C>,
+    other_init: &BTreeSet<Result<usize, String>>,
+    accepting_indices: &BTreeSet<usize>,
+    accepting_tags: &BTreeSet<String>,
 ) -> Transition<I, BTreeSet<Result<usize, String>>> {
-    // let good = s
-    //     .dst
-    //     .view()
-    //     .any(|result| will_accept(result, accepting_indices, accepting_tags));
-    // let iter = s.dst.view().map(|result| result.map_err(str::to_owned));
-    // let dst = if good {
-    //     iter.chain(other_init.iter().cloned()).collect()
-    // } else {
-    //     iter.collect()
-    // };
-    // Transition {
-    //     dst,
-    //     act: s.act,
-    //     update: s.update,
-    // }
-    todo!()
+    match s {
+        Transition::Lateral { ref dst, update } => Transition::Lateral {
+            dst: add_tail_call_c(dst, other_init, accepting_indices, accepting_tags),
+            update,
+        },
+        Transition::Call {
+            region,
+            ref detour,
+            ref dst,
+            combine,
+        } => Transition::Call {
+            region,
+            detour: add_tail_call_c(detour, other_init, accepting_indices, accepting_tags),
+            dst: add_tail_call_c(dst, other_init, accepting_indices, accepting_tags),
+            combine,
+        },
+        Transition::Return { region } => Transition::Return { region },
+    }
 }
 
 /// Check if this state corresponds to an accepting state.
 #[inline]
-fn will_accept(
+fn accepting(
     r: Result<usize, &str>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
@@ -227,5 +228,25 @@ fn will_accept(
     match r {
         Ok(i) => accepting_indices.contains(&i),
         Err(tag) => accepting_tags.contains(tag),
+    }
+}
+
+/// Add a tail call only to accepting states.
+#[inline]
+#[must_use]
+fn add_tail_call_c<I: Input, C: Ctrl<I>>(
+    c: &C,
+    other_init: &BTreeSet<Result<usize, String>>,
+    accepting_indices: &BTreeSet<usize>,
+    accepting_tags: &BTreeSet<String>,
+) -> BTreeSet<Result<usize, String>> {
+    let accepts = c
+        .view()
+        .any(|rs| accepting(rs, accepting_indices, accepting_tags));
+    let iter = c.view().map(|rs| rs.map_err(str::to_owned));
+    if accepts {
+        iter.chain(other_init.iter().cloned()).collect()
+    } else {
+        iter.collect()
     }
 }
