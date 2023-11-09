@@ -174,28 +174,11 @@ macro_rules! never {
 }
 */
 
-/// One-argument function.
-#[macro_export]
-macro_rules! f {
-    ($ex:expr) => {
-        $crate::F::_from_macro(stringify!($ex).to_owned(), $ex)
-    };
-}
-
-/// Two-argument function.
-#[macro_export]
-macro_rules! ff {
-    ($ex:expr) => {
-        $crate::FF::_from_macro(stringify!($ex).to_owned(), $ex)
-    };
-}
-
 // TODO: derive ToSrc
 
 // TODO: Macro that isn't context-aware but just dumps the codegen right there
 
 mod call;
-mod f;
 mod fixpoint;
 mod num;
 mod recurse;

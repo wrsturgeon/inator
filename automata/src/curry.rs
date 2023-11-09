@@ -112,15 +112,6 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
         }
     }
 
-    /// All values in this collection, without their associated keys.
-    #[inline]
-    pub fn values_mut(&mut self) -> Box<dyn '_ + Iterator<Item = &mut Transition<I, S, C>>> {
-        match *self {
-            Self::Wildcard(ref mut etc) => Box::new(iter::once(etc)),
-            Self::Scrutinize(ref mut etc) => Box::new(etc.values_mut()),
-        }
-    }
-
     /// Remove an entry by key.
     /// # Panics
     /// If we ask to remove a wildcard but it's a specific value, or vice-versa.

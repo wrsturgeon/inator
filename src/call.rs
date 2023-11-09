@@ -9,7 +9,6 @@
 use crate::{F, FF};
 use core::{iter, ops};
 use inator_automata::*;
-use std::collections::{BTreeMap, BTreeSet};
 
 /// Save the current value, run this second parser from scratch, then combine the results.
 pub struct Call<I: Input, S: Stack> {

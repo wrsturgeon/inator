@@ -174,6 +174,17 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
         }
     }
 
+    /// Compute the input type of any run that reaches this state.
+    #[inline]
+    #[must_use]
+    pub fn output_type(&self) -> Option<&str> {
+        match *self {
+            Self::Lateral { ref update, .. } => Some(&update.output_t),
+            Self::Call { ref combine, .. } => Some(&combine.output_t),
+            Self::Return { .. } => None,
+        }
+    }
+
     /// Immediate next destination (as a state index).
     /// For local transitions, it's what you would expect.
     /// For calls, it's both the call and the continuation after the call.

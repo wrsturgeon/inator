@@ -109,8 +109,8 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transition<I, S, C>> {
-        self.entries.values_mut()
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transition<I, C>> {
+        self.0.values_mut()
     }
 
     /// Remove an entry by key.
@@ -118,12 +118,6 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     pub fn remove(&mut self, key: &Range<I>) {
         self.0
             .retain(|k, _| key.clone().intersection(k.clone()).is_none());
-    }
-
-    /// All values in this collection, without their associated keys.
-    #[inline]
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transition<I, C>> {
-        self.0.values_mut()
     }
 }
 

@@ -295,21 +295,15 @@ pub fn parse<I: IntoIterator<Item = {token_t}>>(input: I) -> Result<{output_t}, 
 impl<I: Input> State<I, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
-<<<<<<< HEAD
     fn to_src(
         &self,
         i: usize,
         all_states: &[Self],
         all_tags: &BTreeMap<String, usize>,
-    ) -> Result<String, IllFormed<I, S, usize>> {
-        let input_t = self.input_type(all_states, all_tags)?.unwrap_or_else(|| {
-            "core::convert::Infallible"
-                // "()"
-                .to_owned()
-        });
-=======
-    fn to_src(&self, i: usize) -> Result<String, IllFormed<I, usize>> {
-        let input_t = self.input_type()?.unwrap_or("core::convert::Infallible");
+    ) -> Result<String, IllFormed<I, usize>> {
+        let input_t = self
+            .input_type(all_states, all_tags)?
+            .unwrap_or("core::convert::Infallible");
         let token_t = I::src_type();
         let on_some = self.transitions.to_src();
         let on_none = self.non_accepting.first().map_or_else(
@@ -333,7 +327,6 @@ impl<I: Input> State<I, usize> {
                     + "] })"
             },
         );
->>>>>>> main
         Ok(format!(
             r#"
 
@@ -387,22 +380,11 @@ impl<I: Input> Transition<I, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
     #[must_use]
-<<<<<<< HEAD
-    #[allow(clippy::todo)] // TODO: what the fuck does the last case mean?
-    fn to_src(&self, stack_symbol: Option<Option<&str>>) -> String {
-        let dst = self.dst;
-        let f = self.update.src.as_str();
-        match self.act {
-            Action::Local => format!(
-                r#"match state_{dst}(input, context, ({f})(acc, token))? {{
-                (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
-                (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
-=======
     fn to_src(&self) -> String {
         match *self {
             Self::Lateral {
                 dst,
-                update: Update { src, .. },
+                update: Update { ref src, .. },
             } => format!("state_{dst}(input, ({src})(acc, token), stack_top)"),
             Self::Call {
                 region,
@@ -414,7 +396,6 @@ impl<I: Input> Transition<I, usize> {
                 let detour = state_{detour}(input, (), Some(({}, index)))?;
                 let postprocessed = ({src})(acc, detour);
                 state_{dst}(input, postprocessed, stack_top)
->>>>>>> main
             }}"#,
                 region.to_src(),
             ),
@@ -444,16 +425,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Graph<I, C> {
     }
     #[inline]
     fn src_type() -> String {
-<<<<<<< HEAD
-        format!(
-            "Graph::<{}, {}, {}>",
-            I::src_type(),
-            S::src_type(),
-            C::src_type(),
-        )
-=======
         format!("Nondeterministic::<{}>", I::src_type())
->>>>>>> main
     }
 }
 
@@ -604,17 +576,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Transition<I, C> {
 impl<I: Input> ToSrc for Update<I> {
     #[inline]
     fn to_src(&self) -> String {
-<<<<<<< HEAD
-        // format!(
-        //     "Update {{ input_t: {}, output_t: {}, ghost: PhantomData, src: {} }}",
-        //     self.input_t.to_src(),
-        //     self.output_t.to_src(),
-        //     self.src.to_src(),
-        // )
-        format!("update!({})", self.src.escape_default())
-=======
         format!("update!({})", self.src.to_src())
->>>>>>> main
     }
     #[inline]
     fn src_type() -> String {
