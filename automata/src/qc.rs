@@ -174,7 +174,7 @@ shrink_only!(|self: &Transition| {
                         input_t: "()".to_owned(),
                         output_t: "()".to_owned(),
                         ghost: PhantomData,
-                        src: "/* FAKE SOURCE CODE */",
+                        src: "/* FAKE SOURCE CODE */".to_owned(),
                     },
                 }
                 .shrink()

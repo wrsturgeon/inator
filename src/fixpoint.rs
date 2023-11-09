@@ -6,6 +6,7 @@
 
 //! Fixpoint: just a tagged state that can be called later.
 
+use crate::call::Call;
 use core::ops;
 use inator_automata::*;
 
@@ -31,6 +32,16 @@ impl<I: Input> ops::Shr<Deterministic<I>> for Fixpoint<I> {
             panic!("Fixpoint name already in use");
         }
         rhs
+    }
+}
+
+impl<I: Input> ops::Shr<Call<I>> for Fixpoint<I> {
+    type Output = Deterministic<I>;
+    #[inline]
+    #[allow(clippy::todo)] // <-- FIXME
+    #[allow(clippy::arithmetic_side_effects, clippy::manual_assert, clippy::panic)]
+    fn shr(self, rhs: Call<I>) -> Self::Output {
+        self.etc.unwrap_or_else(|| todo!()) >> rhs
     }
 }
 

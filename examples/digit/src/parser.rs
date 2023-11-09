@@ -15,19 +15,17 @@ pub enum Error {
     },
     /// Token that would have closed a delimiter, but the delimiter wasn't open.
     Unopened {
+        /// What was actually open, if anything, and the index of the token that opened it.
+        what_was_open: Option<(&'static str, usize)>,
         /// Index of the token that caused this error.
         index: usize,
-        /// Type of thing that wasn't opened (e.g. parentheses).
-        delimiter: (),
-        /// What actually was open (e.g. you tried to close parentheses, but a bracket was open).
-        instead: Option<()>,
     },
     /// After parsing all input, a delimiter remains open (e.g. "(a, b, c").
     Unclosed {
+        /// Region (user-defined name) that was not closed. Sensible to be e.g. "parentheses" for `(...)`.
+        region: &'static str,
         /// Index at which the delimiter was opened (e.g., for parentheses, the index of the relevant '(').
         opened: usize,
-        /// Type of thing that wasn't closed (e.g. parentheses).
-        delimiter: (),
     },
     /// Ended on a user-defined non-accepting state.
     UserDefined {
@@ -36,47 +34,44 @@ pub enum Error {
     },
 }
 
-type R<I> = Result<(Option<(usize, (), Option<F<I>>)>, u8), Error>;
+type R<I> = Result<(Option<(usize, Option<F<I>>)>, u8), Error>;
 
 #[repr(transparent)]
-struct F<I>(fn(&mut I, Option<()>, u8) -> R<I>);
+struct F<I>(fn(&mut I, u8) -> R<I>);
 
 #[inline]
 pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<u8, Error> {
-    match state_1(&mut input.into_iter().enumerate(), None, Default::default())? {
-        (None, out) => Ok(out),
-        (Some((index, context, None)), out) => panic!("Some(({index:?}, {context:?}, None))"),
-        (Some((index, delimiter, Some(F(_)))), _) => Err(Error::Unopened {
-            index,
-            delimiter,
-            instead: None,
-        }),
-    }
+    state_1(&mut input.into_iter().enumerate(), (), None)
 }
 
 #[inline]
-fn state_0<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: u8) -> R<I> {
+fn state_0<I: Iterator<Item = (usize, u8)>>(
+    input: &mut I,
+    acc: u8,
+    stack_top: Option<(&'static str, usize)>,
+) -> Result<u8, Error> {
     match input.next() {
-        None => Ok((None, acc)),
-        Some((index, token)) => match (&context, &token) {
+        None => stack_top.map_or(Ok(acc), |(region, opened)| {
+            Err(Error::Unclosed { region, opened })
+        }),
+        Some((index, token)) => match token {
             _ => Err(Error::Absurd { index, token }),
         },
     }
 }
 
 #[inline]
-fn state_1<I: Iterator<Item = (usize, u8)>>(input: &mut I, context: Option<()>, acc: ()) -> R<I> {
+fn state_1<I: Iterator<Item = (usize, u8)>>(
+    input: &mut I,
+    acc: (),
+    stack_top: Option<(&'static str, usize)>,
+) -> Result<(), Error> {
     match input.next() {
         None => Err(Error::UserDefined {
             messages: &["Expected a token in the range [b\'0\'..=b\'9\'] but input ended"],
         }),
-        Some((index, token)) => match (&context, &token) {
-            (&_, &(b'0'..=b'9')) => {
-                match state_0(input, context, (|(), i| i - b'0')(acc, token))? {
-                    (done @ (None | Some((_, _, None))), acc) => Ok((done, acc)),
-                    (Some((idx, ctx, Some(F(f)))), out) => f(input, Some(ctx), out),
-                }
-            }
+        Some((index, token)) => match token {
+            b'0'..=b'9' => state_0(input, (|(), i| i - b'0')(acc, token), stack_top),
             _ => Err(Error::Absurd { index, token }),
         },
     }

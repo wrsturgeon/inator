@@ -13,7 +13,7 @@ use inator_automata::*;
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn digit<S: Stack>() -> Deterministic<u8, S> {
+pub fn digit() -> Deterministic<u8> {
     any_of(
         Range {
             first: b'0',
@@ -27,7 +27,7 @@ pub fn digit<S: Stack>() -> Deterministic<u8, S> {
 #[inline]
 #[must_use]
 #[allow(clippy::arithmetic_side_effects)]
-pub fn integer<S: Stack>() -> Deterministic<u8, S> {
+pub fn integer() -> Deterministic<u8> {
     digit()
         >> f!(|i: u8| Some(usize::from(i)))
         >> fixpoint("integer")

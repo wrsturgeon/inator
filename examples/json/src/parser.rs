@@ -34,22 +34,22 @@ pub enum Error {
     },
 }
 
-type R<I> = Result<(Option<(usize, Option<F<I>>)>, core::convert::Infallible), Error>;
+type R<I> = Result<(Option<(usize, Option<F<I>>)>, ()), Error>;
 
 #[repr(transparent)]
-struct F<I>(fn(&mut I, core::convert::Infallible) -> R<I>);
+struct F<I>(fn(&mut I, ()) -> R<I>);
 
 #[inline]
-pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<core::convert::Infallible, Error> {
+pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
     state_1(&mut input.into_iter().enumerate(), (), None)
 }
 
 #[inline]
 fn state_0<I: Iterator<Item = (usize, u8)>>(
     input: &mut I,
-    acc: core::convert::Infallible,
+    acc: (),
     stack_top: Option<(&'static str, usize)>,
-) -> Result<core::convert::Infallible, Error> {
+) -> Result<(), Error> {
     match input.next() {
         None => stack_top.map_or(Ok(acc), |(region, opened)| {
             Err(Error::Unclosed { region, opened })
@@ -67,7 +67,14 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
     stack_top: Option<(&'static str, usize)>,
 ) -> Result<(), Error> {
     match input.next() {
-        None => Err(Error::UserDefined { messages: &["Expected only a single token on [b\' \'..=b\' \'] but got another token after it", "Expected only a single token on [b\'\\n\'..=b\'\\n\'] but got another token after it", "Expected only a single token on [b\'\\r\'..=b\'\\r\'] but got another token after it", "Expected only a single token on [b\'\\t\'..=b\'\\t\'] but got another token after it"] }),
+        None => Err(Error::UserDefined {
+            messages: &[
+                "Expected a token in the range [b\' \'..=b\' \'] but input ended",
+                "Expected a token in the range [b\'\\n\'..=b\'\\n\'] but input ended",
+                "Expected a token in the range [b\'\\r\'..=b\'\\r\'] but input ended",
+                "Expected a token in the range [b\'\\t\'..=b\'\\t\'] but input ended",
+            ],
+        }),
         Some((index, token)) => match token {
             b'\t'..=b'\t' => state_0(input, (|(), _| {})(acc, token), stack_top),
             b'\n'..=b'\n' => state_0(input, (|(), _| {})(acc, token), stack_top),

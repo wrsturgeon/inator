@@ -6,14 +6,15 @@
 
 //! Save the current value, run this second parser from scratch, then combine the results.
 
-use crate::{F, FF};
 use core::{iter, ops};
 use inator_automata::*;
+use std::collections::BTreeSet;
 
 /// Save the current value, run this second parser from scratch, then combine the results.
-pub struct Call<I: Input, S: Stack> {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Call<I: Input> {
     /// Parser to call.
-    parser: Deterministic<I, S>,
+    parser: Deterministic<I>,
     /// Combine the tabled result with the result of the call.
     combinator: FF,
 }
@@ -21,70 +22,71 @@ pub struct Call<I: Input, S: Stack> {
 /// Save the current value, run this second parser from scratch, then combine the results.
 #[inline]
 #[must_use]
-pub fn call<I: Input, S: Stack>(parser: Deterministic<I, S>, combinator: FF) -> Call<I, S> {
+pub const fn call<I: Input>(parser: Deterministic<I>, combinator: FF) -> Call<I> {
     Call { parser, combinator }
 }
 
-impl<I: Input, S: Stack> ops::Shr<Call<I, S>> for Deterministic<I, S> {
-    type Output = Self;
+impl<I: Input, C: Ctrl<I>> ops::Shr<Call<I>> for Graph<I, C> {
+    type Output = Deterministic<I>;
     #[inline]
     #[must_use]
     #[allow(clippy::panic)]
-    fn shr(self, Call { parser, combinator }: Call<I, S>) -> Self::Output {
-        let Ok(maybe_parser_input_t) = parser.input_type() else {
-            panic!("Inconsistent types in the parser argument to `combine`.")
-        };
-        let Some(parser_output_t) = maybe_parser_input_t else {
-            panic!(
+    fn shr(self, c: Call<I>) -> Self::Output {
+        let Call { parser, combinator } = c;
+        match parser.input_type() {
+            Err(e) => panic!("Inconsistent types in the parser argument to `combine`: {e}."),
+            Ok(None) => panic!(
                 "Parser argument to `combine` has no initial states, \
                 so it can never parse anything.",
-            )
-        };
-        if parser_output_t != "()" {
-            panic!(
+            ),
+            Ok(Some("()")) => {}
+            Ok(Some(non_unit)) => panic!(
                 "Called `call` with a parser that doesn't start from scratch \
-                (it wants an input of type `{parser_output_t}`, \
+                (it wants an input of type `{non_unit}`, \
                 but it should start from scratch with an input of type `()`)."
-            );
-        }
+            ),
+        };
 
         // From `automata/src/combinators.rs` (in the original `>>` implementation):
-        let s = self.generalize();
+        let mut s = self.generalize();
         let size = s.states.len();
         let Graph {
-            states: call_states,
+            states: call_states_d,
             initial: call_initial,
             tags: call_tags,
-        } = parser
-            .generalize()
-            .map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
-        assert_eq!(call_initial.len(), 1);
+        } = parser.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
+        let call_states: Vec<_> = call_states_d.into_iter().map(State::generalize).collect();
+        let call_init_nd: BTreeSet<_> = iter::once(Ok(call_initial)).collect();
 
-        let call_init = get!(call_states, unwrap!(unwrap!(call_initial.first())));
-        let init_trans = call_init.transitions.merge();
-        for state in s.states.iter_mut().filter(|&s| {
-            if s.non_accepting.is_empty() {
-                s.non_accepting = iter::once(todo!()).collect();
-                true
-            } else {
-                false
+        let mut at_least_one_accepting = false;
+        for state in &mut s.states {
+            if state.non_accepting.is_empty() {
+                // FIXME: This should be totally fine if the other transition is _also a call_
+                state.transitions = match state.transitions {
+                    Curry::Wildcard(_) => panic!("TODO: SPECIFY AN ERROR"),
+                    Curry::Scrutinize(ref map) => {
+                        if map.0.is_empty() {
+                            Curry::Wildcard(Transition::Call {
+                                region: "call", // <-- TODO
+                                detour: call_init_nd.clone(),
+                                dst: BTreeSet::new(),
+                                combine: combinator.clone(),
+                            })
+                        } else {
+                            panic!("TODO: SPECIFY AN ERROR");
+                        }
+                    }
+                };
+                at_least_one_accepting = true;
             }
-        }) {
-            state.transitions = state
-                .transitions
-                .merge(call_init.transitions)
-                .unwrap_or_else(|e| panic!("{e}"));
+        }
+        if !at_least_one_accepting {
+            panic!("TODO")
         }
 
         s.states.extend(call_states);
         s.tags.extend(call_tags);
 
-        // Split the accumulator into a passthrough unmodified first argument and a new modifiable second argument.
-        let split = F {
-            src: "|x| (x, ())".to_owned(),
-            arg_t: parser_output_t.clone(),
-            output_t: format!("({parser_output_t}, ())"),
-        };
-        let splat /* past tense */ = parser >> split;
+        s.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
 }

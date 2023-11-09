@@ -99,6 +99,7 @@
     clippy::wildcard_imports
 )]
 
+/*
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(any(debug_assertions, test))]
 macro_rules! unwrap {
@@ -135,7 +136,6 @@ macro_rules! get {
     }};
 }
 
-/*
 /// Unwrap if we're debugging but `unwrap_unchecked` if we're not.
 #[cfg(any(debug_assertions, test))]
 macro_rules! get_mut {
@@ -187,7 +187,7 @@ mod recurse;
 mod test;
 
 pub use {
-    f::{F, FF},
+    call::call,
     fixpoint::{fixpoint, Fixpoint},
     inator_automata::*,
     num::{digit, integer},
