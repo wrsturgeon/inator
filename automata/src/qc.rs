@@ -6,37 +6,10 @@
 
 //! `QuickCheck` implementations for various types.
 
-use crate::{
-    Action, Ctrl, CurryInput, CurryStack, Graph, Input, Range, RangeMap, Stack, State, Transition,
-    Update,
-};
-use core::{iter, num::NonZeroUsize};
+use crate::{Ctrl, Curry, Graph, Input, Range, RangeMap, State, Transition, Update, FF};
+use core::{iter, marker::PhantomData, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::{BTreeMap, BTreeSet};
-
-impl<S: Arbitrary + Stack> Arbitrary for Action<S> {
-    #[inline]
-    fn arbitrary(g: &mut Gen) -> Self {
-        match u8::arbitrary(g) % 3 {
-            0 => Self::Local,
-            1 => Self::Push(S::arbitrary(g)),
-            2 => Self::Pop,
-            _ => never!(),
-        }
-    }
-    #[inline]
-    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        match *self {
-            Self::Local => Box::new(iter::empty()),
-            Self::Pop => Box::new(iter::once(Self::Local)),
-            Self::Push(ref symbol) => Box::new(
-                [Self::Local, Self::Pop]
-                    .into_iter()
-                    .chain(symbol.shrink().map(Self::Push)),
-            ),
-        }
-    }
-}
 
 /// Sample a value uniformly below the maximum size allowed by a generator.
 #[inline]
@@ -45,7 +18,7 @@ fn within_size(g: &mut Gen) -> usize {
     usize::arbitrary(g) % NonZeroUsize::new(g.size()).expect("Zero-sized QuickCheck generator")
 }
 
-impl<S: Arbitrary + Stack, C: Arbitrary + Ctrl<u8, S>> Arbitrary for Graph<u8, S, C> {
+impl<C: Arbitrary + Ctrl<u8>> Arbitrary for Graph<u8, C> {
     #[inline]
     #[allow(clippy::arithmetic_side_effects)]
     fn arbitrary(g: &mut Gen) -> Self {
@@ -142,11 +115,7 @@ impl<I: 'static + Input> Arbitrary for Update<I> {
 /// Use when a value requires knowledge of the number of states in an automaton.
 macro_rules! shrink_only {
     (|$self:ident: &$t:ident| $body:expr) => {
-        impl<
-                S: Arbitrary + Stack,
-                C: Arbitrary + Ctrl<u8, S>,
-            > Arbitrary for $t<u8, S, C>
-        {
+        impl<C: Arbitrary + Ctrl<u8>> Arbitrary for $t<u8, C> {
             #[inline(always)]
             fn arbitrary(_: &mut Gen) -> Self {
                 never!()
@@ -168,26 +137,12 @@ shrink_only!(|self: &State| Box::new(
         })
 ));
 
-shrink_only!(|self: &CurryStack| Box::new(
-    (
-        self.wildcard.clone(),
-        self.map_none.clone(),
-        self.map_some.clone()
-    )
-        .shrink()
-        .map(|(wildcard, map_none, map_some)| Self {
-            wildcard,
-            map_none,
-            map_some
-        })
-));
+shrink_only!(|self: &RangeMap| Box::new(self.0.shrink().map(Self)));
 
-shrink_only!(|self: &RangeMap| Box::new(self.entries.shrink().map(|entries| Self { entries })));
-
-shrink_only!(|self: &CurryInput| match *self {
+shrink_only!(|self: &Curry| match *self {
     Self::Wildcard(ref etc) => Box::new(etc.shrink().map(Self::Wildcard)),
     Self::Scrutinize(ref etc) => Box::new(
-        etc.entries
+        etc.0
             .first_key_value()
             .map(|(_, transition)| Self::Wildcard(transition.clone()))
             .into_iter()
@@ -195,55 +150,60 @@ shrink_only!(|self: &CurryInput| match *self {
     ),
 });
 
-shrink_only!(|self: &Transition| Box::new(
-    (self.dst.clone(), self.act.clone(), self.update.clone())
-        .shrink()
-        .map(|(dst, act, update)| Self { dst, act, update })
-));
+shrink_only!(|self: &Transition| {
+    #[allow(clippy::shadow_unrelated, unreachable_code, unused_variables)]
+    match self.clone() {
+        Self::Return { region: _ } => Box::new(iter::empty()),
+        Self::Lateral { dst, update } => Box::new(
+            iter::once(Self::Return { region: "region" }).chain(
+                (dst, update)
+                    .shrink()
+                    .map(|(dst, update)| Self::Lateral { dst, update }),
+            ),
+        ),
+        Self::Call {
+            region: _,
+            detour,
+            dst,
+            combine,
+        } => {
+            Box::new(
+                Self::Lateral {
+                    dst: dst.clone(),
+                    update: Update {
+                        input_t: "()".to_owned(),
+                        output_t: "()".to_owned(),
+                        ghost: PhantomData,
+                        src: "/* FAKE SOURCE CODE */",
+                    },
+                }
+                .shrink()
+                .chain((detour, dst, combine).shrink().map(
+                    |(detour, dst, combine)| Self::Call {
+                        region: "region",
+                        detour,
+                        dst,
+                        combine,
+                    },
+                )),
+            )
+        }
+    }
+});
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> State<u8, S, C> {
+impl<C: Ctrl<u8>> State<u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
     pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
         Self {
-            transitions: CurryStack::arbitrary_given(n_states, g),
+            transitions: Curry::arbitrary_given(n_states, g),
             non_accepting: BTreeSet::arbitrary(g),
         }
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> CurryStack<u8, S, C> {
-    /// Construct an arbitrary value given an automaton with this many states.
-    #[inline]
-    #[must_use]
-    pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
-        let wildcard = bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g));
-        let mut map_none = bool::arbitrary(g).then(|| CurryInput::arbitrary_given(n_states, g));
-        let mut map_some: BTreeMap<_, _> = (0..within_size(g))
-            .map(|_| (S::arbitrary(g), CurryInput::arbitrary_given(n_states, g)))
-            .collect();
-        if let Some(ref wild) = wildcard {
-            for some in map_some.values_mut() {
-                while let Err((overlap, _, _)) = wild.disjoint(&*some) {
-                    some.remove(overlap);
-                }
-            }
-            if let Some(ref mut none) = map_none {
-                while let Err((overlap, _, _)) = wild.disjoint(none) {
-                    none.remove(overlap);
-                }
-            }
-        }
-        Self {
-            wildcard,
-            map_none,
-            map_some,
-        }
-    }
-}
-
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> CurryInput<u8, S, C> {
+impl<C: Ctrl<u8>> Curry<u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
@@ -256,7 +216,7 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> CurryInput<u8, S, C> {
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> RangeMap<u8, S, C> {
+impl<C: Ctrl<u8>> RangeMap<u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
@@ -279,19 +239,45 @@ impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> RangeMap<u8, S, C> {
         }) {
             drop(entries.remove(&key));
         }
-        Self { entries }
+        Self(entries)
     }
 }
 
-impl<S: Arbitrary + Stack, C: Ctrl<u8, S>> Transition<u8, S, C> {
+impl<C: Ctrl<u8>> Transition<u8, C> {
     /// Construct an arbitrary value given an automaton with this many states.
     #[inline]
     #[must_use]
+    #[allow(clippy::missing_panics_doc)]
     pub fn arbitrary_given(n_states: NonZeroUsize, g: &mut Gen) -> Self {
+        let choices: [fn(_, &mut _) -> _; 3] = [
+            |n, r| Self::Lateral {
+                dst: C::arbitrary_given(n, r),
+                update: Arbitrary::arbitrary(r),
+            },
+            |n, r| Self::Call {
+                region: "region",
+                detour: C::arbitrary_given(n, r),
+                dst: C::arbitrary_given(n, r),
+                combine: Arbitrary::arbitrary(r),
+            },
+            |_, _| Self::Return { region: "region" },
+        ];
+        g.choose(&choices).expect("impossible")(n_states, g)
+    }
+}
+
+impl Arbitrary for FF {
+    #[inline]
+    fn arbitrary(_: &mut Gen) -> Self {
         Self {
-            dst: C::arbitrary_given(n_states, g),
-            act: Action::arbitrary(g),
-            update: Update::arbitrary(g),
+            lhs_t: "()".to_owned(),
+            rhs_t: "()".to_owned(),
+            output_t: "()".to_owned(),
+            src: "|(), ()| ()".to_owned(),
         }
+    }
+    #[inline]
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(iter::empty())
     }
 }

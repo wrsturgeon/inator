@@ -17,7 +17,7 @@ pub struct Recurse(String);
 
 /// Check if this state corresponds to an accepting state.
 #[inline]
-fn will_accept(
+fn accepting(
     r: Result<usize, &str>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
@@ -28,8 +28,8 @@ fn will_accept(
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
-    type Output = Deterministic<I, S>;
+impl<I: Input, C: Ctrl<I>> ops::Shr<Recurse> for Graph<I, C> {
+    type Output = Deterministic<I>;
     #[inline]
     #[allow(clippy::panic)]
     fn shr(self, rhs: Recurse) -> Self::Output {
@@ -70,14 +70,14 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> ops::Shr<Recurse> for Graph<I, S, C> {
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: State<I, S, C>,
+fn add_tail_call_state<I: Input, C: Ctrl<I>>(
+    s: State<I, C>,
     r: &Recurse,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> State<I, S, BTreeSet<Result<usize, String>>> {
+) -> State<I, BTreeSet<Result<usize, String>>> {
     State {
-        transitions: add_tail_call_curry_stack(s.transitions, r, accepting_indices, accepting_tags),
+        transitions: add_tail_call_curry(s.transitions, r, accepting_indices, accepting_tags),
         non_accepting: s.non_accepting,
     }
 }
@@ -85,49 +85,20 @@ fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_curry_stack<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: CurryStack<I, S, C>,
+fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
+    s: Curry<I, C>,
     r: &Recurse,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> CurryStack<I, S, BTreeSet<Result<usize, String>>> {
-    CurryStack {
-        wildcard: s
-            .wildcard
-            .map(|w| add_tail_call_curry_input(w, r, accepting_indices, accepting_tags)),
-        map_none: s
-            .map_none
-            .map(|m| add_tail_call_curry_input(m, r, accepting_indices, accepting_tags)),
-        map_some: s
-            .map_some
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    k,
-                    add_tail_call_curry_input(v, r, accepting_indices, accepting_tags),
-                )
-            })
-            .collect(),
-    }
-}
-
-/// Add a tail call to any accepting state.
-#[inline]
-#[must_use]
-fn add_tail_call_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: CurryInput<I, S, C>,
-    r: &Recurse,
-    accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+) -> Curry<I, BTreeSet<Result<usize, String>>> {
     match s {
-        CurryInput::Wildcard(t) => CurryInput::Wildcard(add_tail_call_transition(
+        Curry::Wildcard(t) => Curry::Wildcard(add_tail_call_transition(
             t,
             r,
             accepting_indices,
             accepting_tags,
         )),
-        CurryInput::Scrutinize(rm) => CurryInput::Scrutinize(add_tail_call_range_map(
+        Curry::Scrutinize(rm) => Curry::Scrutinize(add_tail_call_range_map(
             rm,
             r,
             accepting_indices,
@@ -139,16 +110,14 @@ fn add_tail_call_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: RangeMap<I, S, C>,
+fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
+    s: RangeMap<I, C>,
     r: &Recurse,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> RangeMap<I, S, BTreeSet<Result<usize, String>>> {
-    RangeMap {
-        entries: s
-            .entries
-            .into_iter()
+) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
+    RangeMap(
+        s.0.into_iter()
             .map(|(k, v)| {
                 (
                     k,
@@ -156,32 +125,35 @@ fn add_tail_call_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
                 )
             })
             .collect(),
-    }
+    )
 }
 
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: Transition<I, S, C>,
+fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
+    s: Transition<I, C>,
     r: &Recurse,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> Transition<I, S, BTreeSet<Result<usize, String>>> {
-    let good = s
-        .dst
-        .view()
-        .any(|result| will_accept(result, accepting_indices, accepting_tags));
-    let iter = s.dst.view().map(|result| result.map_err(str::to_owned));
-    let dst = if good {
-        iter.chain(iter::once(Err(r.0.clone()))).collect()
-    } else {
-        iter.collect()
-    };
-    Transition {
-        dst,
-        act: s.act,
-        update: s.update,
+) -> Transition<I, BTreeSet<Result<usize, String>>> {
+    match s {
+        Transition::Lateral { ref dst, update } => Transition::Lateral {
+            dst: add_tail_call_c(dst, r, accepting_indices, accepting_tags),
+            update,
+        },
+        Transition::Call {
+            region,
+            ref detour,
+            ref dst,
+            combine,
+        } => Transition::Call {
+            region,
+            detour: add_tail_call_c(detour, r, accepting_indices, accepting_tags),
+            dst: add_tail_call_c(dst, r, accepting_indices, accepting_tags),
+            combine,
+        },
+        Transition::Return { region } => Transition::Return { region },
     }
 }
 
@@ -189,4 +161,24 @@ fn add_tail_call_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
 #[inline]
 pub fn recurse(call_by_name: &str) -> Recurse {
     Recurse(call_by_name.to_owned())
+}
+
+/// Add a tail call only to accepting states.
+#[inline]
+#[must_use]
+fn add_tail_call_c<I: Input, C: Ctrl<I>>(
+    c: &C,
+    r: &Recurse,
+    accepting_indices: &BTreeSet<usize>,
+    accepting_tags: &BTreeSet<String>,
+) -> BTreeSet<Result<usize, String>> {
+    let accepts = c
+        .view()
+        .any(|rs| accepting(rs, accepting_indices, accepting_tags));
+    let iter = c.view().map(|rs| rs.map_err(str::to_owned));
+    if accepts {
+        iter.chain(iter::once(Err(r.0.clone()))).collect()
+    } else {
+        iter.collect()
+    }
 }

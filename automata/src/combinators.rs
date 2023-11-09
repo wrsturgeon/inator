@@ -8,14 +8,11 @@
 
 #![allow(clippy::match_wild_err_arm, clippy::panic)]
 
-use crate::{
-    Ctrl, CurryInput, CurryStack, Deterministic, Graph, Input, Merge, RangeMap, Stack, State,
-    Transition,
-};
-use core::{iter, ops};
+use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition};
+use core::{iter, mem, ops};
 use std::collections::BTreeSet;
 
-impl<I: Input, S: Stack> ops::BitOr for Deterministic<I, S> {
+impl<I: Input> ops::BitOr for Deterministic<I> {
     type Output = Self;
     #[inline]
     fn bitor(self, rhs: Self) -> Self {
@@ -40,16 +37,14 @@ impl<I: Input, S: Stack> ops::BitOr for Deterministic<I, S> {
     }
 }
 
-impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
+impl<I: Input> ops::Shr<Self> for Deterministic<I> {
     type Output = Self;
     #[inline]
     fn shr(mut self, other: Self) -> Self::Output {
-        let rhs_init = {
-            let curry = &get!(other.states, other.initial).transitions;
-            curry.wildcard.clone().merge(curry.map_none.clone())
-        }
-        .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))))
-        .map(CurryInput::generalize);
+        let rhs_init = get!(other.states, other.initial)
+            .transitions
+            .clone()
+            .generalize();
 
         let accepting_indices =
             self.states
@@ -94,17 +89,17 @@ impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
         // For every transition that an empty stack can take from the initial state of the right-hand parser,
         // add that transition (only on the empty stack) to each accepting state of the left-hand parser.
         for state in &mut s.states {
-            state.transitions.map_none = state
-                .transitions
-                .map_none
-                .take()
-                .merge(rhs_init.clone())
-                .unwrap_or_else(|(a, b)| Some(a.merge(b).unwrap_or_else(|e| panic!("{e}"))));
+            state.transitions = mem::replace(
+                &mut state.transitions,
+                Curry::Wildcard(Transition::Return { region: "" }),
+            )
+            .merge(rhs_init.clone())
+            .unwrap_or_else(|e| panic!("{e}"));
         }
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.
         if s.initial.iter().any(|r| {
-            will_accept(
+            accepting(
                 r.as_ref().map_or_else(|st| Err(st.as_str()), |&i| Ok(i)),
                 &accepting_indices,
                 &accepting_tags,
@@ -131,14 +126,14 @@ impl<I: Input, S: Stack> ops::Shr for Deterministic<I, S> {
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: State<I, S, C>,
+fn add_tail_call_state<I: Input, C: Ctrl<I>>(
+    s: State<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> State<I, S, BTreeSet<Result<usize, String>>> {
+) -> State<I, BTreeSet<Result<usize, String>>> {
     State {
-        transitions: add_tail_call_curry_stack(
+        transitions: add_tail_call_curry(
             s.transitions,
             other_init,
             accepting_indices,
@@ -151,49 +146,20 @@ fn add_tail_call_state<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_curry_stack<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: CurryStack<I, S, C>,
+fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
+    s: Curry<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> CurryStack<I, S, BTreeSet<Result<usize, String>>> {
-    CurryStack {
-        wildcard: s
-            .wildcard
-            .map(|w| add_tail_call_curry_input(w, other_init, accepting_indices, accepting_tags)),
-        map_none: s
-            .map_none
-            .map(|m| add_tail_call_curry_input(m, other_init, accepting_indices, accepting_tags)),
-        map_some: s
-            .map_some
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    k,
-                    add_tail_call_curry_input(v, other_init, accepting_indices, accepting_tags),
-                )
-            })
-            .collect(),
-    }
-}
-
-/// Add a tail call to any accepting state.
-#[inline]
-#[must_use]
-fn add_tail_call_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: CurryInput<I, S, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
-    accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> CurryInput<I, S, BTreeSet<Result<usize, String>>> {
+) -> Curry<I, BTreeSet<Result<usize, String>>> {
     match s {
-        CurryInput::Wildcard(t) => CurryInput::Wildcard(add_tail_call_transition(
+        Curry::Wildcard(t) => Curry::Wildcard(add_tail_call_transition(
             t,
             other_init,
             accepting_indices,
             accepting_tags,
         )),
-        CurryInput::Scrutinize(rm) => CurryInput::Scrutinize(add_tail_call_range_map(
+        Curry::Scrutinize(rm) => Curry::Scrutinize(add_tail_call_range_map(
             rm,
             other_init,
             accepting_indices,
@@ -205,16 +171,14 @@ fn add_tail_call_curry_input<I: Input, S: Stack, C: Ctrl<I, S>>(
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: RangeMap<I, S, C>,
+fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
+    s: RangeMap<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> RangeMap<I, S, BTreeSet<Result<usize, String>>> {
-    RangeMap {
-        entries: s
-            .entries
-            .into_iter()
+) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
+    RangeMap(
+        s.0.into_iter()
             .map(|(k, v)| {
                 (
                     k,
@@ -222,38 +186,41 @@ fn add_tail_call_range_map<I: Input, S: Stack, C: Ctrl<I, S>>(
                 )
             })
             .collect(),
-    }
+    )
 }
 
 /// Add a tail call to any accepting state.
 #[inline]
 #[must_use]
-fn add_tail_call_transition<I: Input, S: Stack, C: Ctrl<I, S>>(
-    s: Transition<I, S, C>,
+fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
+    s: Transition<I, C>,
     other_init: &BTreeSet<Result<usize, String>>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
-) -> Transition<I, S, BTreeSet<Result<usize, String>>> {
-    let good = s
-        .dst
-        .view()
-        .any(|result| will_accept(result, accepting_indices, accepting_tags));
-    let iter = s.dst.view().map(|result| result.map_err(str::to_owned));
-    let dst = if good {
-        iter.chain(other_init.iter().cloned()).collect()
-    } else {
-        iter.collect()
-    };
-    Transition {
-        dst,
-        act: s.act,
-        update: s.update,
+) -> Transition<I, BTreeSet<Result<usize, String>>> {
+    match s {
+        Transition::Lateral { ref dst, update } => Transition::Lateral {
+            dst: add_tail_call_c(dst, other_init, accepting_indices, accepting_tags),
+            update,
+        },
+        Transition::Call {
+            region,
+            ref detour,
+            ref dst,
+            combine,
+        } => Transition::Call {
+            region,
+            detour: add_tail_call_c(detour, other_init, accepting_indices, accepting_tags),
+            dst: add_tail_call_c(dst, other_init, accepting_indices, accepting_tags),
+            combine,
+        },
+        Transition::Return { region } => Transition::Return { region },
     }
 }
 
 /// Check if this state corresponds to an accepting state.
 #[inline]
-fn will_accept(
+fn accepting(
     r: Result<usize, &str>,
     accepting_indices: &BTreeSet<usize>,
     accepting_tags: &BTreeSet<String>,
@@ -261,5 +228,25 @@ fn will_accept(
     match r {
         Ok(i) => accepting_indices.contains(&i),
         Err(tag) => accepting_tags.contains(tag),
+    }
+}
+
+/// Add a tail call only to accepting states.
+#[inline]
+#[must_use]
+fn add_tail_call_c<I: Input, C: Ctrl<I>>(
+    c: &C,
+    other_init: &BTreeSet<Result<usize, String>>,
+    accepting_indices: &BTreeSet<usize>,
+    accepting_tags: &BTreeSet<String>,
+) -> BTreeSet<Result<usize, String>> {
+    let accepts = c
+        .view()
+        .any(|rs| accepting(rs, accepting_indices, accepting_tags));
+    let iter = c.view().map(|rs| rs.map_err(str::to_owned));
+    if accepts {
+        iter.chain(other_init.iter().cloned()).collect()
+    } else {
+        iter.collect()
     }
 }

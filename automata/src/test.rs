@@ -9,7 +9,6 @@
     clippy::indexing_slicing,
     clippy::integer_division,
     clippy::panic,
-    clippy::todo,
     clippy::unreachable,
     clippy::unwrap_used
 )]
@@ -48,7 +47,7 @@ mod prop {
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            let d = Deterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into()));
+            let d = Deterministic::<u8>::arbitrary(&mut Gen::new(curved.into()));
             assert_eq!(d.check(), Ok(()), "{d:?}");
         }
     }
@@ -59,7 +58,7 @@ mod prop {
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            let nd = Nondeterministic::<u8, u8>::arbitrary(&mut Gen::new(curved.into()));
+            let nd = Nondeterministic::<u8>::arbitrary(&mut Gen::new(curved.into()));
             assert_eq!(nd.check(), Ok(()), "{nd:?}");
         }
     }
@@ -71,7 +70,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                State::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                State::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -82,30 +81,13 @@ mod prop {
     }
 
     #[test]
-    fn arbitrary_implies_check_curry_stack() {
+    fn arbitrary_implies_check_curry() {
         let gs = gen_size();
         let tests = qc_tests();
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                CurryStack::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
-                    curved,
-                    &mut Gen::new(curved.into())
-                )
-                .check(curved),
-                Ok(())
-            );
-        }
-    }
-
-    #[test]
-    fn arbitrary_implies_check_curry_input() {
-        let gs = gen_size();
-        let tests = qc_tests();
-        for size in 0..tests {
-            let curved = nz(2.max((gs * size * size) / (tests * tests)));
-            assert_eq!(
-                CurryInput::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                Curry::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -122,7 +104,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                RangeMap::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                RangeMap::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -139,7 +121,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Transition::<u8, u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                Transition::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -156,8 +138,8 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                <usize as Check<u8, u8, usize>>::check(
-                    &<usize as Ctrl<u8, u8>>::arbitrary_given(curved, &mut Gen::new(curved.into())),
+                <usize as Check<u8, usize>>::check(
+                    &<usize as Ctrl<u8>>::arbitrary_given(curved, &mut Gen::new(curved.into())),
                     curved
                 ),
                 Ok(())
@@ -174,10 +156,9 @@ mod prop {
             assert_eq!(
                 <BTreeSet<Result<usize, String>> as Check<
                     u8,
-                    u8,
                     BTreeSet<Result<usize, String>>,
                 >>::check(
-                    &<BTreeSet<Result<usize, String>> as Ctrl<u8, u8>>::arbitrary_given(
+                    &<BTreeSet<Result<usize, String>> as Ctrl<u8>>::arbitrary_given(
                         curved,
                         &mut Gen::new(curved.into())
                     ),
@@ -208,18 +189,18 @@ mod prop {
         // Determinization takes exactly as long as checking if determinzation will succeed,
         // and determinization is the only way to check a priori for runtime errors.
         // fn check_implies_no_runtime_errors(
-        //     nd: Nondeterministic<u8, u8>,
+        //     nd: Nondeterministic<u8>,
         //     input: Vec<u8>
         // ) -> bool {
         //     !matches!(nd.accept(input), Err(ParseError::BadParser(..)))
         // }
         //
-        // fn check_implies_determinize(nd: Nondeterministic<u8, u8>) -> bool {
+        // fn check_implies_determinize(nd: Nondeterministic<u8>) -> bool {
         //     nd.determinize().is_ok()
         // }
 
         fn determinize_implies_no_runtime_errors(
-            nd: Nondeterministic<u8, u8>,
+            nd: Nondeterministic<u8>,
             input: Vec<u8>
         ) -> bool {
             let Ok(d) = nd.determinize() else {
@@ -229,19 +210,22 @@ mod prop {
         }
 
         fn deterministic_implies_no_runtime_errors(
-            d: Deterministic<u8, u8>,
+            d: Deterministic<u8>,
             input: Vec<u8>
         ) -> bool {
             !matches!(d.accept(input), Err(ParseError::BadParser(..)))
         }
 
-        fn determinize_identity(d: Deterministic<u8, u8>, input: Vec<u8>) -> bool {
-            d.determinize().unwrap().accept(input.iter().copied()) == d.accept(input)
+        fn determinize_identity(d: Deterministic<u8>, input: Vec<u8>) -> bool {
+            let Ok(dd) = d.determinize() else {
+                return false;
+            };
+            dd.accept(input.iter().copied()) == d.accept(input)
         }
 
         fn union(
-            lhs: Deterministic<u8, u8>,
-            rhs: Deterministic<u8, u8>,
+            lhs: Deterministic<u8>,
+            rhs: Deterministic<u8>,
             input: Vec<u8>
         ) -> bool {
             let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
@@ -279,7 +263,7 @@ mod prop {
             }
         }
 
-        fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) -> bool {
+        fn sort(parser: Nondeterministic<u8>, input: Vec<u8>) -> bool {
             let pre = parser.accept(input.iter().copied());
             let mut sorted = parser;
             sorted.sort();
@@ -295,7 +279,7 @@ mod prop {
 
         // TODO: test that running sort twice does not decrease the number of states the second time.
 
-        fn shr(lhs: Deterministic<u8, u8>, rhs: Deterministic<u8, u8>, input: Vec<u8>) -> bool {
+        fn shr(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) -> bool {
             let splittable = (0..=input.len()).any(|i| {
                 lhs.accept(input[..i].iter().copied()).is_ok() &&
                 rhs.accept(input[i..].iter().copied()).is_ok()
@@ -315,655 +299,28 @@ mod prop {
 }
 
 mod reduced {
-    #![allow(clippy::print_stdout, clippy::use_debug)]
-
     use crate::*;
-    use core::iter;
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        panic,
-    };
 
-    fn determinize_implies_no_runtime_errors(nd: &Nondeterministic<u8, u8>, input: &[u8]) {
-        if let Ok(d) = nd.determinize() {
-            if let Err(ParseError::BadParser(e)) = d.accept(input.iter().copied()) {
-                panic!("{e:?}");
-            }
+    fn deterministic_implies_no_runtime_errors(d: &Deterministic<u8>, input: Vec<u8>) {
+        if let Err(ParseError::BadParser(e)) = d.accept(input) {
+            panic!("{e}");
         }
     }
 
-    fn union(glhs: &Nondeterministic<u8, u8>, grhs: &Nondeterministic<u8, u8>, input: &[u8]) {
-        let lhs = glhs.determinize().unwrap();
-        let rhs = grhs.determinize().unwrap();
-        if lhs.determinize().is_err() || rhs.determinize().is_err() {
-            return;
-        }
-        println!("{lhs:?}");
-        println!("union");
-        println!("{rhs:?}");
-        println!("yields");
-        let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
-            return;
+    fn determinize_identity(d: &Deterministic<u8>, input: Vec<u8>) {
+        let dd = match d.determinize() {
+            Ok(dd) => dd,
+            Err(e) => panic!("{e}"),
         };
-        println!("{union:?}");
-        println!();
-        assert_eq!(union.check(), Ok(()));
-        if union.determinize().is_err() {
-            return;
-        }
-        let union_accept = union.accept(input.iter().copied());
-        if let Err(ParseError::BadParser(err)) = union_accept {
-            panic!("{err:?}");
-        }
-        match (
-            lhs.accept(input.iter().copied()),
-            rhs.accept(input.iter().copied()),
-        ) {
-            (Ok(a), Ok(b)) => {
-                if a == b {
-                    assert_eq!(union_accept, Ok(a));
-                } else {
-                    assert!(matches!(union_accept, Err(ParseError::BadParser(..))));
-                }
-            }
-            (Err(e), Ok(out)) | (Ok(out), Err(e)) => match e {
-                ParseError::BadInput(..) => assert_eq!(union_accept, Ok(out)),
-                ParseError::BadParser(..) => unreachable!(),
-            },
-            (Err(ParseError::BadParser(..)), Err(..))
-            | (Err(..), Err(ParseError::BadParser(..))) => {
-                assert!(matches!(union_accept, Err(ParseError::BadParser(..))));
-            }
-            (Err(ParseError::BadInput(..)), Err(ParseError::BadInput(..))) => {
-                assert!(
-                    union_accept.is_err(),
-                    "Neither original parser accepted on {input:?}, \
-                    but the union yielded {union_accept:?}",
-                );
-            }
-        }
-    }
-
-    fn sort(parser: Nondeterministic<u8, u8>, input: Vec<u8>) {
-        println!("Original: {parser:?}");
-        let pre = parser.accept(input.iter().copied());
-        let mut sorted = parser;
-        sorted.sort();
-        println!("Sorted: {sorted:?}");
-        sorted.check().unwrap();
-        let post = sorted.accept(input);
-        match pre {
-            Ok(out) => assert_eq!(Ok(out), post),
-            Err(ParseError::BadInput(_)) => {
-                assert!(matches!(post, Err(ParseError::BadInput(_)),));
-            }
-            Err(ParseError::BadParser(_)) => {}
-        };
-    }
-
-    fn shr(lhs: Deterministic<u8, u8>, rhs: Deterministic<u8, u8>, input: Vec<u8>) {
-        if lhs.check().is_err() || rhs.check().is_err() {
-            return;
-        }
-        println!("LHS: {lhs:?}");
-        println!("RHS: {rhs:?}");
-        let mut split = None;
-        for i in 0..=input.len() {
-            if lhs.accept(input[..i].iter().copied()).is_ok()
-                && rhs.accept(input[i..].iter().copied()).is_ok()
-            {
-                split = Some(i);
-                break;
-            }
-        }
-        split.map_or_else(
-            || println!("Couldn't split {input:?}"),
-            |i| {
-                println!(
-                    "Split {input:?} into {:?} and {:?}",
-                    &input[..i],
-                    &input[i..],
-                );
-            },
-        );
-        let Ok(concat) = panic::catch_unwind(|| lhs >> rhs) else {
-            return;
-        };
-        println!("SHR: {concat:?}");
-        if concat.determinize().is_err() {
-            return;
-        }
-        let concat_accepted = concat.accept(input).is_ok();
-        assert_eq!(concat_accepted, split.is_some());
+        assert_eq!(dd.accept(input.iter().copied()), d.accept(input));
     }
 
     #[test]
-    fn determinize_implies_no_runtime_errors_1() {
-        determinize_implies_no_runtime_errors(
-            &Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|x: u8, _| x),
-                            })),
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|x: u8, _| x),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                ],
-                initial: [Ok(1), Ok(2)].into_iter().collect(),
-                tags: BTreeMap::new(),
-            },
-            &[0],
-        );
-    }
-
-    /*
-    #[test]
-    fn union_01() {
-        union(
-            &Graph {
-                states: vec![],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
+    fn deterministic_implies_no_runtime_errors_1() {
+        deterministic_implies_no_runtime_errors(
             &Graph {
                 states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &[],
-        );
-    }
-
-    #[test]
-    fn union_02() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &[],
-        );
-    }
-
-    #[test]
-    fn union_03() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: iter::once((
-                            0,
-                            CurryInput::Wildcard(Transition {
-                                dst: BTreeSet::new(),
-                                act: Action::Local,
-                                update: update!(|x: u8, _| x),
-                            }),
-                        ))
-                        .collect(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &[],
-        );
-    }
-
-    #[test]
-    fn union_04() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: Some(CurryInput::Wildcard(Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: update!(|x: u8, _| x),
-                        })),
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &[0],
-        );
-    }
-
-    #[test]
-    fn union_05() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            act: Action::Pop,
-                            update: update!(|x: u8, _| x),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &[0],
-        );
-    }
-
-    #[test]
-    fn union_06() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: Some(CurryInput::Wildcard(Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: update!(|x: u8, _| x),
-                        })),
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: update!(|x: u8, _| x.saturating_add(1)),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &[0],
-        );
-    }
-
-    #[test]
-    fn union_07() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                            entries: iter::once((
-                                Range { first: 0, last: 0 },
-                                Transition {
-                                    dst: iter::once(Ok(0)).collect(),
-                                    act: Action::Local,
-                                    update: update!(|x: u8, _| x),
-                                },
-                            ))
-                            .collect(),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                            entries: iter::once((
-                                Range { first: 0, last: 1 },
-                                Transition {
-                                    dst: iter::once(Ok(0)).collect(),
-                                    act: Action::Local,
-                                    update: update!(|x: u8, _| x.saturating_add(1)),
-                                },
-                            ))
-                            .collect(),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &[0],
-        );
-    }
-
-    #[test]
-    fn union_08() {
-        union(
-            &Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: iter::once((
-                                0,
-                                CurryInput::Wildcard(Transition {
-                                    dst: iter::once(Ok(0)).collect(),
-                                    act: Action::Local,
-                                    update: update!(|x: u8, _| x),
-                                }),
-                            ))
-                            .collect(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|x: u8, _| x),
-                            })),
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                ],
-                initial: iter::once(Ok(2)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: update!(|x: u8, _| x.saturating_add(1)),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &[0],
-        );
-    }
-    */
-
-    #[test]
-    fn union_09() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &[],
-        );
-    }
-
-    #[test]
-    fn union_10() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: iter::once(Ok(0)).collect(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &[],
-        );
-    }
-
-    #[test]
-    fn union_11() {
-        union(
-            &Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Wildcard(Transition {
-                            dst: iter::once(Ok(0)).collect(),
-                            act: Action::Local,
-                            update: update!(|(), _| {}),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: iter::once(String::new()).collect(),
-                }],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &Graph {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|(), _| {}),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                ],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            },
-            &[],
-        );
-    }
-
-    #[test]
-    fn sort_1() {
-        sort(
-            Nondeterministic {
-                states: vec![
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(0)).collect(),
-                                act: Action::Local,
-                                update: update!(|(), _| {}),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                    State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Wildcard(Transition {
-                                dst: iter::once(Ok(1)).collect(),
-                                act: Action::Local,
-                                update: update!(|(), _| {}),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
-                        non_accepting: iter::once(String::new()).collect(),
-                    },
-                ],
-                initial: BTreeSet::<Result<usize, String>>::new(),
-                tags: BTreeMap::new(),
-            },
-            vec![],
-        );
-    }
-
-    #[test]
-    fn shr_1() {
-        shr(
-            Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: 0,
-                tags: BTreeMap::new(),
-            },
-            Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: Some(CurryInput::Wildcard(Transition {
-                            dst: 0,
-                            act: Action::Local,
-                            update: update!(|(), _| {}),
-                        })),
-                        map_some: BTreeMap::new(),
-                    },
+                    transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                     non_accepting: BTreeSet::new(),
                 }],
                 initial: 0,
@@ -974,128 +331,48 @@ mod reduced {
     }
 
     #[test]
-    fn shr_2() {
-        shr(
-            Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: 0,
-                tags: BTreeMap::new(),
-            },
-            Nondeterministic {
-                states: vec![],
-                initial: BTreeSet::new(),
-                tags: BTreeMap::new(),
-            }
-            .determinize()
-            .unwrap(),
-            vec![],
-        );
-    }
-
-    #[test]
-    fn shr_3() {
-        shr(
-            Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: Some(CurryInput::Wildcard(Transition {
-                            dst: 0,
-                            act: Action::Pop,
-                            update: update!(|(), _| {}),
-                        })),
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: 0,
-                tags: BTreeMap::new(),
-            },
-            Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: None,
-                        map_none: Some(CurryInput::Wildcard(Transition {
-                            dst: 0,
-                            act: Action::Local,
-                            update: update!(|(), _| {}),
-                        })),
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
-                initial: 0,
-                tags: BTreeMap::new(),
-            },
-            vec![0],
-        );
-    }
-
-    #[test]
-    fn shr_4() {
-        shr(
-            Graph {
+    fn determinize_identity_1() {
+        determinize_identity(
+            &Graph {
                 states: vec![
                     State {
-                        transitions: CurryStack {
-                            wildcard: None,
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
+                        transitions: Curry::Wildcard(Transition::Lateral {
+                            dst: 4,
+                            update: update!(|(), _| {}),
+                        }),
                         non_accepting: BTreeSet::new(),
                     },
                     State {
-                        transitions: CurryStack {
-                            wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                                entries: iter::once((
-                                    Range { first: 0, last: 0 },
-                                    Transition {
-                                        dst: 1,
-                                        act: Action::Push(0),
-                                        update: update!(|(), _| {}),
-                                    },
-                                ))
-                                .collect(),
-                            })),
-                            map_none: None,
-                            map_some: BTreeMap::new(),
-                        },
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                        non_accepting: iter::once(String::new()).collect(),
+                    },
+                    State {
+                        transitions: Curry::Wildcard(Transition::Call {
+                            region: "region",
+                            detour: 0,
+                            dst: 1,
+                            combine: FF {
+                                src: "|(), ()| ()".to_owned(),
+                                lhs_t: "()".to_owned(),
+                                rhs_t: "()".to_owned(),
+                                output_t: "()".to_owned(),
+                            },
+                        }),
                         non_accepting: BTreeSet::new(),
                     },
                 ],
-                initial: 1,
-                tags: BTreeMap::new(),
-            },
-            Graph {
-                states: vec![State {
-                    transitions: CurryStack {
-                        wildcard: Some(CurryInput::Scrutinize(RangeMap {
-                            entries: iter::once((
-                                Range { first: 1, last: 1 },
-                                Transition {
-                                    dst: 0,
-                                    act: Action::Pop,
-                                    update: update!(|(), _| {}),
-                                },
-                            ))
-                            .collect(),
-                        })),
-                        map_none: None,
-                        map_some: BTreeMap::new(),
-                    },
-                    non_accepting: BTreeSet::new(),
-                }],
                 initial: 0,
                 tags: BTreeMap::new(),
             },
-            vec![0, 1],
+            vec![],
         );
     }
 }

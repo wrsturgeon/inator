@@ -6,10 +6,7 @@
 
 //! Check well-formedness.
 
-use crate::{
-    Action, Ctrl, CurryInput, CurryStack, Input, Range, RangeMap, Stack, State, ToSrc, Transition,
-    Update,
-};
+use crate::{Ctrl, Curry, Input, Range, RangeMap, State, ToSrc, Transition, Update, FF};
 use core::{fmt, mem, num::NonZeroUsize};
 use std::collections::BTreeSet;
 
@@ -17,12 +14,12 @@ use std::collections::BTreeSet;
 const _MAX_ILL_FORMED_BYTES: usize = 64;
 /// Check that the above holds by throwing a compile-time out-of-bounds error if it doesn't.
 #[allow(clippy::indexing_slicing)] // <-- that's the point
-const _: () = [(); _MAX_ILL_FORMED_BYTES][mem::size_of::<IllFormed<(), (), usize>>()];
+const _: () = [(); _MAX_ILL_FORMED_BYTES][mem::size_of::<IllFormed<(), usize>>()];
 
 /// Witness to an ill-formed automaton (or part thereof).
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
+pub enum IllFormed<I: Input, C: Ctrl<I>> {
     /// An index points to a state greater than the total number of states.
     OutOfBounds(usize),
     /// A set of indices contains no elements (we should just delete the transition).
@@ -33,23 +30,23 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
     RangeMapOverlap(Range<I>),
     /// In a `CurryStack`, a wildcard matches an input that a specific key also matches.
     WildcardMask {
-        /// Top of the stack, if one existed.
-        arg_stack: Option<S>,
         /// Input token (or range thereof) that could be ambiguous.
         arg_token: Option<Range<I>>,
         /// First output possibility.
-        possibility_1: Box<Transition<I, S, C>>,
+        possibility_1: Box<Transition<I, C>>,
         /// Second output possibility.
-        possibility_2: Box<Transition<I, S, C>>,
+        possibility_2: Box<Transition<I, C>>,
     },
     /// Can't go to two different (deterministic) states at the same time.
     Superposition(usize, usize),
-    /// Can't e.g. push and pop from the stack at the same time.
-    IncompatibleStackActions(Action<S>, Action<S>),
     /// Can't call two different functions on half-constructed outputs at the same time.
     IncompatibleCallbacks(Box<Update<I>>, Box<Update<I>>),
+    /// Can't call two different functions to combine a returned value with a saved one at the same time.
+    IncompatibleCombinators(Box<FF>, Box<FF>),
+    /// Can't e.g. push to the stack and pop from it at the same time.
+    IncompatibleActions(Box<Transition<I, C>>, Box<Transition<I, C>>),
     /// Two identical states at different indices.
-    DuplicateState(Box<State<I, S, C>>),
+    DuplicateState(Box<State<I, C>>),
     /// Reference to a tagged state, but no state has that tag.
     TagDNE(String),
     /// An initial state expects an accumulator argument that is not `()`.
@@ -58,42 +55,47 @@ pub enum IllFormed<I: Input, S: Stack, C: Ctrl<I, S>> {
     TypeMismatch(String, String),
     /// An accepting state returns the wrong type.
     WrongReturnType(String, String),
+    /// Ambiguous regions: e.g. claiming to be opening both parentheses and brackets at the same time.
+    AmbiguousRegions(&'static str, &'static str),
 }
 
-impl<I: Input, S: Stack> IllFormed<I, S, usize> {
+impl<I: Input> IllFormed<I, usize> {
     /// Convert the control parameter from `usize` to anything else.
     #[inline]
     #[must_use]
-    pub fn convert_ctrl<C: Ctrl<I, S>>(self) -> IllFormed<I, S, C> {
+    pub fn convert_ctrl<C: Ctrl<I>>(self) -> IllFormed<I, C> {
         match self {
             IllFormed::OutOfBounds(i) => IllFormed::OutOfBounds(i),
             IllFormed::ProlongingDeath => IllFormed::ProlongingDeath,
             IllFormed::InvertedRange(a, b) => IllFormed::InvertedRange(a, b),
             IllFormed::RangeMapOverlap(range) => IllFormed::RangeMapOverlap(range),
             IllFormed::WildcardMask {
-                arg_stack,
                 arg_token,
                 possibility_1,
                 possibility_2,
             } => IllFormed::WildcardMask {
-                arg_stack,
                 arg_token,
                 possibility_1: Box::new(possibility_1.convert_ctrl()),
                 possibility_2: Box::new(possibility_2.convert_ctrl()),
             },
             IllFormed::Superposition(a, b) => IllFormed::Superposition(a, b),
-            IllFormed::IncompatibleStackActions(a, b) => IllFormed::IncompatibleStackActions(a, b),
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
+            IllFormed::IncompatibleCombinators(a, b) => IllFormed::IncompatibleCombinators(a, b),
+            IllFormed::IncompatibleActions(a, b) => IllFormed::IncompatibleActions(
+                Box::new(a.convert_ctrl()),
+                Box::new(b.convert_ctrl()),
+            ),
             IllFormed::DuplicateState(s) => IllFormed::DuplicateState(Box::new(s.convert_ctrl())),
             IllFormed::TagDNE(s) => IllFormed::TagDNE(s),
             IllFormed::InitialNotUnit(s) => IllFormed::InitialNotUnit(s),
             IllFormed::TypeMismatch(a, b) => IllFormed::TypeMismatch(a, b),
             IllFormed::WrongReturnType(a, b) => IllFormed::WrongReturnType(a, b),
+            IllFormed::AmbiguousRegions(a, b) => IllFormed::AmbiguousRegions(a, b),
         }
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
+impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -115,24 +117,22 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
                 write!(f, "Multiple ranges would accept {}", r.to_src())
             }
             Self::WildcardMask {
-                ref arg_stack,
                 ref arg_token,
                 ref possibility_1,
                 ref possibility_2,
             } => {
                 write!(
                     f,
-                    "When the stack top is {} and the token is {}, \
+                    "On token {}, \
                     a wildcard match succeeds (`{}`), \
                     but so does a specific match (`{}`).",
-                    arg_stack.to_src(),
-                    arg_token
-                        .as_ref()
-                        .map_or("None".to_owned(), |r| if r.first == r.last {
+                    arg_token.as_ref().map_or("[end of input]".to_owned(), |r| {
+                        if r.first == r.last {
                             r.first.to_src()
                         } else {
                             r.to_src()
-                        }),
+                        }
+                    }),
                     possibility_1.to_src(),
                     possibility_2.to_src(),
                 )
@@ -142,14 +142,6 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
                 "Tried to visit two different deterministic states \
                 ({a} and {b}) at the same time.",
             ),
-            Self::IncompatibleStackActions(ref a, ref b) => {
-                write!(
-                    f,
-                    "Can't {} and {} at the same time.",
-                    a.in_english(),
-                    b.in_english(),
-                )
-            }
             Self::IncompatibleCallbacks(ref a, ref b) => {
                 write!(
                     f,
@@ -157,6 +149,19 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
                     a.src, b.src,
                 )
             }
+            Self::IncompatibleCombinators(ref a, ref b) => {
+                write!(
+                    f,
+                    "Tried to call both `{}` and `{}` at the same time.",
+                    a.src, b.src,
+                )
+            }
+            Self::IncompatibleActions(ref a, ref b) => write!(
+                f,
+                "Tried to {} and {} at the same time.",
+                a.in_english(),
+                b.in_english()
+            ),
             Self::DuplicateState(ref s) => write!(f, "Duplicate state: {}", s.to_src()),
             Self::TagDNE(ref tag) => write!(
                 f,
@@ -168,30 +173,25 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> fmt::Display for IllFormed<I, S, C> {
             ),
             Self::TypeMismatch(ref a, ref b) => write!(f, "Type mismatch: `{a}` =/= `{b}`."),
             Self::WrongReturnType(ref a, ref b) => write!(f, "Wrong output type: `{a}` =/= `{b}`"),
+            Self::AmbiguousRegions(a, b) => write!(
+                f,
+                "Claiming to open two different regions (\"{a}\" and \"{b}\") simultaneously."
+            ),
         }
     }
 }
 
 /// Check well-formedness.
-pub trait Check<I: Input, S: Stack, C: Ctrl<I, S>> {
+pub trait Check<I: Input, C: Ctrl<I>> {
     /// Check well-formedness.
     /// # Errors
     /// When not well-formed (with a witness).
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, C>>;
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>>;
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for Action<S> {
+impl<I: Input> Check<I, BTreeSet<Result<usize, String>>> for BTreeSet<Result<usize, String>> {
     #[inline]
-    fn check(&self, _: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
-        Ok(())
-    }
-}
-
-impl<I: Input, S: Stack> Check<I, S, BTreeSet<Result<usize, String>>>
-    for BTreeSet<Result<usize, String>>
-{
-    #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, Self>> {
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, Self>> {
         if self.is_empty() {
             return Err(IllFormed::ProlongingDeath);
         }
@@ -206,46 +206,9 @@ impl<I: Input, S: Stack> Check<I, S, BTreeSet<Result<usize, String>>>
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryStack<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Check<I, C> for Curry<I, C> {
     #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
-        if let Some(ref wild) = self.wildcard {
-            for (key, some) in &self.map_some {
-                wild.disjoint(some)
-                    .map_err(|(arg_token, possibility_1, possibility_2)| {
-                        IllFormed::WildcardMask {
-                            arg_stack: Some(key.clone()),
-                            arg_token,
-                            possibility_1: Box::new(possibility_1),
-                            possibility_2: Box::new(possibility_2),
-                        }
-                    })?;
-            }
-            if let Some(ref none) = self.map_none {
-                wild.disjoint(none)
-                    .map_err(|(arg_token, possibility_1, possibility_2)| {
-                        IllFormed::WildcardMask {
-                            arg_stack: None,
-                            arg_token,
-                            possibility_1: Box::new(possibility_1),
-                            possibility_2: Box::new(possibility_2),
-                        }
-                    })?;
-            }
-            wild.check(n_states)?;
-        }
-        for some in self.map_some.values() {
-            some.check(n_states)?;
-        }
-        self.map_none
-            .as_ref()
-            .map_or(Ok(()), |none| none.check(n_states))
-    }
-}
-
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryInput<I, S, C> {
-    #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         match *self {
             Self::Wildcard(ref etc) => etc.check(n_states),
             Self::Scrutinize(ref etc) => etc.check(n_states),
@@ -253,9 +216,9 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for CurryInput<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for Range<I> {
+impl<I: Input, C: Ctrl<I>> Check<I, C> for Range<I> {
     #[inline]
-    fn check(&self, _: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
+    fn check(&self, _: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         if self.first <= self.last {
             Ok(())
         } else {
@@ -267,11 +230,11 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for Range<I> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for RangeMap<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Check<I, C> for RangeMap<I, C> {
     #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         self.iter().try_fold((), |(), (k, v)| {
-            self.entries
+            self.0
                 .range(..k.clone())
                 .fold(None, |acc, (range, _)| {
                     acc.or_else(|| range.clone().intersection(k.clone()))
@@ -284,24 +247,26 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for RangeMap<I, S, C> {
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for State<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Check<I, C> for State<I, C> {
     #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         self.transitions.check(n_states)
     }
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>> Check<I, S, C> for Transition<I, S, C> {
+impl<I: Input, C: Ctrl<I>> Check<I, C> for Transition<I, C> {
     #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, C>> {
-        self.dst.check(n_states)?;
-        self.act.check(n_states)
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
+        match *self {
+            Self::Lateral { ref dst, .. } | Self::Call { ref dst, .. } => dst.check(n_states),
+            Self::Return { .. } => Ok(()),
+        }
     }
 }
 
-impl<I: Input, S: Stack> Check<I, S, usize> for usize {
+impl<I: Input> Check<I, usize> for usize {
     #[inline]
-    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, S, Self>> {
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, Self>> {
         if *self >= n_states.into() {
             Err(IllFormed::OutOfBounds(*self))
         } else {

@@ -6,34 +6,32 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{try_merge, Ctrl, Graph, IllFormed, Input, Stack};
+use crate::{try_merge, Ctrl, Graph, IllFormed, Input, ToSrc};
 use core::fmt;
 
 /// Execute an automaton on an input sequence.
 #[non_exhaustive]
-pub struct InProgress<'graph, I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> {
+pub struct InProgress<'graph, I: Input, C: Ctrl<I>, In: Iterator<Item = I>> {
     /// Reference to the graph we're riding.
-    pub graph: &'graph Graph<I, S, C>,
+    pub graph: &'graph Graph<I, C>,
     /// Iterator over input tokens.
     pub input: In,
     /// Internal stack.
-    pub stack: Vec<S>,
+    pub stack: Vec<C>,
     /// Internal state.
     pub ctrl: C,
     /// Output type as we go.
     pub output_t: String,
 }
 
-impl<I: Input, S: fmt::Debug + Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> fmt::Debug
-    for InProgress<'_, I, S, C, In>
-{
+impl<I: Input, C: Ctrl<I>, In: Iterator<Item = I>> fmt::Debug for InProgress<'_, I, C, In> {
     #[inline]
     #[allow(unsafe_code)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "In progress: {:?} @ {:?} -> {:?}",
-            self.stack,
+            self.stack.to_src(),
             self.ctrl.view().collect::<Vec<_>>(),
             self.output_t,
         )
@@ -57,17 +55,15 @@ pub enum InputError {
 /// Either the parser intentionally rejected the input or the parser was broken.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ParseError<I: Input, S: Stack, C: Ctrl<I, S>> {
+pub enum ParseError<I: Input, C: Ctrl<I>> {
     /// Input intentionally rejected by a parser without anything going wrong internally.
     BadInput(InputError),
     /// Parser was broken.
-    BadParser(IllFormed<I, S, C>),
+    BadParser(IllFormed<I, C>),
 }
 
-impl<I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> Iterator
-    for InProgress<'_, I, S, C, In>
-{
-    type Item = Result<I, ParseError<I, S, C>>;
+impl<I: Input, C: Ctrl<I>, In: Iterator<Item = I>> Iterator for InProgress<'_, I, C, In> {
+    type Item = Result<I, ParseError<I, C>>;
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let maybe_token = self.input.next();
@@ -90,13 +86,13 @@ impl<I: Input, S: Stack, C: Ctrl<I, S>, In: Iterator<Item = I>> Iterator
 /// Act on the automaton graph in response to one input token.
 #[inline]
 #[allow(clippy::type_complexity)]
-fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
-    graph: &Graph<I, S, C>,
+fn step<I: Input, C: Ctrl<I>>(
+    graph: &Graph<I, C>,
     ctrl: &C,
     maybe_token: Option<I>,
-    stack: &mut Vec<S>,
+    stack: &mut Vec<C>,
     output_t: &str,
-) -> Result<(Option<C>, String), ParseError<I, S, C>> {
+) -> Result<(Option<C>, String), ParseError<I, C>> {
     ctrl.view().try_fold((), |(), r| match r {
         Ok(i) => {
             if graph.states.get(i).is_none() {
@@ -129,23 +125,17 @@ fn step<I: Input, S: Stack, C: Ctrl<I, S>>(
             Err(ParseError::BadInput(InputError::Unclosed))
         };
     };
-    let maybe_stack_top = stack.last();
-    let transitions = states.filter_map(|s| match s.transitions.get(maybe_stack_top, &token) {
+
+    // Merge into a huge aggregate transition and act on that instead of individual transitions
+    match try_merge(states.filter_map(|s| match s.transitions.get(&token) {
         Err(e) => Some(Err(e)),
-        Ok(opt) => opt.map(Ok),
-    });
-    try_merge(transitions).map_or(Err(ParseError::BadInput(InputError::Absurd)), |r| {
-        r.map_or_else(
-            |e| Err(ParseError::BadParser(e)),
-            |mega_transition| {
-                mega_transition
-                    .invoke(stack, output_t)
-                    .map_err(ParseError::BadParser)?
-                    .map_or(
-                        Err(ParseError::BadInput(InputError::Unopened)),
-                        |(c, out)| Ok((Some(c), out)),
-                    )
-            },
-        )
-    })
+        Ok(opt) => opt.map(|t| Ok(t.clone())),
+    })) {
+        None => Err(ParseError::BadInput(InputError::Absurd)),
+        Some(Err(e)) => Err(ParseError::BadParser(e)),
+        Some(Ok(mega_transition)) => mega_transition.invoke(output_t, stack)?.map_or(
+            Err(ParseError::BadInput(InputError::Unopened)),
+            |(c, out)| Ok((Some(c), out)),
+        ),
+    }
 }
