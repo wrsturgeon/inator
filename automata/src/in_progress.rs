@@ -93,27 +93,14 @@ fn step<I: Input, C: Ctrl<I>>(
     stack: &mut Vec<C>,
     output_t: &str,
 ) -> Result<(Option<C>, String), ParseError<I, C>> {
-    ctrl.view().try_fold((), |(), r| match r {
-        Ok(i) => {
-            if graph.states.get(i).is_none() {
-                Err(ParseError::BadParser(IllFormed::OutOfBounds(i)))
-            } else {
-                Ok(())
-            }
+    ctrl.view().try_fold((), |(), i| {
+        if graph.states.get(i).is_none() {
+            Err(ParseError::BadParser(IllFormed::OutOfBounds(i)))
+        } else {
+            Ok(())
         }
-        Err(tag) => graph
-            .tags
-            .get(tag)
-            .map(|_| ())
-            .ok_or(ParseError::BadParser(IllFormed::TagDNE(tag.to_owned()))),
     })?;
-    let mut states = ctrl.view().map(|r| match r {
-        Ok(i) => get!(graph.states, i),
-        Err(tag) => get!(
-            graph.states,
-            *graph.tags.get(tag).unwrap_or_else(|| never!())
-        ),
-    });
+    let mut states = ctrl.view().map(|i| get!(graph.states, i));
     let Some(token) = maybe_token else {
         return if stack.is_empty() {
             if states.any(|s| s.non_accepting.is_empty()) {
