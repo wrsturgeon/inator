@@ -45,14 +45,9 @@ impl<C: Arbitrary + Ctrl<u8>> Arbitrary for Graph<u8, C> {
                         continue 'sort_again;
                     }
                 }
-                let mut tags = BTreeMap::arbitrary(g);
-                for i in tags.values_mut() {
-                    *i = *i % nz_post;
-                }
                 return Self {
                     states,
                     initial: initial.map_indices(|i| i % nz_post),
-                    tags,
                 };
             }
         }
@@ -60,14 +55,10 @@ impl<C: Arbitrary + Ctrl<u8>> Arbitrary for Graph<u8, C> {
     #[inline]
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         Box::new(
-            (self.states.clone(), self.initial.clone(), self.tags.clone())
+            (self.states.clone(), self.initial.clone())
                 .shrink()
-                .filter_map(|(states, initial, tags)| {
-                    let s = Self {
-                        states,
-                        initial,
-                        tags,
-                    };
+                .filter_map(|(states, initial)| {
+                    let s = Self { states, initial };
                     (s.check() == Ok(())).then_some(s)
                 }),
         )

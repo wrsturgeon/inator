@@ -117,6 +117,7 @@ macro_rules! unwrap {
 }
 
 /// Unreachable state, but checked if we're debugging.
+#[cfg(feature = "quickcheck")]
 #[cfg(any(debug_assertions, test))]
 macro_rules! never {
     () => {
@@ -125,6 +126,7 @@ macro_rules! never {
 }
 
 /// Unreachable state, but checked if we're debugging.
+#[cfg(feature = "quickcheck")]
 #[cfg(not(any(debug_assertions, test)))]
 macro_rules! never {
     () => {{
@@ -216,10 +218,7 @@ mod test;
 #[cfg(test)]
 use rand as _; // <-- needed in examples
 
-use {
-    core::iter,
-    std::collections::{BTreeMap, BTreeSet},
-};
+use {core::iter, std::collections::BTreeSet};
 
 /// Language of matched parentheses and concatenations thereof.
 #[inline]
@@ -251,7 +250,6 @@ pub fn dyck_d() -> Deterministic<char> {
             non_accepting: BTreeSet::new(),
         }],
         initial: 0,
-        tags: BTreeMap::new(),
     }
 }
 
@@ -267,8 +265,8 @@ pub fn dyck_nd() -> Nondeterministic<char> {
                         Range::unit('('),
                         Transition::Call {
                             region: "parentheses",
-                            detour: iter::once(Ok(0)).collect(),
-                            dst: iter::once(Ok(0)).collect(),
+                            detour: iter::once(0).collect(),
+                            dst: iter::once(0).collect(),
                             combine: ff!(|(), ()| ()),
                         },
                     ),
@@ -284,7 +282,6 @@ pub fn dyck_nd() -> Nondeterministic<char> {
             )),
             non_accepting: BTreeSet::new(),
         }],
-        initial: iter::once(Ok(0)).collect(),
-        tags: BTreeMap::new(),
+        initial: iter::once(0).collect(),
     }
 }

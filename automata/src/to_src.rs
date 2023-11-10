@@ -416,11 +416,10 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Graph<I, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "{} {{ states: {}, initial: {}, tags: {} }}",
+            "{} {{ states: {}, initial: {} }}",
             Self::src_type(),
             self.states.to_src(),
             self.initial.to_src(),
-            self.tags.to_src(),
         )
     }
     #[inline]
@@ -462,10 +461,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for State<I, C> {
     }
     #[inline]
     fn src_type() -> String {
-        format!(
-            "State::<{}, BTreeSet<Result<usize, String>>>",
-            I::src_type(),
-        )
+        format!("State::<{}, BTreeSet<usize>>", I::src_type(),)
     }
 }
 
@@ -479,10 +475,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Curry<I, C> {
     }
     #[inline]
     fn src_type() -> String {
-        format!(
-            "Curry::<{}, BTreeSet<Result<usize, String>>>",
-            I::src_type(),
-        )
+        format!("Curry::<{}, BTreeSet<usize>>", I::src_type(),)
     }
 }
 
@@ -493,10 +486,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for RangeMap<I, C> {
     }
     #[inline]
     fn src_type() -> String {
-        format!(
-            "RangeMap::<{}, BTreeSet<Result<usize, String>>>",
-            I::src_type(),
-        )
+        format!("RangeMap::<{}, BTreeSet<usize>>", I::src_type(),)
     }
 }
 
@@ -566,10 +556,7 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Transition<I, C> {
     }
     #[inline]
     fn src_type() -> String {
-        format!(
-            "Transition::<{}, BTreeSet<Result<usize, String>>>",
-            I::src_type(),
-        )
+        format!("Transition::<{}, BTreeSet<usize>>", I::src_type(),)
     }
 }
 

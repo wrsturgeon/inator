@@ -179,9 +179,7 @@ macro_rules! never {
 // TODO: Macro that isn't context-aware but just dumps the codegen right there
 
 mod call;
-mod fixpoint;
 mod num;
-mod recurse;
 
 #[cfg(test)]
 mod test;
@@ -189,7 +187,7 @@ mod test;
 pub use {
     call::call,
     fixpoint::{fixpoint, Fixpoint},
-    inator_automata::*,
+    inator_automata::{Deterministic as Parser, *},
     num::{digit, integer},
     recurse::{recurse, Recurse},
 };
@@ -210,7 +208,6 @@ pub fn empty<I: Input>() -> Deterministic<I> {
             non_accepting: BTreeSet::new(),
         }],
         initial: 0,
-        tags: BTreeMap::new(),
     }
 }
 
@@ -237,7 +234,6 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
             },
         ],
         initial: 1,
-        tags: BTreeMap::new(),
     }
 }
 

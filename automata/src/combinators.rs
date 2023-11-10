@@ -27,11 +27,9 @@ impl<I: Input> ops::BitOr for Deterministic<I> {
         let Graph {
             states: other_states,
             initial: other_initial,
-            tags: other_tags,
         } = other.map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
         s.states.extend(other_states);
         s.initial.extend(other_initial);
-        s.tags = unwrap!(s.tags.merge(other_tags));
         s.sort();
         s.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
@@ -62,12 +60,6 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
                     }
                     acc_i
                 });
-        let accepting_tags: BTreeSet<String> = self
-            .tags
-            .iter()
-            .filter(|&(_, v)| accepting_indices.contains(v))
-            .map(|(k, _)| k.clone())
-            .collect();
 
         let mut s = self.generalize();
         if s.check().is_err() {
@@ -78,13 +70,11 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
         let Graph {
             states: other_states,
             initial: other_initial,
-            tags: other_tags,
         } = other
             .generalize()
             .map_indices(|i| i.checked_add(size).expect("Absurdly huge number of states"));
 
         s.states.extend(other_states);
-        s.tags.extend(other_tags);
 
         // For every transition that an empty stack can take from the initial state of the right-hand parser,
         // add that transition (only on the empty stack) to each accepting state of the left-hand parser.
@@ -98,23 +88,15 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
         }
 
         // If any initial states are immediately accepting, we need to start in the second parser, too.
-        if s.initial.iter().any(|r| {
-            accepting(
-                r.as_ref().map_or_else(|st| Err(st.as_str()), |&i| Ok(i)),
-                &accepting_indices,
-                &accepting_tags,
-            )
-        }) {
-            s.initial.extend(other_initial.iter().cloned());
+        if s.initial.iter().any(|i| accepting_indices.contains(i)) {
+            s.initial.extend(other_initial.iter().copied());
         }
 
         let mut out = Graph {
             states: s
                 .states
                 .into_iter()
-                .map(|st| {
-                    add_tail_call_state(st, &other_initial, &accepting_indices, &accepting_tags)
-                })
+                .map(|st| add_tail_call_state(st, &other_initial, &accepting_indices))
                 .collect(),
             ..s
         };
@@ -128,17 +110,11 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
 #[must_use]
 fn add_tail_call_state<I: Input, C: Ctrl<I>>(
     s: State<I, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
+    other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> State<I, BTreeSet<Result<usize, String>>> {
+) -> State<I, BTreeSet<usize>> {
     State {
-        transitions: add_tail_call_curry(
-            s.transitions,
-            other_init,
-            accepting_indices,
-            accepting_tags,
-        ),
+        transitions: add_tail_call_curry(s.transitions, other_init, accepting_indices),
         non_accepting: s.non_accepting,
     }
 }
@@ -148,23 +124,16 @@ fn add_tail_call_state<I: Input, C: Ctrl<I>>(
 #[must_use]
 fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
     s: Curry<I, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
+    other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> Curry<I, BTreeSet<Result<usize, String>>> {
+) -> Curry<I, BTreeSet<usize>> {
     match s {
-        Curry::Wildcard(t) => Curry::Wildcard(add_tail_call_transition(
-            t,
-            other_init,
-            accepting_indices,
-            accepting_tags,
-        )),
-        Curry::Scrutinize(rm) => Curry::Scrutinize(add_tail_call_range_map(
-            rm,
-            other_init,
-            accepting_indices,
-            accepting_tags,
-        )),
+        Curry::Wildcard(t) => {
+            Curry::Wildcard(add_tail_call_transition(t, other_init, accepting_indices))
+        }
+        Curry::Scrutinize(rm) => {
+            Curry::Scrutinize(add_tail_call_range_map(rm, other_init, accepting_indices))
+        }
     }
 }
 
@@ -173,16 +142,15 @@ fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
 #[must_use]
 fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
     s: RangeMap<I, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
+    other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> RangeMap<I, BTreeSet<Result<usize, String>>> {
+) -> RangeMap<I, BTreeSet<usize>> {
     RangeMap(
         s.0.into_iter()
             .map(|(k, v)| {
                 (
                     k,
-                    add_tail_call_transition(v, other_init, accepting_indices, accepting_tags),
+                    add_tail_call_transition(v, other_init, accepting_indices),
                 )
             })
             .collect(),
@@ -194,13 +162,12 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
 #[must_use]
 fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
     s: Transition<I, C>,
-    other_init: &BTreeSet<Result<usize, String>>,
+    other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> Transition<I, BTreeSet<Result<usize, String>>> {
+) -> Transition<I, BTreeSet<usize>> {
     match s {
         Transition::Lateral { ref dst, update } => Transition::Lateral {
-            dst: add_tail_call_c(dst, other_init, accepting_indices, accepting_tags),
+            dst: add_tail_call_c(dst, other_init, accepting_indices),
             update,
         },
         Transition::Call {
@@ -210,24 +177,11 @@ fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
             combine,
         } => Transition::Call {
             region,
-            detour: add_tail_call_c(detour, other_init, accepting_indices, accepting_tags),
-            dst: add_tail_call_c(dst, other_init, accepting_indices, accepting_tags),
+            detour: add_tail_call_c(detour, other_init, accepting_indices),
+            dst: add_tail_call_c(dst, other_init, accepting_indices),
             combine,
         },
         Transition::Return { region } => Transition::Return { region },
-    }
-}
-
-/// Check if this state corresponds to an accepting state.
-#[inline]
-fn accepting(
-    r: Result<usize, &str>,
-    accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> bool {
-    match r {
-        Ok(i) => accepting_indices.contains(&i),
-        Err(tag) => accepting_tags.contains(tag),
     }
 }
 
@@ -236,16 +190,13 @@ fn accepting(
 #[must_use]
 fn add_tail_call_c<I: Input, C: Ctrl<I>>(
     c: &C,
-    other_init: &BTreeSet<Result<usize, String>>,
+    other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
-    accepting_tags: &BTreeSet<String>,
-) -> BTreeSet<Result<usize, String>> {
-    let accepts = c
-        .view()
-        .any(|rs| accepting(rs, accepting_indices, accepting_tags));
-    let iter = c.view().map(|rs| rs.map_err(str::to_owned));
+) -> BTreeSet<usize> {
+    let accepts = c.view().any(|ref i| accepting_indices.contains(i));
+    let iter = c.view();
     if accepts {
-        iter.chain(other_init.iter().cloned()).collect()
+        iter.chain(other_init.iter().copied()).collect()
     } else {
         iter.collect()
     }

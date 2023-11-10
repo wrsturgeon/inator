@@ -70,11 +70,8 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                State::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
-                    curved,
-                    &mut Gen::new(curved.into())
-                )
-                .check(curved),
+                State::<u8, BTreeSet<usize>>::arbitrary_given(curved, &mut Gen::new(curved.into()))
+                    .check(curved),
                 Ok(())
             );
         }
@@ -87,11 +84,8 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Curry::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
-                    curved,
-                    &mut Gen::new(curved.into())
-                )
-                .check(curved),
+                Curry::<u8, BTreeSet<usize>>::arbitrary_given(curved, &mut Gen::new(curved.into()))
+                    .check(curved),
                 Ok(())
             );
         }
@@ -104,7 +98,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                RangeMap::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                RangeMap::<u8, BTreeSet<usize>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -121,7 +115,7 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                Transition::<u8, BTreeSet<Result<usize, String>>>::arbitrary_given(
+                Transition::<u8, BTreeSet<usize>>::arbitrary_given(
                     curved,
                     &mut Gen::new(curved.into())
                 )
@@ -154,11 +148,8 @@ mod prop {
         for size in 0..tests {
             let curved = nz(2.max((gs * size * size) / (tests * tests)));
             assert_eq!(
-                <BTreeSet<Result<usize, String>> as Check<
-                    u8,
-                    BTreeSet<Result<usize, String>>,
-                >>::check(
-                    &<BTreeSet<Result<usize, String>> as Ctrl<u8>>::arbitrary_given(
+                <BTreeSet<usize> as Check<u8, BTreeSet<usize>>>::check(
+                    &<BTreeSet<usize> as Ctrl<u8>>::arbitrary_given(
                         curved,
                         &mut Gen::new(curved.into())
                     ),
@@ -300,6 +291,7 @@ mod prop {
 
 mod reduced {
     use crate::*;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn deterministic_implies_no_runtime_errors(d: &Deterministic<u8>, input: Vec<u8>) {
         if let Err(ParseError::BadParser(e)) = d.accept(input) {
@@ -324,7 +316,6 @@ mod reduced {
                     non_accepting: BTreeSet::new(),
                 }],
                 initial: 0,
-                tags: BTreeMap::new(),
             },
             vec![0],
         );
@@ -370,7 +361,6 @@ mod reduced {
                     },
                 ],
                 initial: 0,
-                tags: BTreeMap::new(),
             },
             vec![],
         );
