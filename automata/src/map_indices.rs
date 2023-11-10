@@ -20,7 +20,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                 .map(|s| s.map_indices(&mut f))
                 .collect(),
             initial: self.initial.map_indices(&mut f),
-            tags: self.tags.into_iter().map(|(k, v)| (k, f(v))).collect(),
         }
     }
 }

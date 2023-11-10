@@ -156,17 +156,10 @@ macro_rules! get_mut {
 
 // TODO: derive ToSrc
 
-mod fixpoint;
-mod recurse;
-
 #[cfg(test)]
 mod test;
 
-pub use {
-    fixpoint::{fixpoint, Fixpoint},
-    inator_automata::{Deterministic as Parser, *},
-    recurse::{recurse, Recurse},
-};
+pub use inator_automata::{Deterministic as Parser, *};
 
 use core::iter;
 use std::collections::{BTreeMap, BTreeSet};
@@ -184,7 +177,6 @@ pub fn empty<I: Input>() -> Deterministic<I> {
             non_accepting: BTreeSet::new(),
         }],
         initial: 0,
-        tags: BTreeMap::new(),
     }
 }
 
@@ -211,7 +203,6 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
             },
         ],
         initial: 1,
-        tags: BTreeMap::new(),
     }
 }
 

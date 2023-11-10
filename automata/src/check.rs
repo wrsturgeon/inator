@@ -189,17 +189,15 @@ pub trait Check<I: Input, C: Ctrl<I>> {
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>>;
 }
 
-impl<I: Input> Check<I, BTreeSet<Result<usize, String>>> for BTreeSet<Result<usize, String>> {
+impl<I: Input> Check<I, BTreeSet<usize>> for BTreeSet<usize> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, Self>> {
         if self.is_empty() {
             return Err(IllFormed::ProlongingDeath);
         }
-        for r in self {
-            if let &Ok(i) = r {
-                if i >= n_states.into() {
-                    return Err(IllFormed::OutOfBounds(i));
-                }
+        for &i in self {
+            if i >= n_states.into() {
+                return Err(IllFormed::OutOfBounds(i));
             }
         }
         Ok(())

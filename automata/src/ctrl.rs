@@ -28,7 +28,7 @@ pub trait Ctrl<I: Input>:
     Check<I, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
-    type View<'s>: Iterator<Item = Result<usize, &'s str>>
+    type View<'s>: Iterator<Item = usize>
     where
         Self: 's;
     /// View each index in what may be a collection.
@@ -47,10 +47,10 @@ pub trait Ctrl<I: Input>:
 }
 
 impl<I: Input> Ctrl<I> for usize {
-    type View<'s> = iter::Once<Result<usize, &'s str>>;
+    type View<'s> = iter::Once<usize>;
     #[inline]
     fn view(&self) -> Self::View<'_> {
-        iter::once(Ok(*self))
+        iter::once(*self)
     }
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
@@ -69,17 +69,11 @@ impl<I: Input> Ctrl<I> for usize {
     }
 }
 
-impl<I: Input> Ctrl<I> for BTreeSet<Result<usize, String>> {
-    type View<'s> = iter::Map<
-        btree_set::Iter<'s, Result<usize, String>>,
-        fn(&'s Result<usize, String>) -> Result<usize, &'s str>,
-    >;
+impl<I: Input> Ctrl<I> for BTreeSet<usize> {
+    type View<'s> = iter::Copied<btree_set::Iter<'s, usize>>;
     #[inline]
     fn view(&self) -> Self::View<'_> {
-        self.iter().map(|r| match *r {
-            Ok(i) => Ok(i),
-            Err(ref s) => Err(s),
-        })
+        self.iter().copied()
     }
     #[inline]
     #[allow(clippy::arithmetic_side_effects, clippy::unwrap_used, unsafe_code)]
@@ -91,20 +85,15 @@ impl<I: Input> Ctrl<I> for BTreeSet<Result<usize, String>> {
             if set.is_empty() {
                 continue 'restart;
             }
-            return set.into_iter().map(|i| Ok(i % n_states)).collect();
+            return set.into_iter().map(|i| i % n_states).collect();
         }
     }
     #[inline]
-    fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
-        self.into_iter()
-            .map(|r| match r {
-                Ok(i) => Ok(f(i)),
-                Err(e) => Err(e),
-            })
-            .collect()
+    fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
+        self.into_iter().map(f).collect()
     }
     #[inline]
     fn from_usize(i: usize) -> Self {
-        iter::once(Ok(i)).collect()
+        iter::once(i).collect()
     }
 }
