@@ -75,6 +75,7 @@
     clippy::implicit_return,
     clippy::inline_always,
     clippy::let_underscore_untyped,
+    clippy::manual_assert,
     clippy::min_ident_chars,
     clippy::missing_trait_methods,
     clippy::mod_module_files,
@@ -152,14 +153,44 @@ macro_rules! get_mut {
         result
     }};
 }
+
+/// Unreachable state, but checked if we're debugging.
+#[cfg(any(debug_assertions, test))]
+macro_rules! never {
+    () => {
+        unreachable!()
+    };
+}
+
+/// Unreachable state, but checked if we're debugging.
+#[cfg(not(any(debug_assertions, test)))]
+macro_rules! never {
+    () => {{
+        #[allow(unsafe_code, unused_unsafe)]
+        unsafe {
+            core::hint::unreachable_unchecked()
+        }
+    }};
+}
 */
 
 // TODO: derive ToSrc
 
+// TODO: Macro that isn't context-aware but just dumps the codegen right there
+
+mod call;
+mod num;
+
 #[cfg(test)]
 mod test;
 
-pub use inator_automata::{Deterministic as Parser, *};
+pub use {
+    call::call,
+    fixpoint::{fixpoint, Fixpoint},
+    inator_automata::{Deterministic as Parser, *},
+    num::{digit, integer},
+    recurse::{recurse, Recurse},
+};
 
 use core::iter;
 use std::collections::{BTreeMap, BTreeSet};
@@ -192,7 +223,7 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
             },
             State {
                 non_accepting: iter::once(format!(
-                    "Expected only a single token on [{}..={}] but got another token after it",
+                    "Expected a token in the range [{}..={}] but input ended",
                     range.first.to_src(),
                     range.last.to_src(),
                 ))

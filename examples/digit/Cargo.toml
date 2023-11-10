@@ -1,0 +1,11 @@
+[package]
+name = "inator-digit-test"
+version = "0.1.0"
+edition = "2021"
+
+
+[build-dependencies]
+inator = { path = "../.." }
+
+[dev-dependencies]
+quickcheck = "1.0.3"

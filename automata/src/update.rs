@@ -19,14 +19,14 @@ pub struct Update<I: Input> {
     /// Representation of the type of tokens.
     pub ghost: PhantomData<I>,
     /// Source-code representation that's promised to compile to a call operationally identical to `ptr`.
-    pub src: &'static str,
+    pub src: String,
 }
 
 impl<I: Input> Update<I> {
     /// Internals of the `update!` macro.
     #[inline]
     #[must_use]
-    pub fn _update_macro<T: ToSrc, U: ToSrc>(src: &'static str, _: fn(T, I) -> U) -> Self {
+    pub fn _update_macro<T: ToSrc, U: ToSrc>(src: String, _: fn(T, I) -> U) -> Self {
         Self {
             input_t: T::src_type(),
             output_t: U::src_type(),
@@ -66,7 +66,7 @@ impl<I: Input> PartialOrd for Update<I> {
 impl<I: Input> Ord for Update<I> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.src.cmp(other.src)
+        self.src.cmp(&other.src)
     }
 }
 
@@ -84,7 +84,7 @@ impl<I: Input> Clone for Update<I> {
             input_t: self.input_t.clone(),
             output_t: self.output_t.clone(),
             ghost: self.ghost,
-            src: self.src,
+            src: self.src.clone(),
         }
     }
 }

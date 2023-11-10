@@ -36,6 +36,58 @@ impl ToSrc for () {
     }
 }
 
+impl ToSrc for u16 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u16".to_owned()
+    }
+}
+
+impl ToSrc for u32 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u32".to_owned()
+    }
+}
+
+impl ToSrc for u64 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u64".to_owned()
+    }
+}
+
+impl ToSrc for u128 {
+    #[inline]
+    #[must_use]
+    fn to_src(&self) -> String {
+        format!("{self}")
+    }
+    #[inline]
+    #[must_use]
+    fn src_type() -> String {
+        "u128".to_owned()
+    }
+}
+
 impl ToSrc for usize {
     #[inline]
     #[must_use]
@@ -53,7 +105,6 @@ impl ToSrc for u8 {
     #[inline]
     #[must_use]
     fn to_src(&self) -> String {
-        // format!("{self}")
         format!("b'{}'", self.escape_ascii())
     }
     #[inline]
@@ -234,7 +285,9 @@ pub fn parse<I: IntoIterator<Item = {token_t}>>(input: I) -> Result<{output_t}, 
             self.states
                 .iter()
                 .enumerate()
-                .try_fold(String::new(), |acc, (i, s)| Ok(acc + &s.to_src(i)?))?,
+                .try_fold(String::new(), |acc, (i, s)| Ok(
+                    acc + &s.to_src(i, &self.states, &self.tags)?
+                ))?,
         ))
     }
 }
@@ -242,8 +295,15 @@ pub fn parse<I: IntoIterator<Item = {token_t}>>(input: I) -> Result<{output_t}, 
 impl<I: Input> State<I, usize> {
     /// Translate a value into Rust source code that reproduces it.
     #[inline]
-    fn to_src(&self, i: usize) -> Result<String, IllFormed<I, usize>> {
-        let input_t = self.input_type()?.unwrap_or("core::convert::Infallible");
+    fn to_src(
+        &self,
+        i: usize,
+        all_states: &[Self],
+        all_tags: &BTreeMap<String, usize>,
+    ) -> Result<String, IllFormed<I, usize>> {
+        let input_t = self
+            .input_type(all_states, all_tags)?
+            .unwrap_or("core::convert::Infallible");
         let token_t = I::src_type();
         let on_some = self.transitions.to_src();
         let on_none = self.non_accepting.first().map_or_else(
@@ -324,7 +384,7 @@ impl<I: Input> Transition<I, usize> {
         match *self {
             Self::Lateral {
                 dst,
-                update: Update { src, .. },
+                update: Update { ref src, .. },
             } => format!("state_{dst}(input, ({src})(acc, token), stack_top)"),
             Self::Call {
                 region,
@@ -356,7 +416,8 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Graph<I, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "Nondeterministic {{ states: {}, initial: {} }}",
+            "{} {{ states: {}, initial: {} }}",
+            Self::src_type(),
             self.states.to_src(),
             self.initial.to_src(),
         )

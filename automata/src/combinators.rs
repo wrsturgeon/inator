@@ -6,7 +6,7 @@
 
 //! Operations on nondeterministic finite automata returning nondeterministic finite automata.
 
-#![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
+#![allow(clippy::match_wild_err_arm, clippy::panic)]
 
 use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition};
 use core::{iter, mem, ops};

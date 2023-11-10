@@ -70,7 +70,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             let Some(state) = self.states.get(i) else {
                 return Err(IllFormed::OutOfBounds(i));
             };
-            if let Some(t) = state.input_type()? {
+            if let Some(t) = state.input_type(&self.states, &self.tags)? {
                 if t != "()" {
                     return Err(IllFormed::InitialNotUnit(t.to_owned()));
                 }
@@ -214,9 +214,9 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             .try_fold(None, |acc: Option<&str>, state| {
                 if state.non_accepting.is_empty() {
                     acc.map_or_else(
-                        || state.input_type(),
+                        || state.input_type(&self.states, &self.tags),
                         |t| {
-                            if let Some(input_t) = state.input_type()? {
+                            if let Some(input_t) = state.input_type(&self.states, &self.tags)? {
                                 if input_t != t {
                                     return Err(IllFormed::WrongReturnType(
                                         t.to_owned(),

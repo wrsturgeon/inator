@@ -34,22 +34,22 @@ pub enum Error {
     },
 }
 
-type R<I> = Result<(Option<(usize, Option<F<I>>)>, ()), Error>;
+type R<I> = Result<(Option<(usize, Option<F<I>>)>, u8), Error>;
 
 #[repr(transparent)]
-struct F<I>(fn(&mut I, ()) -> R<I>);
+struct F<I>(fn(&mut I, u8) -> R<I>);
 
 #[inline]
-pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<(), Error> {
+pub fn parse<I: IntoIterator<Item = u8>>(input: I) -> Result<u8, Error> {
     state_1(&mut input.into_iter().enumerate(), (), None)
 }
 
 #[inline]
 fn state_0<I: Iterator<Item = (usize, u8)>>(
     input: &mut I,
-    acc: (),
+    acc: u8,
     stack_top: Option<(&'static str, usize)>,
-) -> Result<(), Error> {
+) -> Result<u8, Error> {
     match input.next() {
         None => stack_top.map_or(Ok(acc), |(region, opened)| {
             Err(Error::Unclosed { region, opened })
@@ -68,18 +68,10 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
 ) -> Result<(), Error> {
     match input.next() {
         None => Err(Error::UserDefined {
-            messages: &[
-                "Expected a token in the range [b\' \'..=b\' \'] but input ended",
-                "Expected a token in the range [b\'\\n\'..=b\'\\n\'] but input ended",
-                "Expected a token in the range [b\'\\r\'..=b\'\\r\'] but input ended",
-                "Expected a token in the range [b\'\\t\'..=b\'\\t\'] but input ended",
-            ],
+            messages: &["Expected a token in the range [b\'0\'..=b\'9\'] but input ended"],
         }),
         Some((index, token)) => match token {
-            b'\t'..=b'\t' => state_0(input, (|(), _| {})(acc, token), stack_top),
-            b'\n'..=b'\n' => state_0(input, (|(), _| {})(acc, token), stack_top),
-            b'\r'..=b'\r' => state_0(input, (|(), _| {})(acc, token), stack_top),
-            b' '..=b' ' => state_0(input, (|(), _| {})(acc, token), stack_top),
+            b'0'..=b'9' => state_0(input, (|(), i| i - b'0')(acc, token), stack_top),
             _ => Err(Error::Absurd { index, token }),
         },
     }

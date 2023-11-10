@@ -268,6 +268,8 @@ mod prop {
             }
         }
 
+        // TODO: test that running sort twice does not decrease the number of states the second time.
+
         fn shr(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) -> bool {
             let splittable = (0..=input.len()).any(|i| {
                 lhs.accept(input[..i].iter().copied()).is_ok() &&
