@@ -7,8 +7,8 @@
 //! Automaton loosely based on visibly pushdown automata.
 
 use crate::{
-    try_merge, Check, Ctrl, Curry, IllFormed, Input, InputError, Merge, ParseError, RangeMap,
-    State, Transition,
+    try_merge, Call, Check, Ctrl, Curry, IllFormed, Input, Merge, RangeMap, State, Transition,
+    Transitions,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -93,28 +93,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         NonZeroUsize::new(n_states).map_or(Ok(()), |nz| {
             self.states.iter().try_fold((), |(), state| state.check(nz))
         })
-    }
-
-    /// Run this parser to completion and check types along the way.
-    /// # Errors
-    /// If the parser determines there should be an error.
-    #[inline]
-    #[allow(unsafe_code)]
-    pub fn accept<In: IntoIterator<Item = I>>(
-        &self,
-        input: In,
-    ) -> Result<String, ParseError<I, C>> {
-        use crate::Run;
-        let mut run = input.run(self);
-        for r in &mut run {
-            drop(r?);
-        }
-        for i in run.ctrl.view() {
-            if get!(self.states, i).non_accepting.is_empty() {
-                return Ok(run.output_t);
-            }
-        }
-        Err(ParseError::BadInput(InputError::NotAccepting))
     }
 
     /// Subset construction algorithm for determinizing nondeterministic automata.
@@ -297,7 +275,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
 #[allow(clippy::type_complexity)]
 fn fix_indices_curry<I: Input, C: Ctrl<I>>(value: Curry<I, C>, ordering: &[C]) -> Curry<I, usize> {
     match value {
-        Curry::Wildcard(etc) => Curry::Wildcard(fix_indices_transition(etc, ordering)),
+        Curry::Wildcard(etc) => Curry::Wildcard(fix_indices_transitions(etc, ordering)),
         Curry::Scrutinize(etc) => Curry::Scrutinize(fix_indices_range_map(etc, ordering)),
     }
 }
@@ -313,7 +291,7 @@ fn fix_indices_range_map<I: Input, C: Ctrl<I>>(
         value
             .0
             .into_iter()
-            .map(|(k, v)| (k, fix_indices_transition(v, ordering)))
+            .map(|(k, v)| (k, fix_indices_transitions(v, ordering)))
             .collect(),
     )
 }
@@ -329,17 +307,6 @@ fn fix_indices_transition<I: Input, C: Ctrl<I>>(
         Transition::Lateral { dst, update } => Transition::Lateral {
             dst: unwrap!(ordering.binary_search(&dst)),
             update,
-        },
-        Transition::Call {
-            region,
-            detour,
-            dst,
-            combine,
-        } => Transition::Call {
-            region,
-            detour: unwrap!(ordering.binary_search(&detour)),
-            dst: unwrap!(ordering.binary_search(&dst)),
-            combine,
         },
         Transition::Return { region } => Transition::Return { region },
     }
@@ -358,5 +325,34 @@ impl<I: Input> Graph<I, usize> {
             fs::write(&path, src)?;
             Command::new("rustfmt").arg(path).output().map(|_| {})
         })
+    }
+}
+
+/// Use an ordering on subsets to translate each subset into a specific state.
+#[inline]
+#[allow(clippy::type_complexity)]
+fn fix_indices_transitions<I: Input, C: Ctrl<I>>(
+    value: Transitions<I, C>,
+    ordering: &[C],
+) -> Transitions<I, usize> {
+    Transitions {
+        calls: value
+            .calls
+            .into_iter()
+            .map(|c| fix_indices_call(c, ordering))
+            .collect(),
+        dst: fix_indices_transition(value.dst, ordering),
+    }
+}
+
+/// Use an ordering on subsets to translate each subset into a specific state.
+#[inline]
+#[allow(clippy::type_complexity)]
+fn fix_indices_call<I: Input, C: Ctrl<I>>(value: Call<I, C>, ordering: &[C]) -> Call<I, usize> {
+    Call {
+        region: value.region,
+        init: unwrap!(ordering.binary_search(&value.init)),
+        combine: value.combine,
+        ghost: value.ghost,
     }
 }

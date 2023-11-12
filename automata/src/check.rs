@@ -6,7 +6,9 @@
 
 //! Check well-formedness.
 
-use crate::{Ctrl, Curry, Input, Range, RangeMap, State, ToSrc, Transition, Update, FF};
+use crate::{
+    Call, Ctrl, Curry, Input, Range, RangeMap, State, ToSrc, Transition, Transitions, Update, FF,
+};
 use core::{fmt, mem, num::NonZeroUsize};
 use std::collections::BTreeSet;
 
@@ -33,9 +35,9 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
         /// Input token (or range thereof) that could be ambiguous.
         arg_token: Option<Range<I>>,
         /// First output possibility.
-        possibility_1: Box<Transition<I, C>>,
+        possibility_1: Box<Transitions<I, C>>,
         /// Second output possibility.
-        possibility_2: Box<Transition<I, C>>,
+        possibility_2: Box<Transitions<I, C>>,
     },
     /// Can't go to two different (deterministic) states at the same time.
     Superposition(usize, usize),
@@ -256,9 +258,24 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for Transition<I, C> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         match *self {
-            Self::Lateral { ref dst, .. } | Self::Call { ref dst, .. } => dst.check(n_states),
+            Self::Lateral { ref dst, .. } => dst.check(n_states),
             Self::Return { .. } => Ok(()),
         }
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Check<I, C> for Transitions<I, C> {
+    #[inline]
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
+        self.calls.iter().try_fold((), |(), c| c.check(n_states))?;
+        self.dst.check(n_states)
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Check<I, C> for Call<I, C> {
+    #[inline]
+    fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
+        self.init.check(n_states)
     }
 }
 

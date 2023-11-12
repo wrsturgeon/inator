@@ -6,7 +6,7 @@
 
 //! Apply a function to each index in a structure.
 
-use crate::{Ctrl, Curry, Graph, Input, RangeMap, State, Transition};
+use crate::{Call, Ctrl, Curry, Graph, Input, RangeMap, State, Transition, Transitions};
 
 impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// Apply a function to each index.
@@ -66,24 +66,43 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
-    pub fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
+    pub fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
         match self {
             Self::Lateral { dst, update } => Self::Lateral {
                 dst: dst.map_indices(f),
                 update,
             },
-            Self::Call {
-                region,
-                detour,
-                dst,
-                combine,
-            } => Self::Call {
-                region,
-                detour: detour.map_indices(&mut f),
-                dst: dst.map_indices(f),
-                combine,
-            },
             Self::Return { region } => Self::Return { region },
+        }
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Transitions<I, C> {
+    /// Apply a function to each index.
+    #[inline]
+    #[must_use]
+    pub fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
+        Self {
+            calls: self
+                .calls
+                .into_iter()
+                .map(|c| c.map_indices(&mut f))
+                .collect(),
+            dst: self.dst.map_indices(f),
+        }
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Call<I, C> {
+    /// Apply a function to each index.
+    #[inline]
+    #[must_use]
+    pub fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
+        Self {
+            region: self.region,
+            init: self.init.map_indices(f),
+            combine: self.combine,
+            ghost: self.ghost,
         }
     }
 }

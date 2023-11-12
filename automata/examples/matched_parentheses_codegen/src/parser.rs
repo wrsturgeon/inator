@@ -58,7 +58,7 @@ fn state_0<I: Iterator<Item = (usize, char)>>(
             '('..='(' => {
                 let detour = state_0(input, (), Some(("parentheses", index)))?;
                 let postprocessed = (|(), ()| ())(acc, detour);
-                state_0(input, postprocessed, stack_top)
+                state_0(input, (|(), _| ())(acc, token), stack_top)
             }
             ')'..=')' => match stack_top {
                 Some((region, _)) if region == "parentheses" => Ok(acc),

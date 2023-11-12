@@ -156,6 +156,8 @@ macro_rules! get_mut {
 
 // TODO: derive ToSrc
 
+mod nest;
+
 #[cfg(test)]
 mod test;
 
@@ -198,7 +200,14 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
                 ))
                 .collect(),
                 transitions: Curry::Scrutinize(RangeMap(
-                    iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
+                    iter::once((
+                        range,
+                        Transitions {
+                            calls: vec![],
+                            dst: Transition::Lateral { dst: 0, update },
+                        },
+                    ))
+                    .collect(),
                 )),
             },
         ],

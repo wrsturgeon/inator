@@ -8,7 +8,9 @@
 
 #![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
 
-use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition};
+use crate::{
+    Call, Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition, Transitions,
+};
 use core::{iter, mem, ops};
 use std::collections::BTreeSet;
 
@@ -81,7 +83,10 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
         for state in &mut s.states {
             state.transitions = mem::replace(
                 &mut state.transitions,
-                Curry::Wildcard(Transition::Return { region: "" }),
+                Curry::Wildcard(Transitions {
+                    calls: vec![],
+                    dst: Transition::Return { region: "" },
+                }),
             )
             .merge(rhs_init.clone())
             .unwrap_or_else(|e| panic!("{e}"));
@@ -129,7 +134,7 @@ fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
 ) -> Curry<I, BTreeSet<usize>> {
     match s {
         Curry::Wildcard(t) => {
-            Curry::Wildcard(add_tail_call_transition(t, other_init, accepting_indices))
+            Curry::Wildcard(add_tail_call_transitions(t, other_init, accepting_indices))
         }
         Curry::Scrutinize(rm) => {
             Curry::Scrutinize(add_tail_call_range_map(rm, other_init, accepting_indices))
@@ -150,11 +155,29 @@ fn add_tail_call_range_map<I: Input, C: Ctrl<I>>(
             .map(|(k, v)| {
                 (
                     k,
-                    add_tail_call_transition(v, other_init, accepting_indices),
+                    add_tail_call_transitions(v, other_init, accepting_indices),
                 )
             })
             .collect(),
     )
+}
+
+/// Add a tail call to any accepting state.
+#[inline]
+#[must_use]
+fn add_tail_call_transitions<I: Input, C: Ctrl<I>>(
+    s: Transitions<I, C>,
+    other_init: &BTreeSet<usize>,
+    accepting_indices: &BTreeSet<usize>,
+) -> Transitions<I, BTreeSet<usize>> {
+    Transitions {
+        calls: s
+            .calls
+            .iter()
+            .map(|c| add_tail_call_call(c, other_init, accepting_indices))
+            .collect(),
+        dst: add_tail_call_transition(s.dst, other_init, accepting_indices),
+    }
 }
 
 /// Add a tail call to any accepting state.
@@ -169,17 +192,6 @@ fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
         Transition::Lateral { ref dst, update } => Transition::Lateral {
             dst: add_tail_call_c(dst, other_init, accepting_indices),
             update,
-        },
-        Transition::Call {
-            region,
-            ref detour,
-            ref dst,
-            combine,
-        } => Transition::Call {
-            region,
-            detour: add_tail_call_c(detour, other_init, accepting_indices),
-            dst: add_tail_call_c(dst, other_init, accepting_indices),
-            combine,
         },
         Transition::Return { region } => Transition::Return { region },
     }
@@ -199,5 +211,21 @@ fn add_tail_call_c<I: Input, C: Ctrl<I>>(
         iter.chain(other_init.iter().copied()).collect()
     } else {
         iter.collect()
+    }
+}
+
+/// Add a tail call only to accepting states.
+#[inline]
+#[must_use]
+fn add_tail_call_call<I: Input, C: Ctrl<I>>(
+    c: &Call<I, C>,
+    other_init: &BTreeSet<usize>,
+    accepting_indices: &BTreeSet<usize>,
+) -> Call<I, BTreeSet<usize>> {
+    Call {
+        region: c.region,
+        init: add_tail_call_c(&c.init, other_init, accepting_indices),
+        combine: c.combine.clone(),
+        ghost: c.ghost,
     }
 }

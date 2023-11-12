@@ -6,7 +6,9 @@
 
 //! Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
 
-use crate::{Ctrl, Curry, Graph, Input, Nondeterministic, RangeMap, State, Transition};
+use crate::{
+    Call, Ctrl, Curry, Graph, Input, Nondeterministic, RangeMap, State, Transition, Transitions,
+};
 use std::collections::BTreeSet;
 
 impl<I: Input, C: Ctrl<I>> Graph<I, C> {
@@ -56,6 +58,17 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     }
 }
 
+impl<I: Input, C: Ctrl<I>> Transitions<I, C> {
+    /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
+    #[inline]
+    pub fn generalize(self) -> Transitions<I, BTreeSet<usize>> {
+        Transitions {
+            calls: self.calls.into_iter().map(Call::generalize).collect(),
+            dst: self.dst.generalize(),
+        }
+    }
+}
+
 impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
     #[inline]
@@ -65,18 +78,20 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 dst: dst.view().collect(),
                 update,
             },
-            Self::Call {
-                region,
-                detour,
-                dst,
-                combine,
-            } => Transition::Call {
-                region,
-                detour: detour.view().collect(),
-                dst: dst.view().collect(),
-                combine,
-            },
             Self::Return { region } => Transition::Return { region },
+        }
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Call<I, C> {
+    /// Un-determinize an automaton to return a practically identical (but nominally nondeterministic) version.
+    #[inline]
+    pub fn generalize(self) -> Call<I, BTreeSet<usize>> {
+        Call {
+            region: self.region,
+            init: self.init.view().collect(),
+            combine: self.combine,
+            ghost: self.ghost,
         }
     }
 }
