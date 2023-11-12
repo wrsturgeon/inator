@@ -73,7 +73,7 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
             b'\n'..=b'\n' => state_0(input, acc, stack_top),
             b'\r'..=b'\r' => state_0(input, acc, stack_top),
             b' '..=b' ' => state_0(input, acc, stack_top),
-            _ => Err(Error::Absurd { index, token }),
+            _ => Err(Error::Absurd { index, token })
         },
     }
 }

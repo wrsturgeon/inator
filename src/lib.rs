@@ -205,7 +205,14 @@ pub fn on_any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<
                 .collect(),
                 transitions: Curry::Scrutinize {
                     filter: RangeMap(
-                        iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
+                        iter::once((
+                            range,
+                            Transition::Lateral {
+                                dst: 0,
+                                update: Some(update),
+                            },
+                        ))
+                        .collect(),
                     ),
                     fallback: None,
                 },
@@ -222,9 +229,11 @@ pub fn any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
     Graph {
         states: vec![
             State {
-                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                },
                 non_accepting: BTreeSet::new(),
-                fallback: None,
             },
             State {
                 non_accepting: iter::once(format!(
@@ -233,17 +242,19 @@ pub fn any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
                     range.last.to_src(),
                 ))
                 .collect(),
-                transitions: Curry::Scrutinize(RangeMap(
-                    iter::once((
-                        range,
-                        Transition::Lateral {
-                            dst: 0,
-                            update: None,
-                        },
-                    ))
-                    .collect(),
-                )),
-                fallback: None,
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(
+                        iter::once((
+                            range,
+                            Transition::Lateral {
+                                dst: 0,
+                                update: None,
+                            },
+                        ))
+                        .collect(),
+                    ),
+                    fallback: None,
+                },
             },
         ],
         initial: 1,

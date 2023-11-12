@@ -256,12 +256,6 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for RangeMap<I, C> {
 impl<I: Input, C: Ctrl<I>> Check<I, C> for State<I, C> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
-        if let Some(ref t) = self.fallback {
-            t.check(n_states)?;
-            if let Curry::Wildcard(ref w) = self.transitions {
-                return Err(IllFormed::FallbackOverlap);
-            }
-        }
         self.transitions.check(n_states)
     }
 }
