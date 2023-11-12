@@ -332,9 +332,12 @@ impl<I: Input> Transition<I, usize> {
     #[must_use]
     fn to_src(&self) -> String {
         match *self {
+            Self::Lateral { dst, update: None } => {
+                format!("state_{dst}(input, acc, stack_top)")
+            }
             Self::Lateral {
                 dst,
-                update: Update { src, .. },
+                update: Some(Update { src, .. }),
             } => format!("state_{dst}(input, ({src})(acc, token), stack_top)"),
             Self::Call {
                 region,

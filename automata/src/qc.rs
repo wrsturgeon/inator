@@ -7,7 +7,7 @@
 //! `QuickCheck` implementations for various types.
 
 use crate::{Ctrl, Curry, Graph, Input, Range, RangeMap, State, Transition, Update, FF};
-use core::{iter, marker::PhantomData, num::NonZeroUsize};
+use core::{iter, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -170,12 +170,7 @@ shrink_only!(|self: &Transition| {
             Box::new(
                 Self::Lateral {
                     dst: dst.clone(),
-                    update: Update {
-                        input_t: "()".to_owned(),
-                        output_t: "()".to_owned(),
-                        ghost: PhantomData,
-                        src: "/* FAKE SOURCE CODE */",
-                    },
+                    update: None,
                 }
                 .shrink()
                 .chain((detour, dst, combine).shrink().map(

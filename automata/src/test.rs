@@ -9,8 +9,10 @@
     clippy::indexing_slicing,
     clippy::integer_division,
     clippy::panic,
+    clippy::print_stdout,
     clippy::unreachable,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::use_debug
 )]
 
 #[cfg(feature = "quickcheck")]
@@ -289,7 +291,10 @@ mod prop {
 
 mod reduced {
     use crate::*;
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        panic,
+    };
 
     fn deterministic_implies_no_runtime_errors(d: &Deterministic<u8>, input: Vec<u8>) {
         if let Err(ParseError::BadParser(e)) = d.accept(input) {
@@ -304,6 +309,84 @@ mod reduced {
         };
         assert_eq!(dd.accept(input.iter().copied()), d.accept(input));
     }
+
+    /*
+    fn union(lhs: &Deterministic<u8>, rhs: &Deterministic<u8>, input: &[u8]) {
+        let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
+            return;
+        };
+        union.check().unwrap();
+        if union.determinize().is_err() {
+            return;
+        }
+        {
+            println!();
+            println!("LHS:");
+            let mut run = input.iter().copied().run(lhs);
+            println!("      {run:?}");
+            while let Some(r) = run.next() {
+                println!("{r:?} {run:?}");
+            }
+        }
+        {
+            println!();
+            println!("RHS:");
+            let mut run = input.iter().copied().run(rhs);
+            println!("      {run:?}");
+            while let Some(r) = run.next() {
+                println!("{r:?} {run:?}");
+            }
+        }
+        {
+            println!();
+            println!("Union:");
+            let mut run = input.iter().copied().run(&union);
+            println!("      {run:?}");
+            while let Some(r) = run.next() {
+                println!("{r:?} {run:?}");
+            }
+        }
+        let union_accept = union.accept(input.iter().copied());
+        match (
+            lhs.accept(input.iter().copied()),
+            rhs.accept(input.iter().copied()),
+        ) {
+            (Ok(a), Ok(b)) => {
+                if a == b {
+                    assert_eq!(union_accept, Ok(a));
+                } else {
+                    assert!(matches!(union_accept, Err(ParseError::BadParser(..))));
+                }
+            }
+            (Err(e), Ok(out)) | (Ok(out), Err(e)) => match e {
+                ParseError::BadInput(..) => assert_eq!(union_accept, Ok(out)),
+                ParseError::BadParser(..) => unreachable!(),
+            },
+            (Err(ParseError::BadParser(..)), Err(..))
+            | (Err(..), Err(ParseError::BadParser(..))) => {
+                assert!(matches!(union_accept, Err(ParseError::BadParser(..))));
+            }
+            (Err(ParseError::BadInput(..)), Err(ParseError::BadInput(..))) => {
+                drop(union_accept.unwrap_err());
+            }
+        }
+    }
+
+    fn shr(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) {
+        let splittable = (0..=input.len()).any(|i| {
+            lhs.accept(input[..i].iter().copied()).is_ok()
+                && rhs.accept(input[i..].iter().copied()).is_ok()
+        });
+        let Ok(concat) = panic::catch_unwind(|| lhs >> rhs) else {
+            return;
+        };
+        concat.check().unwrap();
+        if concat.determinize().is_err() {
+            return;
+        }
+        assert_eq!(concat.accept(input).is_ok(), splittable);
+    }
+    */
 
     #[test]
     fn deterministic_implies_no_runtime_errors_1() {
@@ -327,7 +410,7 @@ mod reduced {
                     State {
                         transitions: Curry::Wildcard(Transition::Lateral {
                             dst: 4,
-                            update: update!(|(), _| {}),
+                            update: None,
                         }),
                         non_accepting: BTreeSet::new(),
                     },

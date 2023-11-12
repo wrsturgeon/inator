@@ -20,7 +20,7 @@ pub enum Transition<I: Input, C: Ctrl<I>> {
         /// Go to this state.
         dst: C,
         /// Call this Rust function to update the output we're building.
-        update: Update<I>,
+        update: Option<Update<I>>,
     },
     /// Call another function--i.e., push a pointer/index onto the stack.
     Call {
@@ -144,7 +144,11 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 ref update,
             } => Ok(Some((
                 dst.clone(),
-                update.invoke(output_t).map_err(ParseError::BadParser)?,
+                if let &Some(ref u) = update {
+                    u.invoke(output_t).map_err(ParseError::BadParser)?
+                } else {
+                    output_t.to_owned()
+                },
             ))),
             Self::Call {
                 ref detour,
@@ -168,7 +172,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     #[must_use]
     pub fn input_type(&self) -> Option<&str> {
         match *self {
-            Self::Lateral { ref update, .. } => Some(&update.input_t),
+            Self::Lateral { ref update, .. } => update.as_ref().map(|u| u.input_t.as_str()),
             Self::Call { ref combine, .. } => Some(&combine.lhs_t),
             Self::Return { .. } => None,
         }
