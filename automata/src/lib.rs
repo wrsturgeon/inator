@@ -247,6 +247,7 @@ pub fn dyck_d() -> Deterministic<char> {
                 .collect(),
             )),
             non_accepting: BTreeSet::new(),
+            fallback: None,
         }],
         initial: 0,
     }
@@ -280,6 +281,7 @@ pub fn dyck_nd() -> Nondeterministic<char> {
                 .collect(),
             )),
             non_accepting: BTreeSet::new(),
+            fallback: None,
         }],
         initial: iter::once(0).collect(),
     }

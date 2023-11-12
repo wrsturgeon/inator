@@ -122,6 +122,10 @@ impl<I: Input, C: Ctrl<I>> Merge for State<I, C> {
                 self.non_accepting.extend(other.non_accepting);
                 self.non_accepting
             },
+            fallback: self
+                .fallback
+                .merge(other.fallback)
+                .map_or_else(|(a, b)| a.merge(b).map(Some), Ok)?,
         })
     }
 }

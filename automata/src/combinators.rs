@@ -116,6 +116,9 @@ fn add_tail_call_state<I: Input, C: Ctrl<I>>(
     State {
         transitions: add_tail_call_curry(s.transitions, other_init, accepting_indices),
         non_accepting: s.non_accepting,
+        fallback: s
+            .fallback
+            .map(|f| add_tail_call_transition(f, other_init, accepting_indices)),
     }
 }
 

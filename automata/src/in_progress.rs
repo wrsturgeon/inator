@@ -116,7 +116,8 @@ fn step<I: Input, C: Ctrl<I>>(
     // Merge into a huge aggregate transition and act on that instead of individual transitions
     match try_merge(states.filter_map(|s| match s.transitions.get(&token) {
         Err(e) => Some(Err(e)),
-        Ok(opt) => opt.map(|t| Ok(t.clone())),
+        Ok(None) => s.fallback.as_ref().map(|t| Ok(t.clone())),
+        Ok(Some(t)) => Some(Ok(t.clone())),
     })) {
         None => Err(ParseError::BadInput(InputError::Absurd)),
         Some(Err(e)) => Err(ParseError::BadParser(e)),

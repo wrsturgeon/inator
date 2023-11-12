@@ -27,6 +27,7 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
         State {
             transitions: self.transitions.generalize(),
             non_accepting: self.non_accepting,
+            fallback: self.fallback.map(Transition::generalize),
         }
     }
 }

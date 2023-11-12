@@ -21,6 +21,7 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
         State {
             transitions: self.transitions.reindex(states, index_map),
             non_accepting: self.non_accepting.clone(),
+            fallback: self.fallback.as_ref().map(|f| f.reindex(states, index_map)),
         }
     }
 }
