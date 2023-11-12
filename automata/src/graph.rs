@@ -196,6 +196,10 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             .transitions
             .values()
             .flat_map(|t| t.dsts().into_iter().cloned())
+            .chain(mega_state.fallback.as_ref().map_or_else(
+                || vec![].into_iter().cloned(),
+                |f| f.dsts().into_iter().cloned(),
+            ))
             .collect();
 
         // Insert the finished value (also to tell all below iterations that we've covered this case)

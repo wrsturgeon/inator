@@ -369,4 +369,29 @@ mod reduced {
             vec![],
         );
     }
+
+    #[test]
+    fn determinize_identity_2() {
+        determinize_identity(
+            &Graph {
+                states: vec![
+                    State {
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                        non_accepting: BTreeSet::new(),
+                        fallback: None,
+                    },
+                    State {
+                        transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                        non_accepting: BTreeSet::new(),
+                        fallback: Some(Transition::Lateral {
+                            dst: 0,
+                            update: update!(|_: u8, _| ()),
+                        }),
+                    },
+                ],
+                initial: 1,
+            },
+            vec![],
+        );
+    }
 }
