@@ -212,7 +212,7 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
 /// Accept exactly this token and do exactly these things.
 #[inline]
 #[must_use]
-pub fn tok<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
+pub fn on<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
     any_of(Range::unit(token), update)
 }
 
@@ -220,7 +220,7 @@ pub fn tok<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
 #[inline]
 #[must_use]
 pub fn toss<I: Input>(token: I) -> Deterministic<I> {
-    tok(token, update!(|(), _| {}))
+    on(token, Update {input_t:})
 }
 
 /// Accept exactly this token and do nothing.

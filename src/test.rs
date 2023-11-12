@@ -45,5 +45,11 @@ mod prop {
             if parser.check().is_err() { return false; }
             parser.accept(input.iter().copied()).is_ok() == (input.len() == 1 && range.contains(&input[0]))
         }
+
+        fn star_in_paren(count: u8) -> bool {
+            let input = iter::once('(').chain(iter::repeat('a').take(usize::from(count))).chain(iter::once(')'));
+            let parser = open("parentheses", c('(')) >> c('a').star() << close("parentheses", c(')'));
+            parser.accept(input).is_ok()
+        }
     }
 }
