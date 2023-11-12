@@ -267,6 +267,10 @@ impl<I: Input> State<I, usize> {
                     + "] })"
             },
         );
+        let on_unrecognized = self.fallback.as_ref().map_or_else(
+            || "Err(Error::Absurd { index, token })".to_owned(),
+            Transition::to_src,
+        );
         Ok(format!(
             r#"
 
@@ -276,7 +280,7 @@ fn state_{i}<I: Iterator<Item = (usize, {token_t})>>(input: &mut I, acc: {input_
     match input.next() {{
         None => {on_none},
         Some((index, token)) => match token {{{on_some}
-            _ => Err(Error::Absurd {{ index, token }}),
+            _ => {on_unrecognized},
         }},
     }}
 }}"#,

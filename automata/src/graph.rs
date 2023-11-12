@@ -146,10 +146,12 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                     let State {
                         transitions,
                         non_accepting,
+                        fallback,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
                         transitions: fix_indices_curry(transitions, &ordering),
                         non_accepting,
+                        fallback: fallback.map(|f| fix_indices_transition(f, &ordering)),
                     }
                 })
                 .collect(),
@@ -181,6 +183,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             None => State {
                 transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
                 non_accepting: iter::once("Unexpected token".to_owned()).collect(),
+                fallback: None,
             },
             // If they successfully merged, return the merged state
             Some(Ok(ok)) => ok,

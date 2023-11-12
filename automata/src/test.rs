@@ -312,6 +312,7 @@ mod reduced {
                 states: vec![State {
                     transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                     non_accepting: BTreeSet::new(),
+                    fallback: None,
                 }],
                 initial: 0,
             },
@@ -330,18 +331,22 @@ mod reduced {
                             update: update!(|(), _| {}),
                         }),
                         non_accepting: BTreeSet::new(),
+                        fallback: None,
                     },
                     State {
                         transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                         non_accepting: BTreeSet::new(),
+                        fallback: None,
                     },
                     State {
                         transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
                         non_accepting: BTreeSet::new(),
+                        fallback: None,
                     },
                     State {
                         transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                         non_accepting: iter::once(String::new()).collect(),
+                        fallback: None,
                     },
                     State {
                         transitions: Curry::Wildcard(Transition::Call {
@@ -356,6 +361,7 @@ mod reduced {
                             },
                         }),
                         non_accepting: BTreeSet::new(),
+                        fallback: None,
                     },
                 ],
                 initial: 0,

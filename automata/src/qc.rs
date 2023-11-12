@@ -120,11 +120,16 @@ macro_rules! shrink_only {
 }
 
 shrink_only!(|self: &State| Box::new(
-    (self.transitions.clone(), self.non_accepting.clone(),)
+    (
+        self.transitions.clone(),
+        self.non_accepting.clone(),
+        self.fallback.clone()
+    )
         .shrink()
-        .map(|(transitions, non_accepting)| Self {
+        .map(|(transitions, non_accepting, fallback)| Self {
             transitions,
             non_accepting,
+            fallback
         })
 ));
 
@@ -190,6 +195,7 @@ impl<C: Ctrl<u8>> State<u8, C> {
         Self {
             transitions: Curry::arbitrary_given(n_states, g),
             non_accepting: BTreeSet::arbitrary(g),
+            fallback: bool::arbitrary(g).then(|| Transition::arbitrary_given(n_states, g)),
         }
     }
 }

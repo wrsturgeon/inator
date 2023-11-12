@@ -175,6 +175,7 @@ pub fn empty<I: Input>() -> Deterministic<I> {
         states: vec![State {
             transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
             non_accepting: BTreeSet::new(),
+            fallback: None,
         }],
         initial: 0,
     }
@@ -189,6 +190,7 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
             State {
                 transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
                 non_accepting: BTreeSet::new(),
+                fallback: None,
             },
             State {
                 non_accepting: iter::once(format!(
@@ -200,6 +202,7 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
                 transitions: Curry::Scrutinize(RangeMap(
                     iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
                 )),
+                fallback: None,
             },
         ],
         initial: 1,
