@@ -6,7 +6,7 @@
 
 //! State, i.e. a node in an automaton graph.
 
-use crate::{Ctrl, Curry, IllFormed, Input, Transition};
+use crate::{Ctrl, Curry, IllFormed, Input};
 use core::cmp;
 use std::collections::BTreeSet;
 
@@ -18,8 +18,6 @@ pub struct State<I: Input, C: Ctrl<I>> {
     pub transitions: Curry<I, C>,
     /// If input ends while in this state, should we accept?
     pub non_accepting: BTreeSet<String>,
-    /// If no other transitions work, take this one (if any).
-    pub fallback: Option<Transition<I, C>>,
 }
 
 impl<I: Input, C: Ctrl<I>> State<I, C> {
@@ -49,7 +47,6 @@ impl<I: Input> State<I, usize> {
         State {
             transitions: self.transitions.convert_ctrl(),
             non_accepting: self.non_accepting,
-            fallback: self.fallback.map(Transition::convert_ctrl),
         }
     }
 }
@@ -60,7 +57,6 @@ impl<I: Input, C: Ctrl<I>> Clone for State<I, C> {
         Self {
             transitions: self.transitions.clone(),
             non_accepting: self.non_accepting.clone(),
-            fallback: self.fallback.clone(),
         }
     }
 }

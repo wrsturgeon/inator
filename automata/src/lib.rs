@@ -225,29 +225,31 @@ use {core::iter, std::collections::BTreeSet};
 pub fn dyck_d() -> Deterministic<char> {
     Graph {
         states: vec![State {
-            transitions: Curry::Scrutinize(RangeMap(
-                [
-                    (
-                        Range::unit('('),
-                        Transition::Call {
-                            region: "parentheses",
-                            detour: 0,
-                            dst: 0,
-                            combine: ff!(|(), ()| ()),
-                        },
-                    ),
-                    (
-                        Range::unit(')'),
-                        Transition::Return {
-                            region: "parentheses",
-                        },
-                    ),
-                ]
-                .into_iter()
-                .collect(),
-            )),
+            transitions: Curry::Scrutinize {
+                filter: RangeMap(
+                    [
+                        (
+                            Range::unit('('),
+                            Transition::Call {
+                                region: "parentheses",
+                                detour: 0,
+                                dst: 0,
+                                combine: ff!(|(), ()| ()),
+                            },
+                        ),
+                        (
+                            Range::unit(')'),
+                            Transition::Return {
+                                region: "parentheses",
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                fallback: None,
+            },
             non_accepting: BTreeSet::new(),
-            fallback: None,
         }],
         initial: 0,
     }
@@ -259,29 +261,31 @@ pub fn dyck_d() -> Deterministic<char> {
 pub fn dyck_nd() -> Nondeterministic<char> {
     Graph {
         states: vec![State {
-            transitions: Curry::Scrutinize(RangeMap(
-                [
-                    (
-                        Range::unit('('),
-                        Transition::Call {
-                            region: "parentheses",
-                            detour: iter::once(0).collect(),
-                            dst: iter::once(0).collect(),
-                            combine: ff!(|(), ()| ()),
-                        },
-                    ),
-                    (
-                        Range::unit(')'),
-                        Transition::Return {
-                            region: "parentheses",
-                        },
-                    ),
-                ]
-                .into_iter()
-                .collect(),
-            )),
+            transitions: Curry::Scrutinize {
+                filter: RangeMap(
+                    [
+                        (
+                            Range::unit('('),
+                            Transition::Call {
+                                region: "parentheses",
+                                detour: iter::once(0).collect(),
+                                dst: iter::once(0).collect(),
+                                combine: ff!(|(), ()| ()),
+                            },
+                        ),
+                        (
+                            Range::unit(')'),
+                            Transition::Return {
+                                region: "parentheses",
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                fallback: None,
+            },
             non_accepting: BTreeSet::new(),
-            fallback: None,
         }],
         initial: iter::once(0).collect(),
     }
