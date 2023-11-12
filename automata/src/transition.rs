@@ -20,7 +20,7 @@ pub enum Transition<I: Input, C: Ctrl<I>> {
         /// Go to this state.
         dst: C,
         /// Call this Rust function to update the output we're building.
-        update: Update<I>,
+        update: Option<Update<I>>,
     },
     /// Call another function--i.e., push a pointer/index onto the stack.
     Call {
