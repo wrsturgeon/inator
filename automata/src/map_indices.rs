@@ -40,10 +40,13 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     /// Apply a function to each index.
     #[inline]
     #[must_use]
-    pub fn map_indices<F: FnMut(usize) -> usize>(self, f: F) -> Self {
+    pub fn map_indices<F: FnMut(usize) -> usize>(self, mut f: F) -> Self {
         match self {
             Self::Wildcard(etc) => Self::Wildcard(etc.map_indices(f)),
-            Self::Scrutinize(etc) => Self::Scrutinize(etc.map_indices(f)),
+            Self::Scrutinize { filter, fallback } => Self::Scrutinize {
+                fallback: fallback.map(|t| t.map_indices(&mut f)),
+                filter: filter.map_indices(f),
+            },
         }
     }
 }

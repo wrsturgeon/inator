@@ -27,7 +27,6 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
         State {
             transitions: self.transitions.generalize(),
             non_accepting: self.non_accepting,
-            fallback: self.fallback.map(Transition::generalize),
         }
     }
 }
@@ -38,7 +37,10 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     pub fn generalize(self) -> Curry<I, BTreeSet<usize>> {
         match self {
             Self::Wildcard(w) => Curry::Wildcard(w.generalize()),
-            Self::Scrutinize(s) => Curry::Scrutinize(s.generalize()),
+            Self::Scrutinize { filter, fallback } => Curry::Scrutinize {
+                filter: filter.generalize(),
+                fallback: fallback.map(Transition::generalize),
+            },
         }
     }
 }

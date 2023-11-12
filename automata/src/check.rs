@@ -209,7 +209,15 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for Curry<I, C> {
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         match *self {
             Self::Wildcard(ref etc) => etc.check(n_states),
-            Self::Scrutinize(ref etc) => etc.check(n_states),
+            Self::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => {
+                if let &Some(ref f) = fallback {
+                    f.check(n_states)?;
+                }
+                filter.check(n_states)
+            }
         }
     }
 }
