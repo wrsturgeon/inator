@@ -310,7 +310,6 @@ mod reduced {
         assert_eq!(dd.accept(input.iter().copied()), d.accept(input));
     }
 
-    /*
     fn union(lhs: &Deterministic<u8>, rhs: &Deterministic<u8>, input: &[u8]) {
         let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
             return;
@@ -386,7 +385,6 @@ mod reduced {
         }
         assert_eq!(concat.accept(input).is_ok(), splittable);
     }
-    */
 
     #[test]
     fn deterministic_implies_no_runtime_errors_1() {
@@ -447,6 +445,60 @@ mod reduced {
                 initial: 0,
             },
             vec![],
+        );
+    }
+
+    #[test]
+    fn union_1() {
+        union(
+            &Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: Some(Transition::Lateral {
+                            dst: 0,
+                            update: None,
+                        }),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            &Graph {
+                states: vec![State {
+                    transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            &[0],
+        );
+    }
+
+    #[test]
+    fn shr_1() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: Some(Transition::Lateral {
+                            dst: 0,
+                            update: None,
+                        }),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            Graph {
+                states: vec![State {
+                    transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            vec![0],
         );
     }
 }
