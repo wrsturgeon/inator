@@ -32,6 +32,14 @@ cargo test --no-default-features --examples
 cargo test -r --no-default-features
 cargo test -r --no-default-features --examples
 
+# Recurse on the automata library
+if [ -d automata ]
+then
+  cd automata
+  ../ci.sh
+  cd ..
+fi
+
 # Property tests
 for i in $(seq 2 8)
 do
@@ -70,14 +78,6 @@ cargo miri test --no-default-features
 cargo miri test --no-default-features --examples
 cargo miri test -r --no-default-features
 cargo miri test -r --no-default-features --examples
-
-# Recurse on the automata library
-if [ -d automata ]
-then
-  cd automata
-  ../ci.sh
-  cd ..
-fi
 
 # Nix build status
 git add -A
