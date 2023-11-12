@@ -328,7 +328,7 @@ mod reduced {
                     State {
                         transitions: Curry::Wildcard(Transition::Lateral {
                             dst: 4,
-                            update: update!(|(), _| {}),
+                            update: None,
                         }),
                         non_accepting: BTreeSet::new(),
                         fallback: None,
@@ -385,7 +385,7 @@ mod reduced {
                         non_accepting: BTreeSet::new(),
                         fallback: Some(Transition::Lateral {
                             dst: 0,
-                            update: update!(|_: u8, _| ()),
+                            update: None,
                         }),
                     },
                 ],

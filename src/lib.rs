@@ -181,10 +181,10 @@ pub fn empty<I: Input>() -> Deterministic<I> {
     }
 }
 
-/// Accept exactly this token and do exactly these things.
+/// Accept exactly this range of tokens and do exactly these things.
 #[inline]
 #[must_use]
-pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> {
+pub fn on_any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> {
     Graph {
         states: vec![
             State {
@@ -200,7 +200,14 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
                 ))
                 .collect(),
                 transitions: Curry::Scrutinize(RangeMap(
-                    iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
+                    iter::once((
+                        range,
+                        Transition::Lateral {
+                            dst: 0,
+                            update: Some(update),
+                        },
+                    ))
+                    .collect(),
                 )),
                 fallback: None,
             },
@@ -209,23 +216,44 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
     }
 }
 
-/// Accept exactly this token and do exactly these things.
+/// Accept exactly this range of tokens and forget their values.
 #[inline]
 #[must_use]
-pub fn tok<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
-    any_of(Range::unit(token), update)
+pub fn any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
+    Graph {
+        states: vec![
+            State {
+                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                non_accepting: BTreeSet::new(),
+                fallback: None,
+            },
+            State {
+                non_accepting: iter::once(format!(
+                    "Expected only a single token on [{}..={}] but got another token after it",
+                    range.first.to_src(),
+                    range.last.to_src(),
+                ))
+                .collect(),
+                transitions: Curry::Scrutinize(RangeMap(
+                    iter::once((
+                        range,
+                        Transition::Lateral {
+                            dst: 0,
+                            update: None,
+                        },
+                    ))
+                    .collect(),
+                )),
+                fallback: None,
+            },
+        ],
+        initial: 1,
+    }
 }
 
-/// Accept exactly this token and do nothing.
+/// Accept exactly this token and forget its value.
 #[inline]
 #[must_use]
 pub fn toss<I: Input>(token: I) -> Deterministic<I> {
-    tok(token, update!(|(), _| {}))
-}
-
-/// Accept exactly this token and do nothing.
-#[inline]
-#[must_use]
-pub fn toss_range<I: Input>(range: Range<I>) -> Deterministic<I> {
-    any_of(range, update!(|(), _| {}))
+    any_of(Range::unit(token))
 }
