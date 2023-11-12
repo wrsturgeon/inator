@@ -7,8 +7,8 @@
 //! Translate an automaton into Rust source code.
 
 use crate::{
-    Ctrl, Curry, Deterministic, Graph, IllFormed, Input, Range, RangeMap, State, Transition,
-    Update, FF,
+    Call, Ctrl, Curry, Deterministic, Graph, IllFormed, Input, Range, RangeMap, State, Transition,
+    Transitions, Update, FF,
 };
 use core::ops::Bound;
 use std::collections::{BTreeMap, BTreeSet};
@@ -326,19 +326,6 @@ impl<I: Input> Transition<I, usize> {
                 dst,
                 update: Update { src, .. },
             } => format!("state_{dst}(input, ({src})(acc, token), stack_top)"),
-            Self::Call {
-                region,
-                detour,
-                dst,
-                combine: FF { ref src, .. },
-            } => format!(
-                r#"{{
-                let detour = state_{detour}(input, (), Some(({}, index)))?;
-                let postprocessed = ({src})(acc, detour);
-                state_{dst}(input, postprocessed, stack_top)
-            }}"#,
-                region.to_src(),
-            ),
             Self::Return { region } => {
                 format!(
                     "match stack_top {{
@@ -352,18 +339,46 @@ impl<I: Input> Transition<I, usize> {
     }
 }
 
+impl<I: Input> Transitions<I, usize> {
+    /// Translate a value into Rust source code that reproduces it.
+    #[inline]
+    #[must_use]
+    #[allow(clippy::arithmetic_side_effects)]
+    pub fn to_src(&self) -> String {
+        self.calls.iter().fold(
+            "{ ".to_owned(),
+            |acc,
+             &Call {
+                 region,
+                 init,
+                 combine: FF { ref src, .. },
+                 ..
+             }| {
+                acc + &format!(
+                    "
+                let detour = state_{init}(input, (), Some(({}, index)))?;
+                let postprocessed = ({src})(acc, detour);",
+                    region.to_src(),
+                )
+            },
+        ) + &self.dst.to_src()
+            + " }"
+    }
+}
+
 impl<I: Input, C: Ctrl<I>> ToSrc for Graph<I, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "Nondeterministic {{ states: {}, initial: {} }}",
+            "{} {{ states: {}, initial: {} }}",
+            Self::src_type(),
             self.states.to_src(),
             self.initial.to_src(),
         )
     }
     #[inline]
     fn src_type() -> String {
-        format!("Nondeterministic::<{}>", I::src_type())
+        format!("Graph::<{}, {}>", I::src_type(), C::src_type())
     }
 }
 
@@ -393,14 +408,15 @@ impl<I: Input, C: Ctrl<I>> ToSrc for State<I, C> {
     #[inline]
     fn to_src(&self) -> String {
         format!(
-            "State {{ transitions: {}, non_accepting: {} }}",
+            "{} {{ transitions: {}, non_accepting: {} }}",
+            Self::src_type(),
             self.transitions.to_src(),
             self.non_accepting.to_src(),
         )
     }
     #[inline]
     fn src_type() -> String {
-        format!("State::<{}, BTreeSet<usize>>", I::src_type(),)
+        format!("State::<{}, {}>", I::src_type(), C::src_type())
     }
 }
 
@@ -408,24 +424,24 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Curry<I, C> {
     #[inline]
     fn to_src(&self) -> String {
         match *self {
-            Self::Wildcard(ref w) => format!("Curry::Wildcard({})", w.to_src()),
-            Self::Scrutinize(ref s) => format!("Curry::Scrutinize({})", s.to_src()),
+            Self::Wildcard(ref w) => format!("{}::Wildcard({})", Self::src_type(), w.to_src()),
+            Self::Scrutinize(ref s) => format!("{}::Scrutinize({})", Self::src_type(), s.to_src()),
         }
     }
     #[inline]
     fn src_type() -> String {
-        format!("Curry::<{}, BTreeSet<usize>>", I::src_type(),)
+        format!("Curry::<{}, {}>", I::src_type(), C::src_type())
     }
 }
 
 impl<I: Input, C: Ctrl<I>> ToSrc for RangeMap<I, C> {
     #[inline]
     fn to_src(&self) -> String {
-        format!("RangeMap({})", self.0.to_src())
+        format!("{}({})", Self::src_type(), self.0.to_src())
     }
     #[inline]
     fn src_type() -> String {
-        format!("RangeMap::<{}, BTreeSet<usize>>", I::src_type(),)
+        format!("RangeMap::<{}, {}>", I::src_type(), C::src_type())
     }
 }
 
@@ -433,17 +449,22 @@ impl<K: Clone + Ord + ToSrc, V: Clone + ToSrc> ToSrc for BTreeMap<K, V> {
     #[inline]
     fn to_src(&self) -> String {
         match self.len() {
-            0 => "BTreeMap::new()".to_owned(),
-            1 => format!("iter::once({}).collect()", {
-                let (k, v) = unwrap!(self.first_key_value());
-                (k.clone(), v.clone()).to_src()
-            }),
+            0 => format!("{}::new()", Self::src_type()),
+            1 => format!(
+                "iter::once({}).collect::<{}>()",
+                {
+                    let (k, v) = unwrap!(self.first_key_value());
+                    (k.clone(), v.clone()).to_src()
+                },
+                Self::src_type(),
+            ),
             _ => format!(
-                "{}.into_iter().collect()",
+                "{}.into_iter().collect::<{}>()",
                 self.iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect::<Vec<_>>()
-                    .to_src()
+                    .to_src(),
+                Self::src_type(),
             ),
         }
     }
@@ -472,30 +493,56 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Transition<I, C> {
                 ref dst,
                 ref update,
             } => format!(
-                "Transition::Lateral {{ dst: {}, update: {} }}",
+                "{}::Lateral {{ dst: {}, update: {} }}",
+                Self::src_type(),
                 dst.to_src(),
                 update.to_src(),
             ),
-            Self::Call {
-                region,
-                ref detour,
-                ref dst,
-                ref combine,
-            } => format!(
-                "Transition::Call {{ region: {}, detour: {}, dst: {}, combine: {} }}",
-                region.to_src(),
-                detour.to_src(),
-                dst.to_src(),
-                combine.to_src(),
-            ),
             Self::Return { region } => {
-                format!("Transition::Return {{ region: {} }}", region.to_src())
+                format!(
+                    "{}::Return {{ region: {} }}",
+                    Self::src_type(),
+                    region.to_src(),
+                )
             }
         }
     }
     #[inline]
     fn src_type() -> String {
-        format!("Transition::<{}, BTreeSet<usize>>", I::src_type(),)
+        format!("Transition::<{}, {}>", I::src_type(), C::src_type())
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> ToSrc for Transitions<I, C> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "{} {{ calls: {}, dst: {} }}",
+            Self::src_type(),
+            self.calls.to_src(),
+            self.dst.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Transitions::<{}, {}>", I::src_type(), C::src_type())
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> ToSrc for Call<I, C> {
+    #[inline]
+    fn to_src(&self) -> String {
+        format!(
+            "{} {{ region: {}, init: {}, combine: {}, ghost: PhantomData }}",
+            Self::src_type(),
+            self.region.to_src(),
+            self.init.to_src(),
+            self.combine.to_src(),
+        )
+    }
+    #[inline]
+    fn src_type() -> String {
+        format!("Call::<{}, {}>", I::src_type(), C::src_type())
     }
 }
 

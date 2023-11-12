@@ -6,7 +6,7 @@
 
 //! Map from ranges of keys to values.
 
-use crate::{Ctrl, IllFormed, Input, Range, Transition};
+use crate::{Ctrl, IllFormed, Input, Range, Transitions};
 use core::cmp;
 use std::collections::BTreeMap;
 
@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 pub struct RangeMap<I: Input, C: Ctrl<I>>(
     /// Key-value entries as tuples.
     #[allow(clippy::type_complexity)]
-    pub BTreeMap<Range<I>, Transition<I, C>>,
+    pub BTreeMap<Range<I>, Transitions<I, C>>,
 );
 
 impl<I: Input, C: Ctrl<I>> Clone for RangeMap<I, C> {
@@ -53,7 +53,7 @@ impl<I: Input, C: Ctrl<I>> PartialOrd for RangeMap<I, C> {
 impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     /// Iterate over references to keys and values without consuming anything.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&Range<I>, &Transition<I, C>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Range<I>, &Transitions<I, C>)> {
         self.0.iter()
     }
 
@@ -66,7 +66,7 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
         clippy::unwrap_in_result,
         clippy::type_complexity
     )]
-    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, C>>, IllFormed<I, C>> {
+    pub fn get(&self, key: &I) -> Result<Option<&Transitions<I, C>>, IllFormed<I, C>> {
         let mut acc = None;
         for (range, transition) in &self.0 {
             if range.contains(key) {
@@ -91,7 +91,7 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
     pub fn disjoint(
         &self,
         other: &Self,
-    ) -> Result<(), (Range<I>, Transition<I, C>, Transition<I, C>)> {
+    ) -> Result<(), (Range<I>, Transitions<I, C>, Transitions<I, C>)> {
         self.0.iter().try_fold((), |(), (lk, lv)| {
             other.0.iter().try_fold((), |(), (rk, rv)| {
                 rk.clone()
@@ -103,7 +103,7 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values(&self) -> impl Iterator<Item = &Transition<I, C>> {
+    pub fn values(&self) -> impl Iterator<Item = &Transitions<I, C>> {
         self.0.values()
     }
 
@@ -116,7 +116,7 @@ impl<I: Input, C: Ctrl<I>> RangeMap<I, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transition<I, C>> {
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Transitions<I, C>> {
         self.0.values_mut()
     }
 }

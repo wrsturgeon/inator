@@ -69,27 +69,60 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
         states: &[State<I, C>],
         index_map: &BTreeMap<usize, State<I, C>>,
     ) -> Self {
-        let update_fn = |i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))));
         match *self {
             Self::Lateral {
                 ref dst,
                 ref update,
             } => Self::Lateral {
-                dst: dst.clone().map_indices(update_fn),
+                dst: dst
+                    .clone()
+                    .map_indices(|i| unwrap!(states.binary_search(unwrap!(index_map.get(&i))))),
                 update: update.clone(),
             },
-            Self::Call {
-                region,
-                ref detour,
-                ref dst,
-                ref combine,
-            } => Self::Call {
-                region,
-                detour: detour.clone().map_indices(update_fn),
-                dst: dst.clone().map_indices(update_fn),
-                combine: combine.clone(),
-            },
             Self::Return { region } => Self::Return { region },
+        }
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Transitions<I, C> {
+    /// Update index "pointers" in response to a reordered array.
+    #[inline]
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn reindex(
+        &self,
+        states: &[State<I, C>],
+        index_map: &BTreeMap<usize, State<I, C>>,
+    ) -> Self {
+        Self {
+            calls: self
+                .calls
+                .iter()
+                .map(|c| c.reindex(states, index_map))
+                .collect(),
+            dst: self.dst.reindex(states, index_map),
+        }
+    }
+}
+
+impl<I: Input, C: Ctrl<I>> Call<I, C> {
+    /// Update index "pointers" in response to a reordered array.
+    #[inline]
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn reindex(
+        &self,
+        states: &[State<I, C>],
+        index_map: &BTreeMap<usize, State<I, C>>,
+    ) -> Self {
+        Self {
+            region: self.region,
+            init: self
+                .init
+                .clone()
+                .map_indices(|ref i| unwrap!(states.binary_search(unwrap!(index_map.get(i))))),
+            combine: self.combine.clone(),
+            ghost: self.ghost,
         }
     }
 }

@@ -170,6 +170,7 @@ macro_rules! ff {
     };
 }
 
+mod call;
 mod check;
 mod combinators;
 mod ctrl;
@@ -177,37 +178,36 @@ mod curry;
 mod f;
 mod generalize;
 mod graph;
-mod in_progress;
 mod input;
 mod map_indices;
 mod merge;
 mod range;
 mod range_map;
 mod reindex;
-mod run;
 mod state;
 mod to_src;
 mod transition;
+mod transitions;
 mod update;
 
 #[cfg(feature = "quickcheck")]
 mod qc;
 
 pub use {
+    call::Call,
     check::{Check, IllFormed},
     ctrl::{Ctrl, CtrlMergeConflict},
     curry::Curry,
     f::{F, FF},
     graph::{Deterministic, Graph, Nondeterministic},
-    in_progress::{InProgress, InputError, ParseError},
     input::Input,
     merge::{merge, try_merge, Merge},
     range::Range,
     range_map::RangeMap,
-    run::Run,
     state::State,
     to_src::ToSrc,
     transition::Transition,
+    transitions::Transitions,
     update::Update,
 };
 
@@ -217,7 +217,10 @@ mod test;
 #[cfg(test)]
 use rand as _; // <-- needed in examples
 
-use {core::iter, std::collections::BTreeSet};
+use {
+    core::{iter, marker::PhantomData},
+    std::collections::BTreeSet,
+};
 
 /// Language of matched parentheses and concatenations thereof.
 #[inline]
@@ -229,17 +232,26 @@ pub fn dyck_d() -> Deterministic<char> {
                 [
                     (
                         Range::unit('('),
-                        Transition::Call {
-                            region: "parentheses",
-                            detour: 0,
-                            dst: 0,
-                            combine: ff!(|(), ()| ()),
+                        Transitions {
+                            calls: vec![Call {
+                                region: "parentheses",
+                                init: 0,
+                                combine: ff!(|(), ()| ()),
+                                ghost: PhantomData,
+                            }],
+                            dst: Transition::Lateral {
+                                dst: 0,
+                                update: update!(|(), _| ()),
+                            },
                         },
                     ),
                     (
                         Range::unit(')'),
-                        Transition::Return {
-                            region: "parentheses",
+                        Transitions {
+                            calls: vec![],
+                            dst: Transition::Return {
+                                region: "parentheses",
+                            },
                         },
                     ),
                 ]
@@ -262,17 +274,26 @@ pub fn dyck_nd() -> Nondeterministic<char> {
                 [
                     (
                         Range::unit('('),
-                        Transition::Call {
-                            region: "parentheses",
-                            detour: iter::once(0).collect(),
-                            dst: iter::once(0).collect(),
-                            combine: ff!(|(), ()| ()),
+                        Transitions {
+                            calls: vec![Call {
+                                region: "parentheses",
+                                init: iter::once(0).collect(),
+                                combine: ff!(|(), ()| ()),
+                                ghost: PhantomData,
+                            }],
+                            dst: Transition::Lateral {
+                                dst: iter::once(0).collect(),
+                                update: update!(|(), _| ()),
+                            },
                         },
                     ),
                     (
                         Range::unit(')'),
-                        Transition::Return {
-                            region: "parentheses",
+                        Transitions {
+                            calls: vec![],
+                            dst: Transition::Return {
+                                region: "parentheses",
+                            },
                         },
                     ),
                 ]

@@ -6,7 +6,7 @@
 
 //! Read the next input symbol and decide an action.
 
-use crate::{Ctrl, IllFormed, Input, Range, RangeMap, Transition};
+use crate::{Ctrl, IllFormed, Input, Range, RangeMap, Transitions};
 use core::{cmp, iter};
 use std::collections::BTreeMap;
 
@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 #[derive(Debug)]
 pub enum Curry<I: Input, C: Ctrl<I>> {
     /// Throw away the input (without looking at it) and do this.
-    Wildcard(Transition<I, C>),
+    Wildcard(Transitions<I, C>),
     /// Map specific ranges of inputs to actions.
     Scrutinize(RangeMap<I, C>),
 }
@@ -69,7 +69,7 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     /// If multiple ranges fit an argument.
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub fn get(&self, key: &I) -> Result<Option<&Transition<I, C>>, IllFormed<I, C>> {
+    pub fn get(&self, key: &I) -> Result<Option<&Transitions<I, C>>, IllFormed<I, C>> {
         match *self {
             Self::Wildcard(ref transition) => Ok(Some(transition)),
             Self::Scrutinize(ref range_map) => range_map.get(key),
@@ -88,7 +88,7 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     pub fn disjoint(
         &self,
         other: &Self,
-    ) -> Result<(), (Option<Range<I>>, Transition<I, C>, Transition<I, C>)> {
+    ) -> Result<(), (Option<Range<I>>, Transitions<I, C>, Transitions<I, C>)> {
         match (self, other) {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
             (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
@@ -105,7 +105,7 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, C>>> {
+    pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transitions<I, C>>> {
         match *self {
             Self::Wildcard(ref etc) => Box::new(iter::once(etc)),
             Self::Scrutinize(ref etc) => Box::new(etc.values()),
@@ -135,7 +135,7 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
 
     /// All values in this collection, without their associated keys.
     #[inline]
-    pub fn values_mut(&mut self) -> Box<dyn '_ + Iterator<Item = &mut Transition<I, C>>> {
+    pub fn values_mut(&mut self) -> Box<dyn '_ + Iterator<Item = &mut Transitions<I, C>>> {
         match *self {
             Self::Wildcard(ref mut etc) => Box::new(iter::once(etc)),
             Self::Scrutinize(ref mut etc) => Box::new(etc.values_mut()),
