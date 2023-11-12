@@ -122,10 +122,6 @@ impl<I: Input, C: Ctrl<I>> Merge for State<I, C> {
                 self.non_accepting.extend(other.non_accepting);
                 self.non_accepting
             },
-            fallback: self
-                .fallback
-                .merge(other.fallback)
-                .map_or_else(|(a, b)| a.merge(b).map(Some), Ok)?,
         })
     }
 }
@@ -145,8 +141,9 @@ impl<I: Input, C: Ctrl<I>> Merge for Curry<I, C> {
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         match (self, other) {
             (Self::Wildcard(lhs), Self::Wildcard(rhs)) => Ok(Self::Wildcard(lhs.merge(rhs)?)),
-            (Self::Wildcard(w), Self::Scrutinize(s)) | (Self::Scrutinize(s), Self::Wildcard(w)) => {
-                match s.0.first_key_value() {
+            (Self::Wildcard(w), Self::Scrutinize { filter, .. })
+            | (Self::Scrutinize { filter, .. }, Self::Wildcard(w)) => {
+                match filter.0.first_key_value() {
                     None => Ok(Self::Wildcard(w)),
                     Some((k, v)) => Err(IllFormed::WildcardMask {
                         arg_token: Some(k.clone()),
@@ -155,7 +152,21 @@ impl<I: Input, C: Ctrl<I>> Merge for Curry<I, C> {
                     }),
                 }
             }
-            (Self::Scrutinize(lhs), Self::Scrutinize(rhs)) => Ok(Self::Scrutinize(lhs.merge(rhs)?)),
+            (
+                Self::Scrutinize {
+                    filter: l_filter,
+                    fallback: l_fallback,
+                },
+                Self::Scrutinize {
+                    filter: r_filter,
+                    fallback: r_fallback,
+                },
+            ) => Ok(Self::Scrutinize {
+                filter: l_filter.merge(r_filter)?,
+                fallback: l_fallback
+                    .merge(r_fallback)
+                    .map_or_else(|(a, b)| a.merge(b).map(Some), Ok)?,
+            }),
         }
     }
 }
