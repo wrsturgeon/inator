@@ -494,6 +494,42 @@ mod reduced {
     }
 
     #[test]
+    fn union_2() {
+        union(
+            &Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            iter::once((
+                                Range { first: 0, last: 0 },
+                                Transition::Return { region: "region" },
+                            ))
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            &Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: Some(Transition::Lateral {
+                            dst: 0,
+                            update: None,
+                        }),
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            &[0],
+        );
+    }
+
+    #[test]
     fn shr_1() {
         shr(
             Graph {
@@ -512,6 +548,42 @@ mod reduced {
             Graph {
                 states: vec![State {
                     transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            vec![0],
+        );
+    }
+
+    #[test]
+    fn shr_2() {
+        shr(
+            Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            iter::once((
+                                Range { first: 0, last: 0 },
+                                Transition::Return { region: "region" },
+                            ))
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: BTreeSet::new(),
+                }],
+                initial: 0,
+            },
+            Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: Some(Transition::Lateral {
+                            dst: 0,
+                            update: None,
+                        }),
+                    },
                     non_accepting: BTreeSet::new(),
                 }],
                 initial: 0,
