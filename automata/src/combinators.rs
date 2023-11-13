@@ -12,7 +12,7 @@ use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Tr
 use core::{iter, mem, ops};
 use std::collections::BTreeSet;
 
-impl<I: Input> ops::BitOr for Deterministic<I> {
+impl<I: Input> ops::BitOr<Self> for Deterministic<I> {
     type Output = Self;
     #[inline]
     fn bitor(self, rhs: Self) -> Self {
@@ -32,6 +32,29 @@ impl<I: Input> ops::BitOr for Deterministic<I> {
         s.initial.extend(other_initial);
         s.sort();
         s.determinize().unwrap_or_else(|e| panic!("{e}"))
+    }
+}
+
+impl<I: Input> ops::Rem<Transition<I, usize>> for Deterministic<I> {
+    type Output = Self;
+    #[inline]
+    fn rem(mut self, rhs: Transition<I, usize>) -> Self::Output {
+        for state in &mut self.states {
+            if state.non_accepting.is_empty() {
+                if let Curry::Scrutinize {
+                    ref mut fallback, ..
+                } = state.transitions
+                {
+                    assert!(
+                        fallback.is_none(),
+                        "Tried to add a fallback transition, \
+                        but a fallback already existed.",
+                    );
+                    *fallback = Some(rhs.clone());
+                }
+            }
+        }
+        self
     }
 }
 
