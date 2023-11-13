@@ -226,19 +226,19 @@ pub fn on_any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<
 #[inline]
 #[must_use]
 pub fn on<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
-    any_of(Range::unit(token), update)
+    on_any_of(Range::unit(token), update)
 }
 
 /// Accept exactly this token and forget its value.
 #[inline]
 #[must_use]
 pub fn toss<I: Input>(token: I) -> Deterministic<I> {
-    on(token, Update {input_t:})
+    toss_range(Range::unit(token))
 }
 
 /// Accept exactly this token and do nothing.
 #[inline]
 #[must_use]
 pub fn toss_range<I: Input>(range: Range<I>) -> Deterministic<I> {
-    any_of(range, update!(|(), _| {}))
+    on_any_of(range, update!(|(), _| {}))
 }

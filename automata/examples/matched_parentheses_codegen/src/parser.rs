@@ -44,23 +44,28 @@ pub fn parse<I: IntoIterator<Item = char>>(input: I) -> Result<(), Error> {
     state_0(&mut input.into_iter().enumerate(), (), None)
 }
 
-
 #[inline]
-fn state_0<I: Iterator<Item = (usize, char)>>(input: &mut I, acc: (), stack_top: Option<(&'static str, usize)>) -> Result<(), Error> {
+fn state_0<I: Iterator<Item = (usize, char)>>(
+    input: &mut I,
+    acc: (),
+    stack_top: Option<(&'static str, usize)>,
+) -> Result<(), Error> {
     match input.next() {
-        None => stack_top.map_or(
-            Ok(acc),
-            |(region, opened)| Err(Error::Unclosed { region, opened }),
-        ),
+        None => stack_top.map_or(Ok(acc), |(region, opened)| {
+            Err(Error::Unclosed { region, opened })
+        }),
         Some((index, token)) => match token {
             '('..='(' => {
                 let detour = state_0(input, (), Some(("parentheses", index)))?;
                 let postprocessed = (|(), ()| ())(acc, detour);
                 state_0(input, postprocessed, stack_top)
-            },
+            }
             ')'..=')' => match stack_top {
                 Some((region, _)) if region == "parentheses" => Ok(acc),
-                _ => Err(Error::Unopened { what_was_open: stack_top, index })
+                _ => Err(Error::Unopened {
+                    what_was_open: stack_top,
+                    index,
+                }),
             },
             _ => Err(Error::Absurd { index, token }),
         },
