@@ -46,6 +46,7 @@ mod prop {
             parser.accept(input.iter().copied()).is_ok() == (input.len() == 1 && range.contains(&input[0]))
         }
 
+        #[allow(clippy::diverging_sub_expression, clippy::todo, unreachable_code, unused_variables)] // <-- FIXME
         fn star_in_paren(count: u8) -> bool {
             let input = iter::once('(').chain(iter::repeat('a').take(usize::from(count))).chain(iter::once(')'));
             let parser = region(
