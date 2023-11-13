@@ -6,8 +6,9 @@
 
 //! Transition in an automaton: an action and a destination state.
 
-use crate::{Ctrl, Input, InputError, ParseError, Update, FF};
-use core::cmp;
+use crate::{Ctrl, Input, InputError, Merge, ParseError, Update, FF};
+use core::{cmp, mem};
+use std::collections::BTreeSet;
 
 // TODO: rename `Call` to `Open` and `Return` to `Close`
 
@@ -230,6 +231,22 @@ impl<I: Input> Transition<I, usize> {
                 combine,
             },
             Self::Return { region } => Transition::Return { region },
+        }
+    }
+}
+
+impl<I: Input> Transition<I, BTreeSet<usize>> {
+    /// Kleene-star operation: accept any number (including zero!) of repetitions of this parser.
+    #[inline]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn star(&mut self, init: &BTreeSet<usize>, accepting: &BTreeSet<usize>) {
+        match *self {
+            Transition::Lateral { ref mut dst, .. } | Transition::Call { ref mut dst, .. } => {
+                if dst.iter().any(|i| accepting.contains(i)) {
+                    *dst = unwrap!(mem::take(dst).merge(init.clone()));
+                }
+            }
+            Transition::Return { .. } => {}
         }
     }
 }

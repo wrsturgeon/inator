@@ -8,7 +8,7 @@
 
 use crate::{
     try_merge, Check, Ctrl, Curry, IllFormed, Input, InputError, Merge, ParseError, RangeMap,
-    State, Transition,
+    State, ToSrc, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -271,7 +271,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
 
     /// Change nothing about the semantics but sort the internal vector of states.
     #[inline]
-    #[allow(clippy::panic)] // <-- TODO
     #[allow(clippy::missing_panics_doc)]
     pub fn sort(&mut self) {
         // Associate each original index with a concrete state instead of just an index,
@@ -297,6 +296,48 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     #[must_use]
     pub fn involves_any_fallback(&self) -> bool {
         self.states.iter().any(State::involves_any_fallback)
+    }
+
+    /// Kleene-star operation: accept any number (including zero!) of repetitions of this parser.
+    #[inline]
+    #[must_use]
+    #[allow(clippy::print_stdout, clippy::todo)] // <-- FIXME
+    #[allow(clippy::panic, clippy::missing_panics_doc)]
+    pub fn star(self) -> Deterministic<I> {
+        let mut s = self.generalize();
+        let accepting: BTreeSet<usize> = s
+            .states
+            .iter()
+            .enumerate()
+            .filter(|&(_, st)| st.non_accepting.is_empty())
+            .map(|(i, _)| i)
+            .collect();
+        for state in &mut s.states {
+            match state.transitions {
+                Curry::Wildcard(ref mut t) => t.star(&s.initial, &accepting),
+                Curry::Scrutinize {
+                    ref mut filter,
+                    ref mut fallback,
+                } => {
+                    filter.star(&s.initial, &accepting);
+                    if let &mut Some(ref mut f) = fallback {
+                        f.star(&s.initial, &accepting);
+                    }
+                }
+            }
+        }
+        let empty = Graph {
+            states: vec![State {
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                },
+                non_accepting: BTreeSet::new(),
+            }],
+            initial: 0,
+        };
+        println!("FUCK {}", s.to_src());
+        empty | s.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
 }
 
