@@ -6,9 +6,7 @@
 
 //! Trait to fallibly combine multiple values into one value with identical semantics.
 
-use crate::{
-    Ctrl, CtrlMergeConflict, Curry, IllFormed, Input, RangeMap, State, Transition, Update, FF,
-};
+use crate::{Ctrl, Curry, IllFormed, Input, RangeMap, State, Transition, Update, FF};
 use core::convert::Infallible;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
@@ -59,13 +57,13 @@ impl<T> Merge for Option<T> {
 }
 
 impl Merge for usize {
-    type Error = CtrlMergeConflict;
+    type Error = (usize, usize);
     #[inline]
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         if self == other {
             Ok(self)
         } else {
-            Err(CtrlMergeConflict::NotEqual(self, other))
+            Err((self, other))
         }
     }
 }
@@ -83,7 +81,7 @@ impl<'s> Merge for &'s str {
 }
 
 impl<T: Ord> Merge for BTreeSet<T> {
-    type Error = CtrlMergeConflict;
+    type Error = (usize, usize);
     #[inline]
     fn merge(mut self, other: Self) -> Result<Self, Self::Error> {
         self.extend(other);
@@ -194,9 +192,9 @@ impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
                     update: r_update,
                 },
             ) => Ok(Self::Lateral {
-                dst: l_dst.merge(r_dst).map_err(|e| match e {
-                    CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
-                })?,
+                dst: l_dst
+                    .merge(r_dst)
+                    .map_err(|(a, b)| IllFormed::Superposition(a, b))?,
                 update: l_update
                     .merge(r_update)
                     .map_err(|(a, b)| IllFormed::IncompatibleCallbacks(Box::new(a), Box::new(b)))?,
@@ -218,12 +216,12 @@ impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
                 region: l_region
                     .merge(r_region)
                     .map_err(|(a, b)| IllFormed::AmbiguousRegions(a, b))?,
-                detour: l_detour.merge(r_detour).map_err(|e| match e {
-                    CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
-                })?,
-                dst: l_dst.merge(r_dst).map_err(|e| match e {
-                    CtrlMergeConflict::NotEqual(a, b) => IllFormed::Superposition(a, b),
-                })?,
+                detour: l_detour
+                    .merge(r_detour)
+                    .map_err(|(a, b)| IllFormed::Superposition(a, b))?,
+                dst: l_dst
+                    .merge(r_dst)
+                    .map_err(|(a, b)| IllFormed::Superposition(a, b))?,
                 combine: l_combine.merge(r_combine).map_err(|(a, b)| {
                     IllFormed::IncompatibleCombinators(Box::new(a), Box::new(b))
                 })?,

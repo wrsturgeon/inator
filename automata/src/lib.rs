@@ -195,7 +195,7 @@ mod qc;
 
 pub use {
     check::{Check, IllFormed},
-    ctrl::{Ctrl, CtrlMergeConflict},
+    ctrl::Ctrl,
     curry::Curry,
     f::{F, FF},
     graph::{Deterministic, Graph, Nondeterministic},

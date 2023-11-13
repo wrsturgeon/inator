@@ -15,9 +15,29 @@
     clippy::use_debug
 )]
 
+use crate::*;
+
+#[inline]
+#[must_use]
+fn splittable<I: Input, C: Ctrl<I>>(parser: &Graph<I, C>, input: &[I]) -> bool {
+    match input.len() {
+        0 => true,
+        len => {
+            for i in (1..=len).rev() {
+                if parser.accept(get!(input, ..i).iter().cloned()).is_ok()
+                    && splittable(parser, get!(input, i..))
+                {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+}
+
 #[cfg(feature = "quickcheck")]
 mod prop {
-    use crate::*;
+    use super::*;
     use core::num::NonZeroUsize;
     use quickcheck::*;
     use std::{collections::BTreeSet, env, panic};
@@ -304,11 +324,24 @@ mod prop {
             }
             concat.accept(input).is_ok() == splittable
         }
+
+        fn star(d: Deterministic<u8>, input: Vec<u8>) -> bool {
+            if d.involves_any_fallback() {
+                return true;
+            }
+            if !splittable(&d, &input) {
+                return true;
+            }
+            let Ok(star) = panic::catch_unwind(|| d.star()) else {
+                return true;
+            };
+            star.accept(input).is_ok()
+        }
     }
 }
 
 mod reduced {
-    use crate::*;
+    use super::*;
     use std::{
         collections::{BTreeMap, BTreeSet},
         panic,
@@ -412,6 +445,20 @@ mod reduced {
             return;
         }
         assert_eq!(concat.accept(input).is_ok(), splittable);
+    }
+
+    fn star(d: Deterministic<u8>, input: Vec<u8>) {
+        if d.involves_any_fallback() {
+            return;
+        }
+        if !splittable(&d, &input) {
+            return;
+        }
+        let Ok(star) = panic::catch_unwind(|| d.star()) else {
+            return;
+        };
+        println!("{star:?}");
+        drop(star.accept(input).unwrap());
     }
 
     #[test]
@@ -599,6 +646,57 @@ mod reduced {
                 initial: 0,
             },
             vec![0],
+        );
+    }
+
+    #[test]
+    fn star_1() {
+        star(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Wildcard(Transition::Call {
+                            region: "region",
+                            detour: 0,
+                            dst: 0,
+                            combine: ff!(|(), ()| ()),
+                        }),
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: 1,
+            },
+            vec![],
+        );
+    }
+
+    #[test]
+    fn star_2() {
+        star(
+            Graph {
+                states: vec![
+                    State {
+                        transitions: Curry::Wildcard(Transition::Return { region: "region" }),
+                        non_accepting: BTreeSet::new(),
+                    },
+                    State {
+                        transitions: Curry::Scrutinize {
+                            filter: RangeMap(BTreeMap::new()),
+                            fallback: Some(Transition::Lateral {
+                                dst: 0,
+                                update: None,
+                            }),
+                        },
+                        non_accepting: BTreeSet::new(),
+                    },
+                ],
+                initial: 1,
+            },
+            vec![0, 0],
         );
     }
 }
