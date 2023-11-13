@@ -8,7 +8,7 @@
 
 use crate::{
     try_merge, Check, Ctrl, Curry, IllFormed, Input, InputError, Merge, ParseError, RangeMap,
-    State, ToSrc, Transition,
+    State, Transition,
 };
 use core::{iter, num::NonZeroUsize};
 use std::{
@@ -301,7 +301,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
     /// Kleene-star operation: accept any number (including zero!) of repetitions of this parser.
     #[inline]
     #[must_use]
-    #[allow(clippy::print_stdout, clippy::todo)] // <-- FIXME
     #[allow(clippy::panic, clippy::missing_panics_doc)]
     pub fn star(self) -> Deterministic<I> {
         let mut s = self.generalize();
@@ -336,7 +335,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             }],
             initial: 0,
         };
-        println!("FUCK {}", s.to_src());
         empty | s.determinize().unwrap_or_else(|e| panic!("{e}"))
     }
 }
