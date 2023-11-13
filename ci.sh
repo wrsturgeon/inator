@@ -69,6 +69,10 @@ cargo miri test --no-default-features --examples
 cargo miri test -r --no-default-features
 cargo miri test -r --no-default-features --examples
 
+# Nix build status
+git add -A
+nix build
+
 # Recurse on the automata library
 if [ -d automata ]
 then
@@ -76,10 +80,6 @@ then
   ../ci.sh
   cd ..
 fi
-
-# Nix build status
-git add -A
-nix build
 
 # Check for remaining `FIXME`s
 grep -Rnw . --exclude-dir=target --exclude-dir=.git --exclude-dir='*JSONTestSuite*' --exclude=ci.sh -e FIXME && exit 1 || : # next line checks result

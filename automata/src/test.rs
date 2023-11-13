@@ -15,6 +15,24 @@
     clippy::use_debug
 )]
 
+mod unit {
+    use crate::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn check_reject_wildcard_mask_fallback() {
+        let lhs = Curry::<(), _>::Scrutinize {
+            filter: RangeMap(BTreeMap::new()),
+            fallback: Some(Transition::Lateral {
+                dst: 0,
+                update: None,
+            }),
+        };
+        let rhs = Curry::<(), _>::Wildcard(Transition::Return { region: "region" });
+        drop(lhs.merge(rhs).unwrap_err());
+    }
+}
+
 #[cfg(feature = "quickcheck")]
 mod prop {
     use crate::*;

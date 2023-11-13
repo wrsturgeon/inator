@@ -174,9 +174,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         };
 
         // Merge this subset of states into one (most of the heavy lifting)
-        let result_iterator = subset.view().map(|i| Ok(get!(self.states, i).clone()));
-
-        let mega_state = match try_merge(result_iterator) {
+        let mega_state = match try_merge(subset.view().map(|i| Ok(get!(self.states, i).clone()))) {
             // If no state follows, reject immediately.
             None => State {
                 transitions: Curry::Scrutinize {
