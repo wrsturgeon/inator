@@ -141,11 +141,10 @@ impl<I: Input, C: Ctrl<I>> Merge for Curry<I, C> {
     fn merge(self, other: Self) -> Result<Self, Self::Error> {
         match (self, other) {
             (Self::Wildcard(lhs), Self::Wildcard(rhs)) => Ok(Self::Wildcard(lhs.merge(rhs)?)),
-            (Self::Wildcard(w), Self::Scrutinize { filter, fallback })
-            | (Self::Scrutinize { filter, fallback }, Self::Wildcard(w)) => {
+            (Self::Wildcard(w), Self::Scrutinize { filter, .. })
+            | (Self::Scrutinize { filter, .. }, Self::Wildcard(w)) => {
                 match filter.0.first_key_value() {
-                    None if fallback.is_none() => Ok(Self::Wildcard(w)),
-                    None => Err(IllFormed::WildcardFallback),
+                    None => Ok(Self::Wildcard(w)),
                     Some((k, v)) => Err(IllFormed::WildcardMask {
                         arg_token: Some(k.clone()),
                         possibility_1: Box::new(w),
