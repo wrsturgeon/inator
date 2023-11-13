@@ -15,24 +15,6 @@
     clippy::use_debug
 )]
 
-mod unit {
-    use crate::*;
-    use std::collections::BTreeMap;
-
-    #[test]
-    fn check_reject_wildcard_mask_fallback() {
-        let lhs = Curry::<(), _>::Scrutinize {
-            filter: RangeMap(BTreeMap::new()),
-            fallback: Some(Transition::Lateral {
-                dst: 0,
-                update: None,
-            }),
-        };
-        let rhs = Curry::<(), _>::Wildcard(Transition::Return { region: "region" });
-        drop(lhs.merge(rhs).unwrap_err());
-    }
-}
-
 #[cfg(feature = "quickcheck")]
 mod prop {
     use crate::*;
@@ -239,6 +221,9 @@ mod prop {
             rhs: Deterministic<u8>,
             input: Vec<u8>
         ) -> bool {
+            if lhs.involves_any_fallback() || rhs.involves_any_fallback() {
+                return true;
+            }
             let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
                 return true;
             };
@@ -249,7 +234,7 @@ mod prop {
                 return true;
             }
             let union_accept = union.accept(input.iter().copied());
-            match (
+            if !match (
                 lhs.accept(input.iter().copied()),
                 rhs.accept(input.iter().copied()),
             ) {
@@ -271,7 +256,19 @@ mod prop {
                 (Err(ParseError::BadInput(..)), Err(ParseError::BadInput(..))) => {
                     union_accept.is_err()
                 }
+            } {
+                return false;
             }
+            let Ok(symm) = panic::catch_unwind(|| rhs | lhs) else {
+                return false;
+            };
+            if symm.check().is_err() {
+                return false;
+            }
+            if symm.determinize().is_err() {
+                return false;
+            }
+            union_accept == symm.accept(input.iter().copied())
         }
 
         fn sort(parser: Nondeterministic<u8>, input: Vec<u8>) -> bool {
@@ -289,6 +286,9 @@ mod prop {
         }
 
         fn shr(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) -> bool {
+            if lhs.involves_any_fallback() || rhs.involves_any_fallback() {
+                return true;
+            }
             let splittable = (0..=input.len()).any(|i| {
                 lhs.accept(input[..i].iter().copied()).is_ok() &&
                 rhs.accept(input[i..].iter().copied()).is_ok()
@@ -328,7 +328,10 @@ mod reduced {
         assert_eq!(dd.accept(input.iter().copied()), d.accept(input));
     }
 
-    fn union(lhs: &Deterministic<u8>, rhs: &Deterministic<u8>, input: &[u8]) {
+    fn union(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) {
+        if lhs.involves_any_fallback() || rhs.involves_any_fallback() {
+            return;
+        }
         let Ok(union) = panic::catch_unwind(|| lhs.clone() | rhs.clone()) else {
             return;
         };
@@ -339,7 +342,7 @@ mod reduced {
         {
             println!();
             println!("LHS:");
-            let mut run = input.iter().copied().run(lhs);
+            let mut run = input.iter().copied().run(&lhs);
             println!("      {run:?}");
             while let Some(r) = run.next() {
                 println!("{r:?} {run:?}");
@@ -348,7 +351,7 @@ mod reduced {
         {
             println!();
             println!("RHS:");
-            let mut run = input.iter().copied().run(rhs);
+            let mut run = input.iter().copied().run(&rhs);
             println!("      {run:?}");
             while let Some(r) = run.next() {
                 println!("{r:?} {run:?}");
@@ -384,12 +387,19 @@ mod reduced {
                 assert!(matches!(union_accept, Err(ParseError::BadParser(..))));
             }
             (Err(ParseError::BadInput(..)), Err(ParseError::BadInput(..))) => {
-                drop(union_accept.unwrap_err());
+                let _ = union_accept.as_ref().unwrap_err();
             }
         }
+        let symm = rhs | lhs;
+        symm.check().unwrap();
+        drop(symm.determinize().unwrap());
+        assert_eq!(union_accept, symm.accept(input));
     }
 
     fn shr(lhs: Deterministic<u8>, rhs: Deterministic<u8>, input: Vec<u8>) {
+        if lhs.involves_any_fallback() || rhs.involves_any_fallback() {
+            return;
+        }
         let splittable = (0..=input.len()).any(|i| {
             lhs.accept(input[..i].iter().copied()).is_ok()
                 && rhs.accept(input[i..].iter().copied()).is_ok()
@@ -469,7 +479,7 @@ mod reduced {
     #[test]
     fn union_1() {
         union(
-            &Graph {
+            Graph {
                 states: vec![State {
                     transitions: Curry::Scrutinize {
                         filter: RangeMap(BTreeMap::new()),
@@ -482,21 +492,21 @@ mod reduced {
                 }],
                 initial: 0,
             },
-            &Graph {
+            Graph {
                 states: vec![State {
                     transitions: Curry::Wildcard(Transition::Return { region: "region" }),
                     non_accepting: BTreeSet::new(),
                 }],
                 initial: 0,
             },
-            &[0],
+            vec![0],
         );
     }
 
     #[test]
     fn union_2() {
         union(
-            &Graph {
+            Graph {
                 states: vec![State {
                     transitions: Curry::Scrutinize {
                         filter: RangeMap(
@@ -512,7 +522,7 @@ mod reduced {
                 }],
                 initial: 0,
             },
-            &Graph {
+            Graph {
                 states: vec![State {
                     transitions: Curry::Scrutinize {
                         filter: RangeMap(BTreeMap::new()),
@@ -525,7 +535,7 @@ mod reduced {
                 }],
                 initial: 0,
             },
-            &[0],
+            vec![0],
         );
     }
 

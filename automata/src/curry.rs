@@ -221,6 +221,19 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
             } => Box::new(filter.values_mut().chain(fallback)),
         }
     }
+
+    /// Check if this parser ever could, at any point, involve a fallback transition.
+    #[inline]
+    #[must_use]
+    pub const fn involves_any_fallback(&self) -> bool {
+        matches!(
+            *self,
+            Self::Scrutinize {
+                fallback: Some(_),
+                ..
+            }
+        )
+    }
 }
 
 impl<I: Input> Curry<I, usize> {

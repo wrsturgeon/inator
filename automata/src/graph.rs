@@ -291,6 +291,13 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             .map(|s| s.reindex(&self.states, &index_map))
             .collect();
     }
+
+    /// Check if this parser ever could, at any point, involve a fallback transition.
+    #[inline]
+    #[must_use]
+    pub fn involves_any_fallback(&self) -> bool {
+        self.states.iter().any(State::involves_any_fallback)
+    }
 }
 
 /// Use an ordering on subsets to translate each subset into a specific state.
