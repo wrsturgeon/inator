@@ -421,12 +421,13 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Curry<I, C> {
     #[inline]
     fn to_src(&self) -> String {
         match *self {
-            Self::Wildcard(ref w) => format!("Curry::Wildcard({})", w.to_src()),
+            Self::Wildcard(ref w) => format!("{}::Wildcard({})", Self::src_type(), w.to_src()),
             Self::Scrutinize {
                 ref filter,
                 ref fallback,
             } => format!(
-                "Curry::Scrutinize{{ filter: {}, fallback: {} }}",
+                "{}::Scrutinize {{ filter: {}, fallback: {} }}",
+                Self::src_type(),
                 filter.to_src(),
                 fallback.to_src(),
             ),

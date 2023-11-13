@@ -8,7 +8,7 @@
 
 use crate::{Ctrl, IllFormed, Input, Range, Transition};
 use core::cmp;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Map from ranges of keys to values.
 #[repr(transparent)]
@@ -132,5 +132,15 @@ impl<I: Input> RangeMap<I, usize> {
                 .map(|(k, v)| (k, v.convert_ctrl()))
                 .collect(),
         )
+    }
+}
+
+impl<I: Input> RangeMap<I, BTreeSet<usize>> {
+    /// Kleene-star operation: accept any number (including zero!) of repetitions of this parser.
+    #[inline]
+    pub fn star(&mut self, init: &BTreeSet<usize>, accepting: &BTreeSet<usize>) {
+        for t in self.0.values_mut() {
+            t.star(init, accepting);
+        }
     }
 }

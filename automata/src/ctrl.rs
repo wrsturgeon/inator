@@ -13,19 +13,9 @@ use std::collections::{btree_set, BTreeSet};
 #[cfg(feature = "quickcheck")]
 use core::num::NonZeroUsize;
 
-/// Everything that could go wrong merging _any_ kind of indices.
-/// No claim to be exhaustive: just the kinds that I've implemented so far.
-#[non_exhaustive]
-#[allow(clippy::module_name_repetitions)]
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CtrlMergeConflict {
-    /// Tried to merge two literal `usize`s that were not equal.
-    NotEqual(usize, usize),
-}
-
 /// Necessary preconditions to function as an index.
 pub trait Ctrl<I: Input>:
-    Check<I, Self> + Clone + Merge<Error = CtrlMergeConflict> + Ord + PartialEq + ToSrc
+    Check<I, Self> + Clone + Merge<Error = (usize, usize)> + Ord + PartialEq + ToSrc
 {
     /// Non-owning view over each index in what may be a collection.
     type View<'s>: Iterator<Item = usize>
