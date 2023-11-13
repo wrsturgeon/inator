@@ -173,24 +173,28 @@ use quickcheck as _; // <-- TODO: remove if we write some implementations
 pub fn empty<I: Input>() -> Deterministic<I> {
     Graph {
         states: vec![State {
-            transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+            transitions: Curry::Scrutinize {
+                filter: RangeMap(BTreeMap::new()),
+                fallback: None,
+            },
             non_accepting: BTreeSet::new(),
-            fallback: None,
         }],
         initial: 0,
     }
 }
 
-/// Accept exactly this token and do exactly these things.
+/// Accept exactly this range of tokens and do exactly these things.
 #[inline]
 #[must_use]
-pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> {
+pub fn on_any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> {
     Graph {
         states: vec![
             State {
-                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                },
                 non_accepting: BTreeSet::new(),
-                fallback: None,
             },
             State {
                 non_accepting: iter::once(format!(
@@ -199,24 +203,33 @@ pub fn any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<I> 
                     range.last.to_src(),
                 ))
                 .collect(),
-                transitions: Curry::Scrutinize(RangeMap(
-                    iter::once((range, Transition::Lateral { dst: 0, update })).collect(),
-                )),
-                fallback: None,
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(
+                        iter::once((
+                            range,
+                            Transition::Lateral {
+                                dst: 0,
+                                update: Some(update),
+                            },
+                        ))
+                        .collect(),
+                    ),
+                    fallback: None,
+                },
             },
         ],
         initial: 1,
     }
 }
 
-/// Accept exactly this token and do exactly these things.
+/// Accept exactly this range of tokens and forget their values.
 #[inline]
 #[must_use]
 pub fn on<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
     any_of(Range::unit(token), update)
 }
 
-/// Accept exactly this token and do nothing.
+/// Accept exactly this token and forget its value.
 #[inline]
 #[must_use]
 pub fn toss<I: Input>(token: I) -> Deterministic<I> {

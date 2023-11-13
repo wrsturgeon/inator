@@ -19,7 +19,7 @@ impl<I: Input> ops::BitOr for Deterministic<I> {
         let mut s = self.generalize();
         let other = rhs.generalize();
         // Note that union on pushdown automata is undecidable;
-        // we just reject a subset of automata that wouldn't work.
+        // we presumably reject a subset of automata that might possibly work.
         if s.check().is_err() {
             panic!("Internal error")
         }
@@ -116,9 +116,6 @@ fn add_tail_call_state<I: Input, C: Ctrl<I>>(
     State {
         transitions: add_tail_call_curry(s.transitions, other_init, accepting_indices),
         non_accepting: s.non_accepting,
-        fallback: s
-            .fallback
-            .map(|f| add_tail_call_transition(f, other_init, accepting_indices)),
     }
 }
 
@@ -134,9 +131,10 @@ fn add_tail_call_curry<I: Input, C: Ctrl<I>>(
         Curry::Wildcard(t) => {
             Curry::Wildcard(add_tail_call_transition(t, other_init, accepting_indices))
         }
-        Curry::Scrutinize(rm) => {
-            Curry::Scrutinize(add_tail_call_range_map(rm, other_init, accepting_indices))
-        }
+        Curry::Scrutinize { filter, fallback } => Curry::Scrutinize {
+            filter: add_tail_call_range_map(filter, other_init, accepting_indices),
+            fallback: fallback.map(|f| add_tail_call_transition(f, other_init, accepting_indices)),
+        },
     }
 }
 

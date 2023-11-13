@@ -7,7 +7,7 @@
 //! `QuickCheck` implementations for various types.
 
 use crate::{Ctrl, Curry, Graph, Input, Range, RangeMap, State, Transition, Update, FF};
-use core::{iter, marker::PhantomData, num::NonZeroUsize};
+use core::{iter, num::NonZeroUsize};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -120,16 +120,11 @@ macro_rules! shrink_only {
 }
 
 shrink_only!(|self: &State| Box::new(
-    (
-        self.transitions.clone(),
-        self.non_accepting.clone(),
-        self.fallback.clone()
-    )
+    (self.transitions.clone(), self.non_accepting.clone(),)
         .shrink()
-        .map(|(transitions, non_accepting, fallback)| Self {
+        .map(|(transitions, non_accepting)| Self {
             transitions,
             non_accepting,
-            fallback
         })
 ));
 
@@ -137,12 +132,21 @@ shrink_only!(|self: &RangeMap| Box::new(self.0.shrink().map(Self)));
 
 shrink_only!(|self: &Curry| match *self {
     Self::Wildcard(ref etc) => Box::new(etc.shrink().map(Self::Wildcard)),
-    Self::Scrutinize(ref etc) => Box::new(
-        etc.0
+    #[allow(clippy::shadow_unrelated)]
+    Self::Scrutinize {
+        ref filter,
+        ref fallback,
+    } => Box::new(
+        filter
+            .0
             .first_key_value()
             .map(|(_, transition)| Self::Wildcard(transition.clone()))
             .into_iter()
-            .chain(etc.shrink().map(Self::Scrutinize))
+            .chain(
+                (filter.clone(), fallback.clone())
+                    .shrink()
+                    .map(|(filter, fallback)| Self::Scrutinize { filter, fallback })
+            )
     ),
 });
 
@@ -166,12 +170,7 @@ shrink_only!(|self: &Transition| {
             Box::new(
                 Self::Lateral {
                     dst: dst.clone(),
-                    update: Update {
-                        input_t: "()".to_owned(),
-                        output_t: "()".to_owned(),
-                        ghost: PhantomData,
-                        src: "/* FAKE SOURCE CODE */",
-                    },
+                    update: None,
                 }
                 .shrink()
                 .chain((detour, dst, combine).shrink().map(
@@ -195,7 +194,6 @@ impl<C: Ctrl<u8>> State<u8, C> {
         Self {
             transitions: Curry::arbitrary_given(n_states, g),
             non_accepting: BTreeSet::arbitrary(g),
-            fallback: bool::arbitrary(g).then(|| Transition::arbitrary_given(n_states, g)),
         }
     }
 }
@@ -208,7 +206,10 @@ impl<C: Ctrl<u8>> Curry<u8, C> {
         if bool::arbitrary(g) {
             Self::Wildcard(Transition::arbitrary_given(n_states, g))
         } else {
-            Self::Scrutinize(RangeMap::arbitrary_given(n_states, g))
+            Self::Scrutinize {
+                filter: RangeMap::arbitrary_given(n_states, g),
+                fallback: bool::arbitrary(g).then(|| Transition::arbitrary_given(n_states, g)),
+            }
         }
     }
 }

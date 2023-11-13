@@ -40,8 +40,8 @@ mod prop {
             input.is_empty() == empty().accept(input).is_ok()
         }
 
-        fn any_of_works(range: Range<u8>, input: Vec<u8>) -> bool {
-            let parser = any_of(range, update!(|(), _| {}));
+        fn on_any_of_works(range: Range<u8>, input: Vec<u8>) -> bool {
+            let parser = on_any_of(range, update!(|(), _| {}));
             if parser.check().is_err() { return false; }
             parser.accept(input.iter().copied()).is_ok() == (input.len() == 1 && range.contains(&input[0]))
         }

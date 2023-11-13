@@ -267,10 +267,6 @@ impl<I: Input> State<I, usize> {
                     + "] })"
             },
         );
-        let on_unrecognized = self.fallback.as_ref().map_or_else(
-            || "Err(Error::Absurd { index, token })".to_owned(),
-            Transition::to_src,
-        );
         Ok(format!(
             r#"
 
@@ -280,7 +276,6 @@ fn state_{i}<I: Iterator<Item = (usize, {token_t})>>(input: &mut I, acc: {input_
     match input.next() {{
         None => {on_none},
         Some((index, token)) => match token {{{on_some}
-            _ => {on_unrecognized},
         }},
     }}
 }}"#,
@@ -299,7 +294,18 @@ impl<I: Input> Curry<I, usize> {
             _ => {},"#,
                 etc.to_src(),
             ),
-            Self::Scrutinize(ref etc) => etc.to_src(),
+            Self::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => format!(
+                "{}
+            _ => {}",
+                filter.to_src(),
+                fallback.as_ref().map_or_else(
+                    || "Err(Error::Absurd { index, token })".to_owned(),
+                    Transition::to_src,
+                )
+            ),
         }
     }
 }
@@ -326,9 +332,12 @@ impl<I: Input> Transition<I, usize> {
     #[must_use]
     fn to_src(&self) -> String {
         match *self {
+            Self::Lateral { dst, update: None } => {
+                format!("state_{dst}(input, acc, stack_top)")
+            }
             Self::Lateral {
                 dst,
-                update: Update { src, .. },
+                update: Some(Update { src, .. }),
             } => format!("state_{dst}(input, ({src})(acc, token), stack_top)"),
             Self::Call {
                 region,
@@ -413,7 +422,14 @@ impl<I: Input, C: Ctrl<I>> ToSrc for Curry<I, C> {
     fn to_src(&self) -> String {
         match *self {
             Self::Wildcard(ref w) => format!("Curry::Wildcard({})", w.to_src()),
-            Self::Scrutinize(ref s) => format!("Curry::Scrutinize({})", s.to_src()),
+            Self::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => format!(
+                "Curry::Scrutinize{{ filter: {}, fallback: {} }}",
+                filter.to_src(),
+                fallback.to_src(),
+            ),
         }
     }
     #[inline]

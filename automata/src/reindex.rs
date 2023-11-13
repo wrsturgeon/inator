@@ -21,7 +21,6 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
         State {
             transitions: self.transitions.reindex(states, index_map),
             non_accepting: self.non_accepting.clone(),
-            fallback: self.fallback.as_ref().map(|f| f.reindex(states, index_map)),
         }
     }
 }
@@ -37,7 +36,13 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     ) -> Self {
         match *self {
             Curry::Wildcard(ref etc) => Curry::Wildcard(etc.reindex(states, index_map)),
-            Curry::Scrutinize(ref etc) => Curry::Scrutinize(etc.reindex(states, index_map)),
+            Curry::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => Curry::Scrutinize {
+                filter: filter.reindex(states, index_map),
+                fallback: fallback.as_ref().map(|f| f.reindex(states, index_map)),
+            },
         }
     }
 }

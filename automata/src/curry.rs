@@ -17,7 +17,12 @@ pub enum Curry<I: Input, C: Ctrl<I>> {
     /// Throw away the input (without looking at it) and do this.
     Wildcard(Transition<I, C>),
     /// Map specific ranges of inputs to actions.
-    Scrutinize(RangeMap<I, C>),
+    Scrutinize {
+        /// Specific ranges to route to various transitions.
+        filter: RangeMap<I, C>,
+        /// If no ranges match, take this transition (if any; otherwise, fail).
+        fallback: Option<Transition<I, C>>,
+    },
 }
 
 impl<I: Input, C: Ctrl<I>> Clone for Curry<I, C> {
@@ -25,7 +30,13 @@ impl<I: Input, C: Ctrl<I>> Clone for Curry<I, C> {
     fn clone(&self) -> Self {
         match *self {
             Self::Wildcard(ref etc) => Self::Wildcard(etc.clone()),
-            Self::Scrutinize(ref etc) => Self::Scrutinize(etc.clone()),
+            Self::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => Self::Scrutinize {
+                filter: filter.clone(),
+                fallback: fallback.clone(),
+            },
         }
     }
 }
@@ -37,9 +48,18 @@ impl<I: Input, C: Ctrl<I>> PartialEq for Curry<I, C> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => a == b,
-            (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a == b,
-            (&Self::Wildcard(..), &Self::Scrutinize(..))
-            | (&Self::Scrutinize(..), &Self::Wildcard(..)) => false, // unfortunately no general way to tell if a range covers a whole type
+            (
+                &Self::Scrutinize {
+                    filter: ref l_filter,
+                    fallback: ref l_fallback,
+                },
+                &Self::Scrutinize {
+                    filter: ref r_filter,
+                    fallback: ref r_fallback,
+                },
+            ) => (l_filter, l_fallback) == (r_filter, r_fallback),
+            (&Self::Wildcard(..), &Self::Scrutinize { .. })
+            | (&Self::Scrutinize { .. }, &Self::Wildcard(..)) => false, // unfortunately no general way to tell if a range covers a whole type
         }
     }
 }
@@ -49,9 +69,18 @@ impl<I: Input, C: Ctrl<I>> Ord for Curry<I, C> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         match (self, other) {
             (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => a.cmp(b),
-            (&Self::Wildcard(..), &Self::Scrutinize(..)) => cmp::Ordering::Less,
-            (&Self::Scrutinize(..), &Self::Wildcard(..)) => cmp::Ordering::Greater,
-            (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a.cmp(b),
+            (&Self::Wildcard(..), &Self::Scrutinize { .. }) => cmp::Ordering::Less,
+            (&Self::Scrutinize { .. }, &Self::Wildcard(..)) => cmp::Ordering::Greater,
+            (
+                &Self::Scrutinize {
+                    filter: ref l_filter,
+                    fallback: ref l_fallback,
+                },
+                &Self::Scrutinize {
+                    filter: ref r_filter,
+                    fallback: ref r_fallback,
+                },
+            ) => (l_filter, l_fallback).cmp(&(r_filter, r_fallback)),
         }
     }
 }
@@ -72,34 +101,67 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     pub fn get(&self, key: &I) -> Result<Option<&Transition<I, C>>, IllFormed<I, C>> {
         match *self {
             Self::Wildcard(ref transition) => Ok(Some(transition)),
-            Self::Scrutinize(ref range_map) => range_map.get(key),
+            Self::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => Ok(filter.get(key)?.or(fallback.as_ref())),
         }
     }
 
     /// Assert that this map has no keys in common with another.
     /// # Errors
     /// If there are keys in common, don't panic: instead, return them.
-    /// Here's the format of what it returns:
-    /// - `None`: Conflict on literally anything. Means both are wildcards.
-    /// - `Some(range)`: Conflict on at least this range of values,
+    /// Here's the meaning of an error:
+    /// - `None`: Conflict on a fallback.
+    /// - `Some(None, ..)`: Conflict on literally anything. Means both are wildcards.
+    /// - `Some(Some(range), ..)`: Conflict on at least this range of values,
     ///   which is an intersection of two offending ranges.
     #[inline]
     #[allow(clippy::result_large_err, clippy::type_complexity)]
     pub fn disjoint(
         &self,
         other: &Self,
-    ) -> Result<(), (Option<Range<I>>, Transition<I, C>, Transition<I, C>)> {
+    ) -> Result<(), Option<(Option<Range<I>>, Transition<I, C>, Transition<I, C>)>> {
         match (self, other) {
-            (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => Err((None, a.clone(), b.clone())),
-            (&Self::Wildcard(ref w), &Self::Scrutinize(ref s))
-            | (&Self::Scrutinize(ref s), &Self::Wildcard(ref w)) => {
-                s.0.first_key_value().map_or(Ok(()), |(k, v)| {
-                    Err((Some(k.clone()), w.clone(), v.clone()))
-                })
+            (&Self::Wildcard(ref a), &Self::Wildcard(ref b)) => {
+                Err(Some((None, a.clone(), b.clone())))
             }
-            (&Self::Scrutinize(ref a), &Self::Scrutinize(ref b)) => a
-                .disjoint(b)
-                .map_err(|(intersection, lv, rv)| (Some(intersection), lv, rv)),
+            (
+                &Self::Wildcard(ref w),
+                &Self::Scrutinize {
+                    ref filter,
+                    ref fallback,
+                },
+            )
+            | (
+                &Self::Scrutinize {
+                    ref filter,
+                    ref fallback,
+                },
+                &Self::Wildcard(ref w),
+            ) => filter.0.first_key_value().map_or_else(
+                || fallback.as_ref().map_or(Ok(()), |_| Err(None)),
+                |(k, v)| Err(Some((Some(k.clone()), w.clone(), v.clone()))),
+            ),
+            (
+                &Self::Scrutinize {
+                    filter: ref l_filter,
+                    fallback: ref l_fallback,
+                },
+                &Self::Scrutinize {
+                    filter: ref r_filter,
+                    fallback: ref r_fallback,
+                },
+            ) => l_filter.disjoint(r_filter).map_or_else(
+                |(intersection, lv, rv)| Err(Some((Some(intersection), lv, rv))),
+                |()| {
+                    if l_fallback.is_some() && r_fallback.is_some() {
+                        Err(None)
+                    } else {
+                        Ok(())
+                    }
+                },
+            ),
         }
     }
 
@@ -108,7 +170,10 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     pub fn values(&self) -> Box<dyn '_ + Iterator<Item = &Transition<I, C>>> {
         match *self {
             Self::Wildcard(ref etc) => Box::new(iter::once(etc)),
-            Self::Scrutinize(ref etc) => Box::new(etc.values()),
+            Self::Scrutinize {
+                ref filter,
+                ref fallback,
+            } => Box::new(filter.values().chain(fallback)),
         }
     }
 
@@ -124,12 +189,24 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
                 //     "Asked to remove a specific value \
                 //     but the map took a wildcard",
                 // );
-                *self = Self::Scrutinize(RangeMap(BTreeMap::new()));
+                *self = Self::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                };
             }
-            Self::Scrutinize(ref mut etc) => etc.remove(&key.expect(
-                "Asked to remove a wildcard \
-                but the map took a specific value",
-            )),
+            Self::Scrutinize {
+                ref mut filter,
+                ref fallback,
+            } => {
+                filter.remove(&key.expect(
+                    "Asked to remove a wildcard \
+                    but the map took a specific value",
+                ));
+                assert!(
+                    fallback.is_none(),
+                    "Asked to remove a value but the map has a fallback",
+                );
+            }
         };
     }
 
@@ -138,7 +215,10 @@ impl<I: Input, C: Ctrl<I>> Curry<I, C> {
     pub fn values_mut(&mut self) -> Box<dyn '_ + Iterator<Item = &mut Transition<I, C>>> {
         match *self {
             Self::Wildcard(ref mut etc) => Box::new(iter::once(etc)),
-            Self::Scrutinize(ref mut etc) => Box::new(etc.values_mut()),
+            Self::Scrutinize {
+                ref mut filter,
+                ref mut fallback,
+            } => Box::new(filter.values_mut().chain(fallback)),
         }
     }
 }
@@ -150,7 +230,10 @@ impl<I: Input> Curry<I, usize> {
     pub fn convert_ctrl<C: Ctrl<I>>(self) -> Curry<I, C> {
         match self {
             Curry::Wildcard(w) => Curry::Wildcard(w.convert_ctrl()),
-            Curry::Scrutinize(s) => Curry::Scrutinize(s.convert_ctrl()),
+            Curry::Scrutinize { filter, fallback } => Curry::Scrutinize {
+                filter: filter.convert_ctrl(),
+                fallback: fallback.map(Transition::convert_ctrl),
+            },
         }
     }
 }

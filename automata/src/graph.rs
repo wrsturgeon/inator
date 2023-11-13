@@ -146,12 +146,10 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                     let State {
                         transitions,
                         non_accepting,
-                        fallback,
                     } = unwrap!(subsets_as_states.remove(set));
                     State {
                         transitions: fix_indices_curry(transitions, &ordering),
                         non_accepting,
-                        fallback: fallback.map(|f| fix_indices_transition(f, &ordering)),
                     }
                 })
                 .collect(),
@@ -176,14 +174,14 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
         };
 
         // Merge this subset of states into one (most of the heavy lifting)
-        let result_iterator = subset.view().map(|i| Ok(get!(self.states, i).clone()));
-
-        let mega_state = match try_merge(result_iterator) {
+        let mega_state = match try_merge(subset.view().map(|i| Ok(get!(self.states, i).clone()))) {
             // If no state follows, reject immediately.
             None => State {
-                transitions: Curry::Scrutinize(RangeMap(BTreeMap::new())),
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                },
                 non_accepting: iter::once("Unexpected token".to_owned()).collect(),
-                fallback: None,
             },
             // If they successfully merged, return the merged state
             Some(Ok(ok)) => ok,
@@ -196,10 +194,6 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
             .transitions
             .values()
             .flat_map(|t| t.dsts().into_iter().cloned())
-            .chain(mega_state.fallback.as_ref().map_or_else(
-                || vec![].into_iter().cloned(),
-                |f| f.dsts().into_iter().cloned(),
-            ))
             .collect();
 
         // Insert the finished value (also to tell all below iterations that we've covered this case)
@@ -305,7 +299,10 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
 fn fix_indices_curry<I: Input, C: Ctrl<I>>(value: Curry<I, C>, ordering: &[C]) -> Curry<I, usize> {
     match value {
         Curry::Wildcard(etc) => Curry::Wildcard(fix_indices_transition(etc, ordering)),
-        Curry::Scrutinize(etc) => Curry::Scrutinize(fix_indices_range_map(etc, ordering)),
+        Curry::Scrutinize { filter, fallback } => Curry::Scrutinize {
+            filter: fix_indices_range_map(filter, ordering),
+            fallback: fallback.map(|f| fix_indices_transition(f, ordering)),
+        },
     }
 }
 
