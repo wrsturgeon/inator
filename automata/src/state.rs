@@ -37,6 +37,13 @@ impl<I: Input, C: Ctrl<I>> State<I, C> {
                 })
             })
     }
+
+    /// Check if this parser ever could, at any point, involve a fallback transition.
+    #[inline]
+    #[must_use]
+    pub const fn involves_any_fallback(&self) -> bool {
+        self.transitions.involves_any_fallback()
+    }
 }
 
 impl<I: Input> State<I, usize> {
