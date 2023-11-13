@@ -28,7 +28,7 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
     InvertedRange(I, I),
     /// In a `RangeMap`, at least one key could be accepted by two existing ranges of keys.
     RangeMapOverlap(Range<I>),
-    /// In a `CurryStack`, a wildcard matches an input that a specific key also matches.
+    /// In a `Curry`, a wildcard matches an input that a specific key also matches.
     WildcardMask {
         /// Input token (or range thereof) that could be ambiguous.
         arg_token: Option<Range<I>>,
@@ -37,6 +37,8 @@ pub enum IllFormed<I: Input, C: Ctrl<I>> {
         /// Second output possibility.
         possibility_2: Box<Transition<I, C>>,
     },
+    /// In a `Curry`, a wildcard would have erased a fallback output.
+    WildcardFallback,
     /// Can't go to two different (deterministic) states at the same time.
     Superposition(usize, usize),
     /// Can't call two different functions on half-constructed outputs at the same time.
@@ -78,6 +80,7 @@ impl<I: Input> IllFormed<I, usize> {
                 possibility_1: Box::new(possibility_1.convert_ctrl()),
                 possibility_2: Box::new(possibility_2.convert_ctrl()),
             },
+            IllFormed::WildcardFallback => IllFormed::WildcardFallback,
             IllFormed::Superposition(a, b) => IllFormed::Superposition(a, b),
             IllFormed::IncompatibleCallbacks(a, b) => IllFormed::IncompatibleCallbacks(a, b),
             IllFormed::IncompatibleCombinators(a, b) => IllFormed::IncompatibleCombinators(a, b),
@@ -135,6 +138,12 @@ impl<I: Input, C: Ctrl<I>> fmt::Display for IllFormed<I, C> {
                     }),
                     possibility_1.to_src(),
                     possibility_2.to_src(),
+                )
+            }
+            Self::WildcardFallback => {
+                write!(
+                    f,
+                    "A wildcard match would have overwritten a fallback output",
                 )
             }
             Self::Superposition(a, b) => write!(

@@ -30,7 +30,7 @@ impl<I: Input, C: Ctrl<I>, In: Iterator<Item = I>> fmt::Debug for InProgress<'_,
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "In progress: {:?} @ {:?} -> {:?}",
+            "In progress: {} @ {:?} -> {}",
             self.stack.to_src(),
             self.ctrl.view().collect::<Vec<_>>(),
             self.output_t,

@@ -19,7 +19,7 @@ impl<I: Input> ops::BitOr for Deterministic<I> {
         let mut s = self.generalize();
         let other = rhs.generalize();
         // Note that union on pushdown automata is undecidable;
-        // we just reject a subset of automata that wouldn't work.
+        // we presumably reject a subset of automata that might possibly work.
         if s.check().is_err() {
             panic!("Internal error")
         }
