@@ -48,7 +48,12 @@ mod prop {
 
         fn star_in_paren(count: u8) -> bool {
             let input = iter::once('(').chain(iter::repeat('a').take(usize::from(count))).chain(iter::once(')'));
-            let parser = open("parentheses", c('(')) >> c('a').star() << close("parentheses", c(')'));
+            let parser = region(
+                "parentheses",
+                toss('('),
+                toss('a').star(),
+                toss(')'),
+            );
             parser.accept(input).is_ok()
         }
     }

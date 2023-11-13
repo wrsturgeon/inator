@@ -156,10 +156,15 @@ macro_rules! get_mut {
 
 // TODO: derive ToSrc
 
+mod region;
+
 #[cfg(test)]
 mod test;
 
-pub use inator_automata::{Deterministic as Parser, *};
+pub use {
+    inator_automata::{Deterministic as Parser, *},
+    region::region,
+};
 
 use core::iter;
 use std::collections::{BTreeMap, BTreeSet};
