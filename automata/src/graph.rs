@@ -382,13 +382,13 @@ fn fix_indices_transition<I: Input, C: Ctrl<I>>(
         },
         Transition::Call {
             region,
-            detour,
+            ref detour,
             dst,
             combine,
         } => Transition::Call {
             region,
-            detour: unwrap!(ordering.binary_search(&detour)),
-            dst: unwrap!(ordering.binary_search(&dst)),
+            detour: unwrap!(ordering.binary_search(detour)),
+            dst: Box::new(fix_indices_transition(*dst, ordering)),
             combine,
         },
         Transition::Return { region } => Transition::Return { region },

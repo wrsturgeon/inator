@@ -337,6 +337,17 @@ mod prop {
             };
             star.accept(input).is_ok()
         }
+
+        // TODO:
+        /*
+        fn star_star_identity(d: Deterministic<u8>, input: Vec<u8>) -> bool {
+            let Ok(once) = panic::catch_unwind(|| d.star()) else {
+                return true;
+            };
+            let twice = once.clone().star();
+            once.accept(input.iter().copied()) == twice.accept(input)
+        }
+        */
     }
 }
 
@@ -506,7 +517,10 @@ mod reduced {
                         transitions: Curry::Wildcard(Transition::Call {
                             region: "region",
                             detour: 0,
-                            dst: 1,
+                            dst: Box::new(Transition::Lateral {
+                                dst: 1,
+                                update: None,
+                            }),
                             combine: FF {
                                 src: "|(), ()| ()".to_owned(),
                                 lhs_t: "()".to_owned(),
@@ -662,7 +676,10 @@ mod reduced {
                         transitions: Curry::Wildcard(Transition::Call {
                             region: "region",
                             detour: 0,
-                            dst: 0,
+                            dst: Box::new(Transition::Lateral {
+                                dst: 0,
+                                update: None,
+                            }),
                             combine: ff!(|(), ()| ()),
                         }),
                         non_accepting: BTreeSet::new(),

@@ -264,7 +264,15 @@ impl<I: Input, C: Ctrl<I>> Check<I, C> for Transition<I, C> {
     #[inline]
     fn check(&self, n_states: NonZeroUsize) -> Result<(), IllFormed<I, C>> {
         match *self {
-            Self::Lateral { ref dst, .. } | Self::Call { ref dst, .. } => dst.check(n_states),
+            Self::Lateral { ref dst, .. } => dst.check(n_states),
+            Self::Call {
+                ref detour,
+                ref dst,
+                ..
+            } => {
+                detour.check(n_states)?;
+                dst.check(n_states)
+            }
             Self::Return { .. } => Ok(()),
         }
     }

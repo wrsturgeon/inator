@@ -36,9 +36,9 @@ cargo test -r --no-default-features --examples
 for i in $(seq 2 8)
 do
   export QUICKCHECK_GENERATOR_SIZE=$(expr ${i} '*' '(' ${i} - 1 ')')
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 50) cargo test --all-features
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) cargo test -r --all-features
-  QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) cargo test -r --all-features --examples
+  RUST_BACKTRACE=0 QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 50) cargo test --all-features
+  RUST_BACKTRACE=0 QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) cargo test -r --all-features
+  RUST_BACKTRACE=0 QUICKCHECK_TESTS=$(expr ${QUICKCHECK_TESTS} / 10) cargo test -r --all-features --examples
 done
 
 # Run examples

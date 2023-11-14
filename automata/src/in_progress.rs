@@ -6,7 +6,7 @@
 
 //! Execute an automaton on an input sequence.
 
-use crate::{try_merge, Ctrl, Graph, IllFormed, Input, ToSrc};
+use crate::{try_merge, Ctrl, Graph, IllFormed, Input, ToSrc, Transition};
 use core::fmt;
 
 /// Execute an automaton on an input sequence.
@@ -17,7 +17,7 @@ pub struct InProgress<'graph, I: Input, C: Ctrl<I>, In: Iterator<Item = I>> {
     /// Iterator over input tokens.
     pub input: In,
     /// Internal stack.
-    pub stack: Vec<C>,
+    pub stack: Vec<Transition<I, C>>,
     /// Internal state.
     pub ctrl: C,
     /// Output type as we go.
@@ -90,7 +90,7 @@ fn step<I: Input, C: Ctrl<I>>(
     graph: &Graph<I, C>,
     ctrl: &C,
     maybe_token: Option<I>,
-    stack: &mut Vec<C>,
+    stack: &mut Vec<Transition<I, C>>,
     output_t: &str,
 ) -> Result<(Option<C>, String), ParseError<I, C>> {
     ctrl.view().try_fold((), |(), i| {
