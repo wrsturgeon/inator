@@ -30,7 +30,7 @@ pub enum Transition<I: Input, C: Ctrl<I>> {
         /// Call (and require a successful run from) this state before continuing.
         detour: C,
         /// After the call has succeeded, go to this state.
-        dst: C,
+        dst: Box<Self>,
         /// Combine the cached results and the results of the called parser with this function.
         combine: FF,
     },
