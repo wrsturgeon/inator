@@ -8,7 +8,7 @@
 
 #![allow(clippy::manual_assert, clippy::match_wild_err_arm, clippy::panic)]
 
-use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition};
+use crate::{Ctrl, Curry, Deterministic, Graph, Input, Merge, RangeMap, State, Transition, FF};
 use core::{iter, mem, ops};
 use std::collections::BTreeSet;
 
@@ -128,10 +128,10 @@ impl<I: Input> ops::Shr<Self> for Deterministic<I> {
     }
 }
 
-impl<I: Input> ops::BitXor<Self> for Deterministic<I> {
+impl<I: Input> ops::BitXor<(&'static str, Self, FF)> for Deterministic<I> {
     type Output = Self;
     #[inline]
-    fn bitxor(mut self, other: Self) -> Self::Output {
+    fn bitxor(mut self, (region, other, combine): (&'static str, Self, FF)) -> Self::Output {
         let rhs_init = get!(other.states, other.initial)
             .transitions
             .clone()
@@ -189,7 +189,7 @@ impl<I: Input> ops::BitXor<Self> for Deterministic<I> {
             states: s
                 .states
                 .into_iter()
-                .map(|st| add_call_state(st, &other_initial, &accepting_indices))
+                .map(|st| add_call_state(st, &other_initial, &accepting_indices, region, &combine))
                 .collect(),
             ..s
         };
@@ -307,9 +307,17 @@ fn add_call_state<I: Input, C: Ctrl<I>>(
     s: State<I, C>,
     other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
+    region: &'static str,
+    combine: &FF,
 ) -> State<I, BTreeSet<usize>> {
     State {
-        transitions: add_call_curry(s.transitions, other_init, accepting_indices),
+        transitions: add_call_curry(
+            s.transitions,
+            other_init,
+            accepting_indices,
+            region,
+            combine,
+        ),
         non_accepting: s.non_accepting,
     }
 }
@@ -321,14 +329,21 @@ fn add_call_curry<I: Input, C: Ctrl<I>>(
     s: Curry<I, C>,
     other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
+    region: &'static str,
+    combine: &FF,
 ) -> Curry<I, BTreeSet<usize>> {
     match s {
-        Curry::Wildcard(t) => {
-            Curry::Wildcard(add_call_transition(t, other_init, accepting_indices))
-        }
+        Curry::Wildcard(t) => Curry::Wildcard(add_call_transition(
+            t,
+            other_init,
+            accepting_indices,
+            region,
+            combine,
+        )),
         Curry::Scrutinize { filter, fallback } => Curry::Scrutinize {
-            filter: add_call_range_map(filter, other_init, accepting_indices),
-            fallback: fallback.map(|f| add_call_transition(f, other_init, accepting_indices)),
+            filter: add_call_range_map(filter, other_init, accepting_indices, region, combine),
+            fallback: fallback
+                .map(|f| add_call_transition(f, other_init, accepting_indices, region, combine)),
         },
     }
 }
@@ -340,10 +355,17 @@ fn add_call_range_map<I: Input, C: Ctrl<I>>(
     s: RangeMap<I, C>,
     other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
+    region: &'static str,
+    combine: &FF,
 ) -> RangeMap<I, BTreeSet<usize>> {
     RangeMap(
         s.0.into_iter()
-            .map(|(k, v)| (k, add_call_transition(v, other_init, accepting_indices)))
+            .map(|(k, v)| {
+                (
+                    k,
+                    add_call_transition(v, other_init, accepting_indices, region, combine),
+                )
+            })
             .collect(),
     )
 }
@@ -351,16 +373,22 @@ fn add_call_range_map<I: Input, C: Ctrl<I>>(
 /// Add a call to any accepting state.
 #[inline]
 #[must_use]
-#[allow(clippy::todo)] // <-- FIXME
 fn add_call_transition<I: Input, C: Ctrl<I>>(
     s: Transition<I, C>,
-    _other_init: &BTreeSet<usize>,
+    other_init: &BTreeSet<usize>,
     accepting_indices: &BTreeSet<usize>,
+    region: &'static str,
+    combine: &FF,
 ) -> Transition<I, BTreeSet<usize>> {
     match s {
         Transition::Lateral { dst, update } => {
             if dst.view().any(|ref i| accepting_indices.contains(i)) {
-                todo!()
+                Transition::Call {
+                    region,
+                    detour: other_init.clone(),
+                    dst: Box::new(Transition::Lateral { dst, update }.generalize()),
+                    combine: combine.clone(),
+                }
             } else {
                 Transition::Lateral {
                     dst: dst.view().collect(),
@@ -368,23 +396,25 @@ fn add_call_transition<I: Input, C: Ctrl<I>>(
                 }
             }
         }
+        #[allow(clippy::shadow_unrelated)]
         Transition::Call {
             region,
-            detour,
+            ref detour,
             dst,
             combine,
-        } => {
-            if dst.view().any(|ref i| accepting_indices.contains(i)) {
-                todo!()
-            } else {
-                Transition::Call {
-                    region,
-                    detour: detour.view().collect(),
-                    dst: dst.view().collect(),
-                    combine,
-                }
-            }
-        }
+        } => Transition::Call {
+            region,
+            detour: detour.view().collect(),
+            dst: Box::new(add_call_transition(
+                *dst,
+                other_init,
+                accepting_indices,
+                region,
+                &combine,
+            )),
+            combine,
+        },
+        #[allow(clippy::shadow_unrelated)]
         Transition::Return { region } => Transition::Return { region },
     }
 }
