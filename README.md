@@ -55,6 +55,7 @@ The [`automata` directory](automata/) in this repository contains both an interp
 ## What does this whole process look like?
 
 Surprisingly, it looks a lot like just writing down what you want.
+The key idea is that ***parsers are data***, and you can pass them around, modify them, and combine them just like anything else.
 
 Here's how we parse either "abc" or "azc":
 ```rust
@@ -93,23 +94,14 @@ let paren_abc_azc = parenthesized(
 ```
 Above, if `p` is a parser that accepts `ABC`, then `parenthesized(p)` will accept `(ABC)`, and so on for any language other than `ABC`. Simple as that.
 
-If you need to _nest_ parentheses (or any other delimiters) and verify that everything matches up, there's a built-in function for that:
-```rust
-/// Delimit a region with three parsers: one opens, one parses the contents, and one closes.
-pub fn region<I: Input>(
-    name: &'static str,
-    open: Parser<I>,
-    contents: Parser<I>,
-    close: Parser<I>,
-    combine: FF, // <-- Every parser returns a value, but after a call, we have two: what we had before, and the return value from the call. Combine them as you wish.
-) -> Parser<I> {
-    // To make `rustdoc` happy:
-    inator::region(name, open, contents, close, combine)
-}
-```
-Matching delimiters is the only use-case for the stack in this model of computation, but it's crucial nonetheless.
-
-The key idea here is that ***parsers are data***, and you can pass them around, modify them, and combine them just like anything else.
+If you need to _nest_ parentheses (or any other delimiters) and verify that everything matches up, there's a built-in function for that. `region` takes five arguments:
+- `name`, a `&'static string` describing the region (e.g. in error messages);
+- `open`, a parser that opens the region (here, it would be `toss('(')`);
+- `contents`, the parser that runs inside the region;
+- `close`, a parser that closes the region (here, it would be `toss(')')`); and
+- `combine`, which is a bit more complicated.
+    - Every parser returns a value, but after a call, we have two: what we had before, and the return value from the call.
+      You can combine these two values in any way you'd like, including by throwing one or the other out.
 
 ## Anything else cool you can do?
 
