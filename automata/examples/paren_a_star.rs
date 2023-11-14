@@ -40,7 +40,10 @@ pub fn main() {
                             Transition::Call {
                                 region: "parentheses",
                                 detour: 1,
-                                dst: 2,
+                                dst: Box::new(Transition::Lateral {
+                                    dst: 2,
+                                    update: None,
+                                }),
                                 combine: ff!(|(), ()| ()),
                             },
                         ))
@@ -87,6 +90,9 @@ pub fn main() {
     };
     parser.check().unwrap();
 
+    // Print the Rust source representation of this parser
+    println!("{}", parser.to_src().unwrap());
+
     let mut rng = thread_rng();
 
     // Accept all valid strings
@@ -122,7 +128,4 @@ pub fn main() {
         }
         assert!(accept(s.chars()));
     }
-
-    // Print the Rust source representation of this parser
-    println!("{}", parser.to_src().unwrap());
 }

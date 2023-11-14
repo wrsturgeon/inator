@@ -6,7 +6,7 @@
 
 //! Delimit a region with three parsers: one opens, one parses the contents, and one closes.
 
-use crate::{Curry, Input, Parser, Transition};
+use crate::{Curry, Input, Parser, Transition, FF};
 
 /// Delimit a region with three parsers: one opens, one parses the contents, and one closes.
 #[inline]
@@ -25,6 +25,7 @@ pub fn region<I: Input>(
     open: Parser<I>,
     contents: Parser<I>,
     mut close: Parser<I>,
+    combine: FF,
 ) -> Parser<I> {
     // Split `close` into accepting and non-accepting states.
     // Move all accepting states out of `close` and into the post-return `dst` position.
@@ -75,7 +76,7 @@ pub fn region<I: Input>(
         }
     }
 
-    open ^ (contents >> close)
+    open ^ (name, contents >> close, combine)
 }
 
 /// Convert a transition to an accepting state into a `Return`.

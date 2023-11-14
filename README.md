@@ -43,12 +43,15 @@ Surprisingly, it looks a lot like just writing down what you want. Here's the de
 
 ```rust
 # use inator::*;
+# type A = ();
+# type B = ();
 pub fn parenthesized(p: Parser<char>) -> Parser<char> {
     region(
-        "parentheses",
-        toss('('),
-        p,
-        toss(')'),
+        "parentheses",             // <-- Name of the region
+        toss('('),                 // <-- Parser that opens the region
+        p,                         // <-- Parser inside the region
+        toss(')'),                 // <-- Parser that closes the region
+        ff!(|a: A, b: B| todo!()), // <-- Function to fuse our previous value with the result of the call
     )
 }
 ```

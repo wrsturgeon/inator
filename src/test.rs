@@ -12,7 +12,6 @@
     clippy::unwrap_used
 )]
 
-#[cfg(feature = "quickcheck")] // <-- TODO: disable for reduced tests
 use crate::*;
 
 /*
@@ -27,6 +26,83 @@ fn sliceable<I: Input, C: Ctrl<I>>(parser: &Graph<I, C>, input: &[I]) -> bool {
         })
 }
 */
+
+mod unit {
+    use super::*;
+
+    #[test]
+    fn star_in_paren_structural() {
+        // Same as `automata/examples/paren_a_star.rs`
+        let handcrafted = Graph {
+            states: vec![
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            iter::once((
+                                Range::unit('('),
+                                Transition::Call {
+                                    region: "parentheses",
+                                    detour: 1,
+                                    dst: Box::new(Transition::Lateral {
+                                        dst: 2,
+                                        update: None,
+                                    }),
+                                    combine: ff!(|(), ()| ()),
+                                },
+                            ))
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: iter::once("No input".to_owned()).collect(),
+                },
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            [
+                                (
+                                    Range::unit('a'),
+                                    Transition::Lateral {
+                                        dst: 1,
+                                        update: None,
+                                    },
+                                ),
+                                (
+                                    Range::unit(')'),
+                                    Transition::Return {
+                                        region: "parentheses",
+                                    },
+                                ),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: iter::once("Unclosed parentheses".to_owned()).collect(),
+                },
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: None,
+                    },
+                    non_accepting: BTreeSet::new(),
+                },
+            ],
+            initial: 0,
+        };
+        assert_eq!(
+            region(
+                "parentheses",
+                toss('('),
+                toss('a').star(),
+                toss(')'),
+                ff!(|(), ()| ()),
+            ),
+            handcrafted,
+        );
+    }
+}
 
 #[cfg(feature = "quickcheck")]
 mod prop {
@@ -54,14 +130,39 @@ mod prop {
                 toss('('),
                 toss('a').star(),
                 toss(')'),
+                ff!(|(), ()| ()),
             );
             parser.accept(input).is_ok()
         }
 
         fn region_depth_one(open: Parser<u8>, contents: Parser<u8>, close: Parser<u8>, input: Vec<u8>) -> bool {
             let seq = open.clone() >> contents.clone() >> close.clone();
-            let reg = region("region", open, contents, close);
+            let reg = region("region", open, contents, close, ff!(|(), ()| ()));
             seq.accept(input.iter().copied()) == reg.accept(input)
         }
+    }
+}
+
+mod reduced {
+    use super::*;
+    use core::iter;
+
+    fn star_in_paren(count: u8) {
+        let input = iter::once('(')
+            .chain(iter::repeat('a').take(usize::from(count)))
+            .chain(iter::once(')'));
+        let parser = region(
+            "parentheses",
+            toss('('),
+            toss('a').star(),
+            toss(')'),
+            ff!(|(), ()| ()),
+        );
+        assert_eq!(parser.accept(input), Ok("()".to_owned()));
+    }
+
+    #[test]
+    fn star_in_paren_1() {
+        star_in_paren(0);
     }
 }
