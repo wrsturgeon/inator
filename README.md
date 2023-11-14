@@ -58,6 +58,7 @@ Surprisingly, it looks a lot like just writing down what you want.
 
 Here's how we parse either "abc" or "azc":
 ```rust
+use inator::toss; // Combinator that filters for a certain character, then forgets it.
 let a = toss('a');
 let b = toss('b');
 let c = toss('c');
@@ -76,6 +77,7 @@ Plus, this approach to parsing requires zero allocations, so even microcontrolle
 Then we can take that whole above parser and pass it around, e.g. to put it in parentheses:
 ```rust
 // Copied from above:
+use inator::toss;
 let a = toss('a');
 let b = toss('b');
 let c = toss('c');
