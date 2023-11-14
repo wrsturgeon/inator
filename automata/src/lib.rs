@@ -233,7 +233,10 @@ pub fn dyck_d() -> Deterministic<char> {
                             Transition::Call {
                                 region: "parentheses",
                                 detour: 0,
-                                dst: 0,
+                                dst: Box::new(Transition::Lateral {
+                                    dst: 0,
+                                    update: None,
+                                }),
                                 combine: ff!(|(), ()| ()),
                             },
                         ),
@@ -269,7 +272,10 @@ pub fn dyck_nd() -> Nondeterministic<char> {
                             Transition::Call {
                                 region: "parentheses",
                                 detour: iter::once(0).collect(),
-                                dst: iter::once(0).collect(),
+                                dst: Box::new(Transition::Lateral {
+                                    dst: iter::once(0).collect(),
+                                    update: None,
+                                }),
                                 combine: ff!(|(), ()| ()),
                             },
                         ),

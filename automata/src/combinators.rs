@@ -267,12 +267,16 @@ fn add_tail_call_transition<I: Input, C: Ctrl<I>>(
         Transition::Call {
             region,
             ref detour,
-            ref dst,
+            dst,
             combine,
         } => Transition::Call {
             region,
             detour: add_tail_call_c(detour, other_init, accepting_indices),
-            dst: add_tail_call_c(dst, other_init, accepting_indices),
+            dst: Box::new(add_tail_call_transition(
+                *dst,
+                other_init,
+                accepting_indices,
+            )),
             combine,
         },
         Transition::Return { region } => Transition::Return { region },

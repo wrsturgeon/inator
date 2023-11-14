@@ -83,7 +83,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
             } => Self::Call {
                 region,
                 detour: detour.map_indices(&mut f),
-                dst: dst.map_indices(f),
+                dst: Box::new(dst.map_indices(f)),
                 combine,
             },
             Self::Return { region } => Self::Return { region },

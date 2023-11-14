@@ -152,37 +152,33 @@ shrink_only!(|self: &Curry| match *self {
 
 shrink_only!(|self: &Transition| {
     #[allow(clippy::shadow_unrelated, unreachable_code, unused_variables)]
-    match self.clone() {
-        Self::Return { region: _ } => Box::new(iter::empty()),
-        Self::Lateral { dst, update } => Box::new(
+    match *self {
+        Self::Return { .. } => Box::new(iter::empty()),
+        Self::Lateral {
+            ref dst,
+            ref update,
+        } => Box::new(
             iter::once(Self::Return { region: "region" }).chain(
-                (dst, update)
+                (dst.clone(), update.clone())
                     .shrink()
                     .map(|(dst, update)| Self::Lateral { dst, update }),
             ),
         ),
         Self::Call {
-            region: _,
-            detour,
-            dst,
-            combine,
-        } => {
-            Box::new(
-                Self::Lateral {
-                    dst: dst.clone(),
-                    update: None,
-                }
-                .shrink()
-                .chain((detour, dst, combine).shrink().map(
-                    |(detour, dst, combine)| Self::Call {
-                        region: "region",
-                        detour,
-                        dst,
-                        combine,
-                    },
-                )),
-            )
-        }
+            ref detour,
+            ref dst,
+            ref combine,
+            ..
+        } => Box::new(dst.as_ref().shrink().chain(
+            (detour.clone(), dst.clone(), combine.clone()).shrink().map(
+                |(detour, dst, combine)| Self::Call {
+                    region: "region",
+                    detour,
+                    dst,
+                    combine,
+                },
+            ),
+        )),
     }
 });
 
@@ -255,7 +251,7 @@ impl<C: Ctrl<u8>> Transition<u8, C> {
             |n, r| Self::Call {
                 region: "region",
                 detour: C::arbitrary_given(n, r),
-                dst: C::arbitrary_given(n, r),
+                dst: Box::new(Transition::arbitrary_given(n, r)),
                 combine: Arbitrary::arbitrary(r),
             },
             |_, _| Self::Return { region: "region" },

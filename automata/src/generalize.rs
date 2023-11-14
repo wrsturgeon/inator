@@ -76,7 +76,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
             } => Transition::Call {
                 region,
                 detour: detour.view().collect(),
-                dst: dst.view().collect(),
+                dst: Box::new(dst.generalize()),
                 combine,
             },
             Self::Return { region } => Transition::Return { region },
