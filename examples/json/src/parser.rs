@@ -69,10 +69,18 @@ fn state_1<I: Iterator<Item = (usize, u8)>>(
     match input.next() {
         None => Err(Error::UserDefined { messages: &["Expected only a single token on [b\' \'..=b\' \'] but got another token after it", "Expected only a single token on [b\'\\n\'..=b\'\\n\'] but got another token after it", "Expected only a single token on [b\'\\r\'..=b\'\\r\'] but got another token after it", "Expected only a single token on [b\'\\t\'..=b\'\\t\'] but got another token after it"] }),
         Some((index, token)) => match token {
-            b'\t'..=b'\t' => state_0(input, acc, stack_top),
-            b'\n'..=b'\n' => state_0(input, acc, stack_top),
-            b'\r'..=b'\r' => state_0(input, acc, stack_top),
-            b' '..=b' ' => state_0(input, acc, stack_top),
+            b'\t'..=b'\t' => {
+                state_0(input, acc, stack_top)
+            },
+            b'\n'..=b'\n' => {
+                state_0(input, acc, stack_top)
+            },
+            b'\r'..=b'\r' => {
+                state_0(input, acc, stack_top)
+            },
+            b' '..=b' ' => {
+                state_0(input, acc, stack_top)
+            },
             _ => Err(Error::Absurd { index, token })
         },
     }

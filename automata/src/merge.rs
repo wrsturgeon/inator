@@ -219,9 +219,7 @@ impl<I: Input, C: Ctrl<I>> Merge for Transition<I, C> {
                 detour: l_detour
                     .merge(r_detour)
                     .map_err(|(a, b)| IllFormed::Superposition(a, b))?,
-                dst: l_dst
-                    .merge(r_dst)
-                    .map_err(|(a, b)| IllFormed::Superposition(a, b))?,
+                dst: Box::new(l_dst.merge(*r_dst)?),
                 combine: l_combine.merge(r_combine).map_err(|(a, b)| {
                     IllFormed::IncompatibleCombinators(Box::new(a), Box::new(b))
                 })?,

@@ -7,7 +7,7 @@
 //! Transition in an automaton: an action and a destination state.
 
 use crate::{Ctrl, Input, InputError, Merge, ParseError, Update, FF};
-use core::{cmp, mem};
+use core::{cmp, iter, mem};
 use std::collections::BTreeSet;
 
 // TODO: rename `Call` to `Open` and `Return` to `Close`
@@ -137,7 +137,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     pub fn invoke(
         &self,
         output_t: &str,
-        stack: &mut Vec<C>,
+        stack: &mut Vec<Transition<I, C>>,
     ) -> Result<Option<(C, String)>, ParseError<I, C>> {
         match *self {
             Self::Lateral {
@@ -156,14 +156,17 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
                 ref dst,
                 ..
             } => {
-                stack.push(dst.clone());
+                stack.push(*dst.clone());
                 Ok(Some((detour.clone(), "()".to_owned())))
             }
             Self::Return { .. } => {
                 let rtn_to = stack
                     .pop()
                     .ok_or(ParseError::BadInput(InputError::Unopened))?;
-                Ok(Some((rtn_to, output_t.to_owned())))
+                // Ok(Some((rtn_to, output_t.to_owned())))
+                // No longer strictly small-step semantics,
+                // but the alternative is a nightmare
+                rtn_to.invoke(output_t, stack)
             }
         }
     }
@@ -185,15 +188,15 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
     /// For returns, it's nothing.
     #[inline]
     #[must_use]
-    pub fn dsts(&self) -> Vec<&C> {
+    pub fn dsts(&self) -> BTreeSet<&C> {
         match *self {
-            Self::Lateral { ref dst, .. } => vec![dst],
+            Self::Lateral { ref dst, .. } => iter::once(dst).collect(),
             Self::Call {
                 ref detour,
                 ref dst,
                 ..
-            } => vec![detour, dst],
-            Self::Return { .. } => vec![],
+            } => iter::once(detour).chain(dst.dsts()).collect(),
+            Self::Return { .. } => BTreeSet::new(),
         }
     }
 
@@ -227,7 +230,7 @@ impl<I: Input> Transition<I, usize> {
             } => Transition::Call {
                 region,
                 detour: C::from_usize(detour),
-                dst: C::from_usize(dst),
+                dst: Box::new(dst.convert_ctrl()),
                 combine,
             },
             Self::Return { region } => Transition::Return { region },
@@ -241,11 +244,12 @@ impl<I: Input> Transition<I, BTreeSet<usize>> {
     #[allow(clippy::missing_panics_doc)]
     pub fn star(&mut self, init: &BTreeSet<usize>, accepting: &BTreeSet<usize>) {
         match *self {
-            Transition::Lateral { ref mut dst, .. } | Transition::Call { ref mut dst, .. } => {
+            Transition::Lateral { ref mut dst, .. } => {
                 if dst.iter().any(|i| accepting.contains(i)) {
                     *dst = unwrap!(mem::take(dst).merge(init.clone()));
                 }
             }
+            Transition::Call { ref mut dst, .. } => dst.star(init, accepting),
             Transition::Return { .. } => {}
         }
     }
