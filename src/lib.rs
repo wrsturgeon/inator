@@ -227,6 +227,45 @@ pub fn on_any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<
     }
 }
 
+/// Accept exactly this range of tokens and do exactly these things.
+#[inline]
+#[must_use]
+pub fn toss_any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
+    Graph {
+        states: vec![
+            State {
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                },
+                non_accepting: BTreeSet::new(),
+            },
+            State {
+                non_accepting: iter::once(format!(
+                    "Expected only a single token on [{}..={}] but got another token after it",
+                    range.first.to_src(),
+                    range.last.to_src(),
+                ))
+                .collect(),
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(
+                        iter::once((
+                            range,
+                            Transition::Lateral {
+                                dst: 0,
+                                update: None,
+                            },
+                        ))
+                        .collect(),
+                    ),
+                    fallback: None,
+                },
+            },
+        ],
+        initial: 1,
+    }
+}
+
 /// Accept exactly this range of tokens and forget their values.
 #[inline]
 #[must_use]
@@ -245,5 +284,5 @@ pub fn toss<I: Input>(token: I) -> Deterministic<I> {
 #[inline]
 #[must_use]
 pub fn toss_range<I: Input>(range: Range<I>) -> Deterministic<I> {
-    on_any_of(range, update!(|(), _| {}))
+    toss_any_of(range)
 }

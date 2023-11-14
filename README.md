@@ -41,9 +41,15 @@ Every case I know of in which intersection fails has nothing to do with parsing,
 
 Surprisingly, it looks a lot like just writing down what you want. Here's the definition for "put this thing in parentheses":
 
-```compile_fail
+```rust
+# use inator::*;
 pub fn parenthesized(p: Parser<char>) -> Parser<char> {
-    delim("parentheses", c('('), p, c(')'))
+    region(
+        "parentheses",
+        toss('('),
+        p,
+        toss(')'),
+    )
 }
 ```
 

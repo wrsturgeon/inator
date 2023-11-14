@@ -2,3 +2,4 @@
 **/target/
 **/result
 **/examples/**/Cargo.lock
+**/autogen.rs

@@ -57,5 +57,11 @@ mod prop {
             );
             parser.accept(input).is_ok()
         }
+
+        fn region_depth_one(open: Parser<u8>, contents: Parser<u8>, close: Parser<u8>, input: Vec<u8>) -> bool {
+            let seq = open.clone() >> contents.clone() >> close.clone();
+            let reg = region("region", open, contents, close);
+            seq.accept(input.iter().copied()) == reg.accept(input)
+        }
     }
 }
