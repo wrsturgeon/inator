@@ -75,12 +75,16 @@ Plus, this approach to parsing requires zero allocations, so even microcontrolle
 
 Then we can take that whole above parser and pass it around, e.g. to put it in parentheses:
 ```rust
-# let a = toss('a');
-# let b = toss('b');
-# let c = toss('c');
-# let z = toss('z');
-# let abc_azc = a >> (b | z) >> c;
+// Copied from above:
+let a = toss('a');
+let b = toss('b');
+let c = toss('c');
+let z = toss('z');
+let abc_azc = a >> (b | z) >> c;
+
+// Function from a parser to another parser!
 let parenthesized = |p| toss('(') >> p >> toss(')');
+
 let paren_abc_azc = parenthesized(
     abc_azc, // <-- Parser we just made above, passed around as data
 );
@@ -88,7 +92,7 @@ let paren_abc_azc = parenthesized(
 Above, if `p` is a parser that accepts `ABC`, then `parenthesized(p)` will accept `(ABC)`, and so on for any language other than `ABC`. Simple as that.
 
 If you need to _nest_ parentheses (or any other delimiters) and verify that everything matches up, there's a built-in function for that:
-```compile_fail
+```rust
 /// Delimit a region with three parsers: one opens, one parses the contents, and one closes.
 pub fn region<I: Input>(
     name: &'static str,
@@ -96,7 +100,10 @@ pub fn region<I: Input>(
     contents: Parser<I>,
     close: Parser<I>,
     combine: FF, // <-- Every parser returns a value, but after a call, we have two: what we had before, and the return value from the call. Combine them as you wish.
-) -> Parser<I> { ... }
+) -> Parser<I> {
+    // To make `rustdoc` happy:
+    inator::region(name, open, contents, close, combine)
+}
 ```
 Matching delimiters is the only use-case for the stack in this model of computation, but it's crucial nonetheless.
 
