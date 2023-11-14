@@ -291,7 +291,9 @@ impl<I: Input> Curry<I, usize> {
         match *self {
             Self::Wildcard(ref etc) => format!(
                 r#"
-            _ => {},"#,
+            _ => {{
+                {}
+            }}"#,
                 etc.to_src(),
             ),
             Self::Scrutinize {
@@ -318,7 +320,9 @@ impl<I: Input> RangeMap<I, usize> {
         self.0.iter().fold(String::new(), |acc, (k, v)| {
             format!(
                 r#"{acc}
-            {} => {},"#,
+            {} => {{
+                {}
+            }},"#,
                 k.to_src(),
                 v.to_src(),
             )
@@ -342,15 +346,15 @@ impl<I: Input> Transition<I, usize> {
             Self::Call {
                 region,
                 detour,
-                dst,
+                ref dst,
                 combine: FF { ref src, .. },
             } => format!(
-                r#"{{
+                "\
                 let detour = state_{detour}(input, (), Some(({}, index)))?;
                 let postprocessed = ({src})(acc, detour);
-                state_{dst}(input, postprocessed, stack_top)
-            }}"#,
+                {}",
                 region.to_src(),
+                dst.to_src(),
             ),
             Self::Return { region } => {
                 format!(

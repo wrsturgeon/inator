@@ -92,7 +92,7 @@ impl<I: Input, C: Ctrl<I>> Transition<I, C> {
             } => Self::Call {
                 region,
                 detour: detour.clone().map_indices(update_fn),
-                dst: dst.clone().map_indices(update_fn),
+                dst: Box::new(dst.clone().map_indices(update_fn)),
                 combine: combine.clone(),
             },
             Self::Return { region } => Self::Return { region },
