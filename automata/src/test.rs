@@ -35,6 +35,129 @@ fn splittable<I: Input, C: Ctrl<I>>(parser: &Graph<I, C>, input: &[I]) -> bool {
     }
 }
 
+mod unit {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn call_empty_structural() {
+        let empty = Deterministic::<char> {
+            states: vec![State {
+                transitions: Curry::Scrutinize {
+                    filter: RangeMap(BTreeMap::new()),
+                    fallback: None,
+                },
+                non_accepting: BTreeSet::new(),
+            }],
+            initial: 0,
+        };
+        assert_eq!(
+            empty.clone() ^ ("region", empty, ff!(|(), ()| ())),
+            Graph {
+                states: vec![State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(iter::once(((), ())).collect()),
+                        fallback: None
+                    },
+                    non_accepting: "TODO"
+                }],
+                initial: 0
+            }
+        );
+    }
+
+    /*
+    #[test]
+    fn call_simple_structural() {
+        let single_char = |c| Graph {
+            states: vec![
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            iter::once((
+                                Range::unit(c),
+                                Transition::Lateral {
+                                    dst: 1,
+                                    update: None,
+                                },
+                            ))
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: iter::once("not accepting".to_owned()).collect(),
+                },
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: None,
+                    },
+                    non_accepting: BTreeSet::new(),
+                },
+            ],
+            initial: 0,
+        };
+        let a = single_char('a');
+        let b = single_char('b');
+        let ab = Graph {
+            states: vec![
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            iter::once((
+                                Range::unit('a'),
+                                Transition::Call {
+                                    region: "ab",
+                                    detour: 1,
+                                    dst: Box::new(Transition::Lateral {
+                                        dst: 2,
+                                        update: None,
+                                    }),
+                                    combine: ff!(|(), ()| ()),
+                                },
+                            ))
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: iter::once("not accepting".to_owned()).collect(),
+                },
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(
+                            iter::once((
+                                Range::unit('b'),
+                                Transition::Call {
+                                    region: "ab",
+                                    detour: 1,
+                                    dst: Box::new(Transition::Lateral {
+                                        dst: 2,
+                                        update: None,
+                                    }),
+                                    combine: ff!(|(), ()| ()),
+                                },
+                            ))
+                            .collect(),
+                        ),
+                        fallback: None,
+                    },
+                    non_accepting: iter::once("not accepting".to_owned()).collect(),
+                },
+                State {
+                    transitions: Curry::Scrutinize {
+                        filter: RangeMap(BTreeMap::new()),
+                        fallback: None,
+                    },
+                    non_accepting: BTreeSet::new(),
+                },
+            ],
+            initial: 0,
+        };
+        assert_eq!(a ^ ("ab", b, ff!(|(), ()| ())), ab);
+    }
+    */
+}
+
 #[cfg(feature = "quickcheck")]
 mod prop {
     use super::*;

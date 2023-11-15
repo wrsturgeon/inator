@@ -25,7 +25,7 @@ pub fn region<I: Input>(
     open: Parser<I>,
     contents: Parser<I>,
     mut close: Parser<I>,
-    combine: FF,
+    combine: FF, // <-- Every parser returns a value, but after a call, we have two: what we had before, and the return value from the call. Combine them as you wish.
 ) -> Parser<I> {
     // Split `close` into accepting and non-accepting states.
     // Move all accepting states out of `close` and into the post-return `dst` position.
