@@ -3,3 +3,4 @@
 **/result
 **/examples/**/Cargo.lock
 **/autogen.rs
+**/.direnv/
