@@ -319,7 +319,7 @@ impl<I: Input, C: Ctrl<I>> Graph<I, C> {
                     ref mut fallback,
                 } => {
                     filter.star(&s.initial, &accepting);
-                    if let &mut Some(ref mut f) = fallback {
+                    if let Some(ref mut f) = *fallback {
                         f.star(&s.initial, &accepting);
                     }
                 }

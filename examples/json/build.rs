@@ -10,5 +10,5 @@ fn main() -> Result<io::Result<()>, IllFormed<I, usize>> {
 
     let parser = empty;
 
-    parser.determinize().unwrap().to_file("src/parser.rs")
+    parser.determinize().unwrap().to_file("src/autogen.rs")
 }

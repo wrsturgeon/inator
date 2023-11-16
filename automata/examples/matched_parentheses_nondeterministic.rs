@@ -38,10 +38,10 @@ fn shitpost<R: RngCore>(rng: &mut R) -> String {
     let mut s = String::new();
     loop {
         let i = rng.next_u32();
-        if i & 2 == 0 {
+        if (i & 2) == 0 {
             return s;
         }
-        s.push(if i & 1 == 0 { '(' } else { ')' });
+        s.push(if (i & 1) == 0 { '(' } else { ')' });
     }
 }
 

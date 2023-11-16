@@ -1,6 +1,6 @@
 #![allow(unreachable_code, unused_variables)]
 
-mod parser;
+mod autogen;
 
 use rand::{thread_rng, RngCore};
 
@@ -55,7 +55,7 @@ fn main() {
     for _ in 0..50 {
         let s = generate(&mut rng, 32);
         println!("\"{s}\"");
-        assert_eq!(parser::parse(s.chars()), Ok(()));
+        assert_eq!(autogen::parse(s.chars()), Ok(()));
     }
 
     // Reject all invalid strings
@@ -63,9 +63,9 @@ fn main() {
         let s = shitpost(&mut rng);
         println!("\"{s}\"");
         if accept(s.chars()) {
-            assert_eq!(parser::parse(s.chars()), Ok(()));
+            assert_eq!(autogen::parse(s.chars()), Ok(()));
         } else {
-            assert!(parser::parse(s.chars()).is_err());
+            assert!(autogen::parse(s.chars()).is_err());
         }
     }
 }

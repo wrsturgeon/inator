@@ -156,10 +156,15 @@ macro_rules! get_mut {
 
 // TODO: derive ToSrc
 
+mod region;
+
 #[cfg(test)]
 mod test;
 
-pub use inator_automata::{Deterministic as Parser, *};
+pub use {
+    inator_automata::{Deterministic as Parser, *},
+    region::region,
+};
 
 use core::iter;
 use std::collections::{BTreeMap, BTreeSet};
@@ -222,10 +227,10 @@ pub fn on_any_of<I: Input>(range: Range<I>, update: Update<I>) -> Deterministic<
     }
 }
 
-/// Accept exactly this range of tokens and forget their values.
+/// Accept exactly this range of tokens and do exactly these things.
 #[inline]
 #[must_use]
-pub fn any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
+pub fn toss_any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
     Graph {
         states: vec![
             State {
@@ -261,9 +266,23 @@ pub fn any_of<I: Input>(range: Range<I>) -> Deterministic<I> {
     }
 }
 
+/// Accept exactly this range of tokens and forget their values.
+#[inline]
+#[must_use]
+pub fn on<I: Input>(token: I, update: Update<I>) -> Deterministic<I> {
+    on_any_of(Range::unit(token), update)
+}
+
 /// Accept exactly this token and forget its value.
 #[inline]
 #[must_use]
 pub fn toss<I: Input>(token: I) -> Deterministic<I> {
-    any_of(Range::unit(token))
+    toss_range(Range::unit(token))
+}
+
+/// Accept exactly this token and do nothing.
+#[inline]
+#[must_use]
+pub fn toss_range<I: Input>(range: Range<I>) -> Deterministic<I> {
+    toss_any_of(range)
 }

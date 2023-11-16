@@ -1,4 +1,4 @@
-// mod parser;
+// mod autogen;
 
 #[cfg(test)]
 mod test;
