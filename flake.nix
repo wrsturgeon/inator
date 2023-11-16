@@ -1,32 +1,18 @@
 {
   inputs = {
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    fenix.url = "github:nix-community/fenix";
     flake-utils.url = "github:numtide/flake-utils";
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    naersk.url = "github:nix-community/naersk";
   };
-  outputs = { fenix, flake-utils, naersk, nixpkgs, self }:
+  outputs = { fenix, flake-utils, naersk, self }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         name = "inator";
-        # pkgs = (import nixpkgs) { inherit system; };
-        # naersk' = pkgs.callPackage naersk { };
-        naersk' = (naersk.lib.${system}.override {
+        naersk' = naersk.lib.${system}.override {
           cargo = toolchain;
           rustc = toolchain;
-        });
+        };
         settings = {
-          # cargoBuildOptions = orig: orig ++ [ "--examples" ];
-          # doCheck = true;
-          doDocFail = true;
-          gitAllRefs = true;
-          gitSubmodules = true;
           pname = "${name}";
           src = ./.;
         };
