@@ -15,8 +15,6 @@ fi
 set -u
 
 # Update our workbench
-rustup self update || :
-rustup update || :
 rustup toolchain install nightly || :
 rustup component add clippy miri rustfmt
 git submodule update --init --recursive --remote
